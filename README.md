@@ -27,28 +27,28 @@ Movement in 3 dimensions
 - [ ] 
 - [ ] 
 
-#### v0.2
+#### v0.3
 Suction cup and manual pickup
 - [ ] 
 - [ ] 
 - [ ] 
 - [ ] 
 
-#### v0.3
+#### v0.4
 Implementation of conveyor belt
 - [ ] 
 - [ ] 
 - [ ] 
 - [ ] 
 
-#### v0.4
+#### v0.5
 Material Detection
 - [ ] 
 - [ ] 
 - [ ] 
 - [ ] 
 
-#### v0.5
+#### v0.6
 Pickup of materical and sorting
 - [ ] 
 - [ ] 
