@@ -13,9 +13,22 @@ Physical robot with inspiration from:
 ### List of components
 - ()
 
-### Design aim:
-#### v0
+### Design stages:
+#### v0.1
+Physical model and movement in 2 dimensions
+- [ ] Movement in 1 dimension
+- [ ] Movement in 2 dimensions
+- [ ] Full 3D Square physical model
+#### v0.2
+Physical model and movement in 2 dimensions
 - [ ] 
-#### v0.5
+- [ ] 
+- [ ] 
+- [ ] 
 
-#### v1
+#### v0.3
+Physical model and movement in 2 dimensions
+- [ ] 
+- [ ] 
+- [ ] 
+- [ ] 
