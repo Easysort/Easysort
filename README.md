@@ -2,7 +2,7 @@
 Under development...
 
 Physical robot with inspiration from:
-1. Surgery robot: [Micheal Reaves]()
+1. Surgery robot: [Micheal Reaves](https://www.youtube.com/watch?v=A_BlNA7bBxo&t=383s&ab_channel=MichaelReeves)
 2. Robotic arm with suction cup: [Automatic Addiction](https://automaticaddison.com/robotic-arm-with-vacuum-suction-cup-for-pick-and-place/)
 3. [DIY CNC Machine](https://www.youtube.com/watch?v=covhU4L5N5g&ab_channel=BenMakesEverything)
 4. [4 axis scara Z-arm](https://www.youtube.com/watch?v=e11BQrpTd9I&ab_channel=HITBOTROBOTICS)
