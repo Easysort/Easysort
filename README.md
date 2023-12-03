@@ -4,14 +4,11 @@ Under development...
 Physical robot with inspiration from:
 1. Surgery robot: [Micheal Reaves]()
 2. Robotic arm with suction cup: [Automatic Addiction](https://automaticaddison.com/robotic-arm-with-vacuum-suction-cup-for-pick-and-place/)
-3. [Micheal Reaves]()
-4. [Micheal Reaves]()
+3. [DIY CNC Machine](https://www.youtube.com/watch?v=covhU4L5N5g&ab_channel=BenMakesEverything)
+4. [Conveyor belt](https://www.youtube.com/watch?v=qoejrZhn5XI&ab_channel=EasyHomeMadeProjects)
 
 ### Design considerations:
 - Robot arm is hard,
-
-### List of components
-- ()
 
 ### Design stages:
 #### v0.1
