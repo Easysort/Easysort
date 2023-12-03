@@ -1,4 +1,6 @@
 # ReUseSortingBot
+Project for me to learn basics of mechatronics + some 3d modelling and printing
+
 Under development...
 
 Physical robot with inspiration from:
@@ -8,6 +10,8 @@ Physical robot with inspiration from:
 4. [4 axis scara Z-arm](https://www.youtube.com/watch?v=e11BQrpTd9I&ab_channel=HITBOTROBOTICS)
 5. [Conveyor belt](https://www.youtube.com/watch?v=qoejrZhn5XI&ab_channel=EasyHomeMadeProjects)
 
+### Design components:
+- 
 
 ### Design considerations:
 - Robot arm is hard,
