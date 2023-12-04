@@ -11,7 +11,7 @@ Physical robot with inspiration from:
 5. [Conveyor belt](https://www.youtube.com/watch?v=qoejrZhn5XI&ab_channel=EasyHomeMadeProjects)
 
 ### Design components:
-- 
+- [Suction cup](https://www.amazon.co.uk/Suction-Gripper-Mechanical-Controller-Intelligent/dp/B0C373ML4X/ref=sr_1_17?crid=3VAWPE1RVIUCW&keywords=suction%2Bcup%2Brobot%2Barm&qid=1701639653&sprefix=suction%2Bcup%2Brobot%2Barm%2Caps%2C82&sr=8-17&th=1)
 
 ### Design considerations:
 - Robot arm is hard,
