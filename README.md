@@ -3,6 +3,8 @@ Project for me to learn basics of mechatronics + some 3d modelling and printing
 
 Under development...
 
+See Wiki for more information
+
 Physical robot with inspiration from:
 1. Surgery robot: [Micheal Reaves](https://www.youtube.com/watch?v=A_BlNA7bBxo&t=383s&ab_channel=MichaelReeves)
 2. Robotic arm with suction cup: [Automatic Addiction](https://automaticaddison.com/robotic-arm-with-vacuum-suction-cup-for-pick-and-place/)
