@@ -17,11 +17,6 @@ Physical robot with inspiration from:
 ### Design components:
 - [Suction cup](https://www.amazon.co.uk/Suction-Gripper-Mechanical-Controller-Intelligent/dp/B0C373ML4X/ref=sr_1_17?crid=3VAWPE1RVIUCW&keywords=suction%2Bcup%2Brobot%2Barm&qid=1701639653&sprefix=suction%2Bcup%2Brobot%2Barm%2Caps%2C82&sr=8-17&th=1)
 
-### Design considerations:
-The aim is to develop a robot able to pick up materials from a moving coneyor belt and sort them. The following considerations were made:
-- Robot arm is hard, not only to build due to weight distribution, narrow spaces, but also to get kinematics working correctly (especially if more than 3 dof). 
-- CNC inspired machine could be good. Allows for 1) building each dof slowly, test and progress, 2) more space for motors and 3) relatively easy to program as only one movement in each dimension.
-
 ### Where is this project currently?
 See [tests]()
 
