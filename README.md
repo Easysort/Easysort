@@ -1,9 +1,7 @@
 # ReUseSortingBot
-Project for me to learn basics of mechatronics + some 3d modelling and printing
+Project for me to learn basics of mechatronics & design + some 3d modelling and printing
 
 Under development...
-
-See Wiki for more information
 
 Physical robot with inspiration from:
 1. Surgery robot: [Micheal Reaves](https://www.youtube.com/watch?v=A_BlNA7bBxo&t=383s&ab_channel=MichaelReeves)
@@ -20,46 +18,22 @@ Physical robot with inspiration from:
 - [Suction cup](https://www.amazon.co.uk/Suction-Gripper-Mechanical-Controller-Intelligent/dp/B0C373ML4X/ref=sr_1_17?crid=3VAWPE1RVIUCW&keywords=suction%2Bcup%2Brobot%2Barm&qid=1701639653&sprefix=suction%2Bcup%2Brobot%2Barm%2Caps%2C82&sr=8-17&th=1)
 
 ### Design considerations:
-- Robot arm is hard,
+The aim is to develop a robot able to pick up materials from a moving coneyor belt and sort them. The following considerations were made:
+- Robot arm is hard, not only to build due to weight distribution, narrow spaces, but also to get kinematics working correctly (especially if more than 3 dof). 
+- CNC inspired machine could be good. Allows for 1) building each dof slowly, test and progress, 2) more space for motors and 3) relatively easy to program as only one movement in each dimension.
 
-### Design stages:
-#### v0.1
-Physical model and movement in 2 dimensions
+### Where is this project currently?
+See [tests]()
+
+### Design specifications:
+A collection of requirements the machine has to meet:
 - [ ] Movement in 1 dimension
 - [ ] Movement in 2 dimensions
-- [ ] Full 3D Square physical model
-
-#### v0.2
-Movement in 3 dimensions
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
-
-#### v0.3
-Suction cup and manual pickup
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
-
-#### v0.4
-Implementation of conveyor belt
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
-
-#### v0.5
-Material Detection
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
-
-#### v0.6
-Pickup of materical and sorting
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
+- [ ] Movement in 3 dimensions
+- [ ] Suction cup and manual pickup
+- [ ] Implementation of conveyor belt
+- [ ] Material Detection
+- [ ] Pickup of static material
+- [ ] Pickup of moving material
+- [ ] Pickup of materical and sorting
+- [ ] Pickup of material in heterogenic input
