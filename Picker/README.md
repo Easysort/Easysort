@@ -10,3 +10,7 @@ The aim is to develop a robot able to pick up materials from a moving coneyor be
 Should be able to pickup items from a moving conveyor belt and sort in boxes
 
 **See (README) for design specifications**
+
+### Videos:
+1. [Delta Robot](https://www.youtube.com/watch?v=Njs0FU6PfPg&ab_channel=NikodemBartnik)
+2. [Small CNC](https://www.youtube.com/watch?v=Njs0FU6PfPg&ab_channel=NikodemBartnik)
