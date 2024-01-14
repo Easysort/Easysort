@@ -1,10 +1,12 @@
 import cv2
-from transformers import DetrImageProcessor, DetrForObjectDetection
+from transformers import DetrImageProcessor, DetrForObjectDetection, YolosImageProcessor, YolosForObjectDetection
 import torch
 
-# Load the DETR model and processor
-processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50", revision="no_timm")
-model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", revision="no_timm")
+processor = YolosImageProcessor.from_pretrained("hustvl/yolos-tiny")
+model = YolosForObjectDetection.from_pretrained('hustvl/yolos-tiny')
+
+# processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50", revision="no_timm")
+# model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", revision="no_timm")
 
 # Set the device to GPU if available
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
