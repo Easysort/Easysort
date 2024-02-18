@@ -1,6 +1,7 @@
 import cv2
 import torch
 from ultralytics import YOLO
+import math
 
 model = YOLO("/Users/lucasvilsen/Desktop/ReUse/vision/runs/train/weights/best.pt")
 
@@ -23,7 +24,30 @@ while True:
         masks = result.masks  # Masks object for segmentation masks outputs
         keypoints = result.keypoints  # Keypoints object for pose outputs
         probs = result.probs  # Probs object for classification outputs
-        result.show()  # display to screen
+        names = model.names
+        # result.show()  # display to screen
+
+        for box in boxes:
+            x1, y1, x2, y2 = box.xyxy[0]
+            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 255), 3)
+
+            confidence = math.ceil((box.conf[0]*100))/100
+            cls = int(box.cls[0])
+
+            org = [x1, y1]
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            fontScale = 1
+            color = (255, 0, 0)
+            thickness = 2
+
+            cv2.putText(frame, names[cls], org, font, fontScale, color, thickness)
+
+        masks = result.masks  # Masks object for segmentation masks outputs
+        keypoints = result.keypoints  # Keypoints object for pose outputs
+        probs = result.probs  # Probs object for classification outputs
+        # result.show()  # display to screen
 
     # Display the resulting frame
     cv2.imshow('DETR Object Detection', frame)
