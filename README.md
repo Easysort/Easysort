@@ -1,4 +1,7 @@
 # ReUseSortingBot
+
+See [Linear](https://linear.app/reuse) for issues, vision, etc.
+
 Project for me to learn basics of mechatronics & design + some 3d modelling and printing
 
 Under development...
