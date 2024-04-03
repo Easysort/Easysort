@@ -2,7 +2,7 @@
 
 <h1>EasySort</h1>
 
-EasySort: An open-source trash sorting system. Maintained by [Lucas Vilsen](https://tinygrad.org).
+EasySort: An open-source trash sorting system. Maintained by [Lucas Vilsen](https://github.com/Apros7).
 </div>
 
 ---
