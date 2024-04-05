@@ -16,5 +16,5 @@ Given a picture it will give the center location, a descriptive label and the co
 ...
 
 # Why open-source?
-I believe this is a positive-sum game. The market is so large that we can all win. This technology should be so cheap that it exists everywhere on earth.
+I believe this is a positive-sum game. The market is so large that we can all win. This technology should be so cheap that it exists everywhere on earth helping everyone better take of their trash.
 
