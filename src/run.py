@@ -3,12 +3,14 @@
 # When an object is found
 # it returns the type and midpoint.
 
+# NOT DONE
+
 import cv2
 import torch
 from ultralytics import YOLO
 import math
 
-model = YOLO("/Users/lucasvilsen/Desktop/ReUse/vision/runs/train/weights/best.pt")
+model = YOLO("/Users/lucasvilsen/Desktop/EasySort/vision/runs/train/weights/best.pt")
 
 # Set the device to GPU if available
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
