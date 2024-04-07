@@ -1,7 +1,9 @@
 from ultralytics import YOLO
+import os
 
 model = YOLO("yolov8n.pt")  # load a pretrained model (recommended for training)
 
+base_path = "/Users/lucasvilsen/Desktop/EasySort"
 data_yaml = "/Users/lucasvilsen/Desktop/EasySort/vision/recycle.v6i.yolov8/data.yaml"
 save_dir = "/Users/lucasvilsen/Desktop/ReUse/vision/runs"
 
