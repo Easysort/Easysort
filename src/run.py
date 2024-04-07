@@ -1,3 +1,8 @@
+# This script runs the best performing model
+# It continuously evaluates the camera
+# When an object is found
+# it returns the type and midpoint.
+
 import cv2
 import torch
 from ultralytics import YOLO
@@ -7,7 +12,7 @@ model = YOLO("/Users/lucasvilsen/Desktop/ReUse/vision/runs/train/weights/best.pt
 
 # Set the device to GPU if available
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("mps" if torch.cuda.is_available() else "cpu")
+device = torch.device("mps")
 model = model.to(device)
 
 # Open a connection to the camera (0 is usually the default camera)
