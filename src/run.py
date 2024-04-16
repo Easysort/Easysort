@@ -19,26 +19,32 @@ model = model.to(device)
 
 # Open a connection to the camera (0 is usually the default camera)
 cap = cv2.VideoCapture(0)
+window_name = 'DETR Object Detection'
+cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+cv2.resizeWindow(window_name, 800, 600)  # Adjust the size as needed
 
 while True:
     # Capture frame-by-frame
     ret, frame = cap.read()
+    if not ret:
+        break
+
+    # Create a blank frame to draw the bounding boxes on
+    output_frame = frame.copy()
+
+    # Perform object detection on the frame
     results = model(frame, stream=True)
 
-    # Draw bounding boxes on the frame
+    # Draw bounding boxes on the output frame
     for result in results:
-        boxes = result.boxes  # Boxes object for bounding box outputs
-        masks = result.masks  # Masks object for segmentation masks outputs
-        keypoints = result.keypoints  # Keypoints object for pose outputs
-        probs = result.probs  # Probs object for classification outputs
+        boxes = result.boxes
         names = model.names
-        # result.show()  # display to screen
 
         for box in boxes:
             x1, y1, x2, y2 = box.xyxy[0]
             x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
 
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 255), 3)
+            cv2.rectangle(output_frame, (x1, y1), (x2, y2), (255, 0, 255), 3)
 
             confidence = math.ceil((box.conf[0]*100))/100
             cls = int(box.cls[0])
@@ -49,15 +55,10 @@ while True:
             color = (255, 0, 0)
             thickness = 2
 
-            cv2.putText(frame, names[cls], org, font, fontScale, color, thickness)
-
-        masks = result.masks  # Masks object for segmentation masks outputs
-        keypoints = result.keypoints  # Keypoints object for pose outputs
-        probs = result.probs  # Probs object for classification outputs
-        # result.show()  # display to screen
+            cv2.putText(output_frame, names[cls], org, font, fontScale, color, thickness)
 
     # Display the resulting frame
-    cv2.imshow('DETR Object Detection', frame)
+    cv2.imshow(window_name, output_frame)
 
     # Break the loop if 'q' key is pressed
     if cv2.waitKey(1) & 0xFF == ord('q'):
