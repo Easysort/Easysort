@@ -9,6 +9,7 @@ import cv2
 import torch
 from ultralytics import YOLO
 import math
+import numpy as np
 
 model = YOLO("/Users/lucasvilsen/Desktop/EasySort/vision/runs/train/weights/best.pt")
 
@@ -22,6 +23,11 @@ cap = cv2.VideoCapture(0)
 window_name = 'DETR Object Detection'
 cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 cv2.resizeWindow(window_name, 800, 600)  # Adjust the size as needed
+
+def calculate_farthest_point(box):
+    x1, y1, x2, y2 = box.xyxy[0]
+    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+    return (x1+x2)//2, (y1+y2)//2
 
 while True:
     # Capture frame-by-frame
@@ -40,6 +46,8 @@ while True:
         boxes = result.boxes
         names = model.names
 
+        print("-----------------\nDETECTION:")
+
         for box in boxes:
             x1, y1, x2, y2 = box.xyxy[0]
             x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
@@ -56,6 +64,8 @@ while True:
             thickness = 2
 
             cv2.putText(output_frame, names[cls], org, font, fontScale, color, thickness)
+            cv2.drawMarker(output_frame, calculate_farthest_point(box), (0, 255, 0), markerType=cv2.MARKER_CROSS, markerSize=10, thickness=2)
+            print(f"{names[cls]} at {calculate_farthest_point(box)}")
 
     # Display the resulting frame
     cv2.imshow(window_name, output_frame)
