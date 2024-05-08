@@ -42,8 +42,8 @@ while True:
     # Check for the 'r' key to start recording
     if key == ord('r'):
         if not recording:
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')
-            out = cv2.VideoWriter(os.path.join(data_folder, f'recorded_video{int(time.time())}.avi'), fourcc, 20.0, (640, 480))
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(os.path.join(data_folder, f'recorded_video{int(time.time())}.mp4'), fourcc, 30.0, (1280, 720))
             print("Recording started. Press 's' to stop recording.")
             recording = True
         else:
@@ -58,6 +58,7 @@ while True:
 
     # Write the frame to the video file if recording
     if recording:
+        print("recording...\n-----\n")
         out.write(frame)
 
     # Add a delay to ensure the window is updated
