@@ -9,6 +9,7 @@ import subprocess
 import os
 import cv2
 import time
+import logging
 
 def get_data_folder(): return os.path.join(subprocess.check_output(["git", "rev-parse", "--show-toplevel"]).decode('utf-8').strip("\n"), "data")
 
@@ -37,13 +38,27 @@ class DataRecorder:
             _, frame = self.cap.read()
             cv2.imshow("Camera", self.add_description(frame))
             key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'): break
+            if key == ord('q'): self.quit(); break
             if key == ord('r'): self.record(start=True)
             if key == ord('s'): self.record(start=False)
 
 class DataViewer:
     def __init__(self):
         self.data_folder = get_data_folder()
+        self.files = os.listdir(self.data_folder)
+        logging.info("\n".join(["You can choose from the following list: ", "--------", *self.files, "--------"]))
+
+    def quit(self): self.cap.release(); cv2.destroyAllWindows()
+    
+    def view(self, index):
+        if index > len(self.files) - 1: logging.warning(f"Your index is {index}, but max is {len(self.files) - 1}, so setting it to 0"); index = 0
+        file_to_view = os.path.join(self.data_folder, self.files[index])
+        logging.info(f"Viewing: {file_to_view}")
+        self.cap = cv2.VideoCapture(file_to_view)
+        while (self.cap.isOpened()): 
+            _, frame = self.cap.read()
+            cv2.imshow("frame", frame)
+            if cv2.waitKey(25) & 0xFF == ord('q'): self.quit(); break
 
 class DataExplorer:
     """
@@ -51,4 +66,5 @@ class DataExplorer:
     """
 
 if __name__ == "__main__":
-    DataRecorder().run()
+    # DataRecorder().run()
+    DataViewer().view(0)
