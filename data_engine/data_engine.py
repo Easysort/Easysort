@@ -13,7 +13,10 @@ import logging
 
 def get_data_folder(): return os.path.join(subprocess.check_output(["git", "rev-parse", "--show-toplevel"]).decode('utf-8').strip("\n"), "data")
 
-class DataRecorder:
+class DataBase():
+    def quit(self): self.cap.release(); cv2.destroyAllWindows()
+
+class DataRecorder(DataBase):
     def __init__(self):
         self.data_folder = get_data_folder()
         if not os.path.exists(self.data_folder): os.makedirs(self.data_folder)
@@ -22,8 +25,8 @@ class DataRecorder:
         self.out = None
         self.cap = cv2.VideoCapture(0)
         self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        super().__init__()
 
-    def quit(self): self.cap.release(); cv2.destroyAllWindows()
     def add_description(self, frame): 
         return cv2.rectangle(frame, (10, 10), (50, 30), (0, 0, 255), 2) if self.recording else cv2.rectangle(frame, (10, 10), (50, 30), (128, 128, 128), 2)
 
@@ -42,13 +45,12 @@ class DataRecorder:
             if key == ord('r'): self.record(start=True)
             if key == ord('s'): self.record(start=False)
 
-class DataViewer:
+class DataViewer(DataBase):
     def __init__(self):
         self.data_folder = get_data_folder()
         self.files = os.listdir(self.data_folder)
         logging.info("\n".join(["You can choose from the following list: ", "--------", *self.files, "--------"]))
-
-    def quit(self): self.cap.release(); cv2.destroyAllWindows()
+        super().__init__()
     
     def view(self, index):
         if index > len(self.files) - 1: logging.warning(f"Your index is {index}, but max is {len(self.files) - 1}, so setting it to 0"); index = 0
