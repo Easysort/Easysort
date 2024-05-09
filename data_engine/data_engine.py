@@ -1,8 +1,7 @@
 """
 Data Engine classes
-- DataRecorder: Used to record and store new videos (POST)
-- DataViewer:   Used to view video                  (GET)
-- DataExplorer: Used to load, get and explore data  (GET)
+- DataRecorder: Used to record and store new videos         (POST)
+- DataExplorer: Used to load, get, sort and explore data    (GET)
 """
 
 import subprocess
@@ -45,7 +44,7 @@ class DataRecorder(DataBase):
             if key == ord('r'): self.record(start=True)
             if key == ord('s'): self.record(start=False)
 
-class DataViewer(DataBase):
+class DataExplorer(DataBase):
     def __init__(self):
         self.data_folder = get_data_folder()
         self.files = os.listdir(self.data_folder)
@@ -62,11 +61,6 @@ class DataViewer(DataBase):
             cv2.imshow("frame", frame)
             if cv2.waitKey(25) & 0xFF == ord('q'): self.quit(); break
 
-class DataExplorer:
-    """
-    
-    """
-
 if __name__ == "__main__":
     # DataRecorder().run()
-    DataViewer().view(0)
+    DataExplorer().view(0)
