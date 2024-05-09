@@ -62,5 +62,5 @@ class DataExplorer(DataBase):
             if cv2.waitKey(25) & 0xFF == ord('q'): self.quit(); break
 
 if __name__ == "__main__":
-    # DataRecorder().run()
-    DataExplorer().view(0)
+    DataRecorder().run()
+    # DataExplorer().view(0)
