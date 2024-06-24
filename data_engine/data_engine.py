@@ -9,6 +9,9 @@ import os
 import cv2
 import time
 import logging
+from datetime import datetime
+
+logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s, %(levelname)s]: %(message)s')
 
 def get_data_folder(): return os.path.join(subprocess.check_output(["git", "rev-parse", "--show-toplevel"]).decode('utf-8').strip("\n"), "data")
 
@@ -23,16 +26,20 @@ class DataRecorder(DataBase):
         self.recording = False
         self.out = None
         self.cap = cv2.VideoCapture(0)
-        self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        self.fourcc = cv2.VideoWriter_fourcc(*'avc1')
+        # self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         super().__init__()
 
     def add_description(self, frame): 
         return cv2.rectangle(frame, (10, 10), (50, 30), (0, 0, 255), 2) if self.recording else cv2.rectangle(frame, (10, 10), (50, 30), (128, 128, 128), 2)
+    
+    def get_savename(self):
+        return f't1_{datetime.now().strftime("%d_%m_%y")}.mp4'
 
     def record(self, start): 
         if not start and self.recording: self.out.release(); self.recording = False; self.out = None
         if not self.recording and start: 
-            self.out = cv2.VideoWriter(os.path.join(self.data_folder, f'recorded_video{int(time.time())}.mp4'), self.fourcc, 30.0, (1280, 720))
+            self.out = cv2.VideoWriter(os.path.join(self.data_folder, self.get_savename()), self.fourcc, 30.0, (1280, 720))
             self.recording = True
 
     def run(self):
@@ -63,4 +70,4 @@ class DataExplorer(DataBase):
 
 if __name__ == "__main__":
     DataRecorder().run()
-    # DataExplorer().view(0)
+    # DataExplorer().view(1)
