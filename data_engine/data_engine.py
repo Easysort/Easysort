@@ -64,15 +64,15 @@ class DataRecorder(BaseModel):
             if key == ord('s'): self.record(start=False)
 
 class DataExplorer(BaseModel):
-    def __init__(self, data_folder_to_explore: str = "new"):
-        if data_folder_to_explore not in ["new", "verified"]:
-            raise LookupError(f"Data folder to explore has to be one of {["new", "verified"]}, but is {data_folder_to_explore}")
+    def __init__(self, explore: str = "new"):
+        self.check_new_folder()
+        if explore not in ["new", "verified"]:
+            raise LookupError(f"Data folder to explore has to be one of {["new", "verified"]}, but is {explore}")
         self.fps = 10
-        self.data_folder = os.path.join(get_top_folder(), "data", data_folder_to_explore)
-        self.files = os.listdir(self.data_folder)
+        self.data_folder = os.path.join(get_top_folder(), "data", explore)
+        self.files = sorted(os.listdir(self.data_folder))
         logging.info("\n".join(["You can choose from the following list: ", "--------", 
                                 *[f"{l}: {df}" for l, df in enumerate(self.files)], "--------"]))
-        self.check_new_folder()
         super().__init__(None)
 
     def check_new_folder(self):
@@ -137,7 +137,7 @@ class DataExplorer(BaseModel):
     def delete(self, file_path):
         # Operation not permitted: '/Users/lucasvilsen/Desktop/EasySort/data/new/d_2024-06-25_1'
         if os.path.exists(file_path):
-            os.remove(file_path)
+            shutil.rmtree(file_path)
 
     def _view(self, index: int = None):
         file_to_view = os.path.join(self.data_folder, self.files[index])
@@ -175,6 +175,6 @@ class DataExplorer(BaseModel):
 
 if __name__ == "__main__":
     # DataRecorder().run()
-    DataExplorer().view(3)
+    DataExplorer(explore = "verified").view(-1)
 
 # MISSING DELETE
