@@ -66,8 +66,8 @@ class DataRecorder(BaseModel):
 class DataExplorer(BaseModel):
     def __init__(self, explore: str = "new"):
         self.check_new_folder()
-        if explore not in ["new", "verified"]:
-            raise LookupError(f"Data folder to explore has to be one of {["new", "verified"]}, but is {explore}")
+        if explore not in ["new", "verified", "labelled"]:
+            raise LookupError(f"Data folder to explore has to be one of {["new", "verified", "labelled"]}, but is {explore}")
         self.fps = 10
         self.data_folder = os.path.join(get_top_folder(), "data", explore)
         self.files = sorted(os.listdir(self.data_folder))
