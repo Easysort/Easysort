@@ -11,7 +11,7 @@ from ultralytics import YOLO
 import math
 import numpy as np
 
-model = YOLO("/Users/lucasvilsen/Desktop/EasySort/runs/train/weights/best.pt")
+model = YOLO("/Users/lucasvilsen/Desktop/EasySort/runs/train4/weights/best.pt")
 
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = torch.device("mps")
