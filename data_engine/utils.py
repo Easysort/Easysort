@@ -9,12 +9,14 @@ def get_free_filename(date_str = None):
     """
     base_filename = "d"
     frames_folder = "data/new"
+    frames_folder2 = "data/verified"
     date_str = datetime.date.today().strftime("%Y-%m-%d") if date_str is None else date_str
     base_filename_with_date = f"{base_filename}_{date_str}"
 
     i = 0
     while True:
         filename = os.path.join(frames_folder, f"{base_filename_with_date}_{i}")
-        if not os.path.exists(filename):
+        filename2 = os.path.join(frames_folder2, f"{base_filename_with_date}_{i}")
+        if not os.path.exists(filename) and not os.path.exists(filename2):
             return filename
         i += 1

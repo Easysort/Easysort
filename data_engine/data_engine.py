@@ -19,10 +19,11 @@ logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s, %(levelname)s]: %
 def get_top_folder(): return subprocess.check_output(["git", "rev-parse", "--show-toplevel"]).decode('utf-8').strip("\n")
 
 class BaseModel():
-    def __init__(self, cap): self.cap = cap
+    def __init__(self, cap): self.cap = cap; self.should_quit = False
     def quit(self):
         if self.cap: self.cap.release()
         cv2.destroyAllWindows()
+        self.should_quit = True
 
 class DataRecorder(BaseModel):
     def __init__(self):
@@ -70,6 +71,8 @@ class DataExplorer(BaseModel):
             raise LookupError(f"Data folder to explore has to be one of {["new", "verified", "labelled"]}, but is {explore}")
         self.fps = 10
         self.data_folder = os.path.join(get_top_folder(), "data", explore)
+        self.pause = False
+        self.files_skipped = [] # when reloading folder, remember already skipped files
         self.files = sorted(os.listdir(self.data_folder))
         logging.info("\n".join(["You can choose from the following list: ", "--------", 
                                 *[f"{l}: {df}" for l, df in enumerate(self.files)], "--------"]))
@@ -104,24 +107,39 @@ class DataExplorer(BaseModel):
         font_scale = 0.5
         thickness = 1
 
-        cv2.rectangle(frame, (0, 0), (200, 120), (255, 255, 255), -1)
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (0, 0), (200, 120), (0, 0, 0), -1)
+        frame = frame.copy()
+        cv2.rectangle(frame, (0, 0), (280, 210), (255, 255, 255), -1)
 
-        text = "Press 'q' to quit"
+        text = "Press 'p' to (un)pause"
         cv2.putText(frame, text, (10, 20), font, font_scale, (0, 0, 0), thickness)
 
-        text = "Press 'a' to accept"
+        text = "Press 'q' to quit"
         cv2.putText(frame, text, (10, 40), font, font_scale, (0, 0, 0), thickness)
 
-        text = "Press 's' to skip"
+        text = "Press 'a' to accept"
         cv2.putText(frame, text, (10, 60), font, font_scale, (0, 0, 0), thickness)
 
-        text = "Press 'd' to delete"
+        text = "Press 's' to skip"
         cv2.putText(frame, text, (10, 80), font, font_scale, (0, 0, 0), thickness)
 
-        text = "Press 'r' to review"
+        text = "Press 'd' to delete"
         cv2.putText(frame, text, (10, 100), font, font_scale, (0, 0, 0), thickness)
+
+        text = "Press 'r' to review"
+        cv2.putText(frame, text, (10, 120), font, font_scale, (0, 0, 0), thickness)
+
+        text = "Press 'b' to back 1 frame"
+        cv2.putText(frame, text, (10, 140), font, font_scale, (0, 0, 0), thickness)
+
+        text = "Press 'n' to next 1 frames"
+        cv2.putText(frame, text, (10, 160), font, font_scale, (0, 0, 0), thickness)
+
+        text = "Press 'k' to delete prev. frame"
+        cv2.putText(frame, text, (10, 180), font, font_scale, (0, 0, 0), thickness)
+
+        text = "Press 'l' to accept prev. frames"
+        cv2.putText(frame, text, (10, 200), font, font_scale, (0, 0, 0), thickness)
+
 
         return frame
 
@@ -134,47 +152,88 @@ class DataExplorer(BaseModel):
         filename = os.path.basename(file_path)
         shutil.move(file_path, os.path.join(verified_dir, filename))
 
+    def accept_prev_frames(self, file_to_view, frame_files, up_to_index):
+        new_filename = get_free_filename(file_to_view.split("_")[-2])
+        verified_dir = 'data/verified'
+        if not os.path.exists(verified_dir):
+            os.makedirs(verified_dir)
+        filename = os.path.basename(new_filename)
+        frames_files_to_move = frame_files[:up_to_index]
+
+        new_dir = os.path.join(verified_dir, filename)
+        if not os.path.exists(new_dir):
+            os.makedirs(new_dir)
+
+        for file in frames_files_to_move:
+            shutil.move(os.path.join(file_to_view, file), new_dir)
+
+    def delete_files(self, file_to_view, frame_files, up_to_index):
+        for frame in frame_files[:up_to_index]:
+            os.remove(os.path.join(file_to_view, frame))
+
     def delete(self, file_path):
-        # Operation not permitted: '/Users/lucasvilsen/Desktop/EasySort/data/new/d_2024-06-25_1'
         if os.path.exists(file_path):
             shutil.rmtree(file_path)
+
+    # def _freeze(self, file_to_view, frame, frame_files, index, allow_pause):
+    #     while True:
+    #         cv2.imshow("frame", self.add_description(frame))
+    #         key = cv2.waitKey(1000//self.fps) & 0xFF
+    #         if key == ord('q'): self.quit(); return True
+    #         if key == ord('a'): self.accept(file_to_view); return True
+    #         if key == ord('s'): self.files_skipped.append(file_to_view); return True
+    #         if key == ord('d'): self.delete(file_to_view); return True
+    #         if key == ord('r'): self._view(index); self.pause = False; return True
+    #         if key == ord('p') and allow_pause: self.pause = not self.pause; return False
+    #         if key == ord('b'): self.delete_files(frame_files, index); self.pause = False; self._view(index); return False
+    #         if key == ord('n'): self.accept_prev_frames(file_to_view, frame_files, index); return True
 
     def _view(self, index: int = None):
         file_to_view = os.path.join(self.data_folder, self.files[index])
         logging.info(f"Viewing: {file_to_view}")
         frame_files = sorted(os.listdir(file_to_view))
-        for frame_file in frame_files:
-            frame_path = os.path.join(file_to_view, frame_file)
-            frame = cv2.imread(frame_path)
-            cv2.imshow("frame", self.add_description(frame.copy()))
-            key = cv2.waitKey(1000//self.fps) & 0xFF
-            if key == ord('q'): self.quit(); break
-            if key == ord('a'): self.accept(file_to_view); return
-            if key == ord('s'): return
-            if key == ord('d'): self.delete(file_to_view); return
-            if key == ord('r'): self._view(index); return
-        
+        frame_index = 0
+
         while True:
-            cv2.imshow("frame", self.add_description(frame.copy()))
+            cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
+            cv2.resizeWindow("frame", 800, 600)
+            frame_path = os.path.join(file_to_view, frame_files[frame_index])
+            frame = cv2.imread(frame_path)
+            cv2.imshow("frame", self.add_description(frame))
             key = cv2.waitKey(1000//self.fps) & 0xFF
             if key == ord('q'): self.quit(); break
-            if key == ord('a'): self.accept(file_to_view); return
-            if key == ord('s'): return
+            if key == ord('a'): self.accept(file_to_view); self.files_skipped.append(self.files[index]); return
+            if key == ord('s'): self.files_skipped.append(self.files[index]); return
             if key == ord('d'): self.delete(file_to_view); return
-            if key == ord('r'): self._view(index); return
+            if key == ord('r'): frame_index = 0; self.pause = False
+            if key == ord('p'): self.pause = not self.pause
+            if key == ord('b'): frame_index -= 1
+            if key == ord('n'): frame_index += 1
+            if key == ord('k'): self.delete_files(file_to_view, frame_files, frame_index); self.pause = False; frame_index = 0; return False
+            if key == ord('l'): self.accept_prev_frames(file_to_view, frame_files, frame_index); return True
+
+            if not self.pause:
+                frame_index += 1
+
+            if frame_index >= len(frame_files): frame_index = len(frame_files) - 1
+            if frame_index < 0: frame_index = 0
+
+    def _reload(self):
+        self.files = sorted(os.listdir(self.data_folder))
+        return [file for file in self.files if file not in self.files_skipped]
     
     def view(self, index: int = None):
         index = self.prompt_index() if index is None else index
         if index > len(self.files) - 1: logging.warning(f"Your index is {index}, but max is {len(self.files) - 1}, so setting it to -1"); index = -1
-        if index >= 0:
-            self._view(index)
-        else:
-            for i in range(len(self.files)):
-                self._view(i)
+        if index >= 0: self._view(index); return
+        while True:
+            if self.should_quit: break
+            unseen_files = self._reload()
+            if len(unseen_files) == 0: break
+            for i in range(len(self.files)): self._view(i)
 
 
 if __name__ == "__main__":
     # DataRecorder().run()
+    # DataExplorer().view(-1)
     DataExplorer(explore = "verified").view(-1)
-
-# MISSING DELETE
