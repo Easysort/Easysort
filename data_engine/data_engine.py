@@ -175,19 +175,6 @@ class DataExplorer(BaseModel):
         if os.path.exists(file_path):
             shutil.rmtree(file_path)
 
-    # def _freeze(self, file_to_view, frame, frame_files, index, allow_pause):
-    #     while True:
-    #         cv2.imshow("frame", self.add_description(frame))
-    #         key = cv2.waitKey(1000//self.fps) & 0xFF
-    #         if key == ord('q'): self.quit(); return True
-    #         if key == ord('a'): self.accept(file_to_view); return True
-    #         if key == ord('s'): self.files_skipped.append(file_to_view); return True
-    #         if key == ord('d'): self.delete(file_to_view); return True
-    #         if key == ord('r'): self._view(index); self.pause = False; return True
-    #         if key == ord('p') and allow_pause: self.pause = not self.pause; return False
-    #         if key == ord('b'): self.delete_files(frame_files, index); self.pause = False; self._view(index); return False
-    #         if key == ord('n'): self.accept_prev_frames(file_to_view, frame_files, index); return True
-
     def _view(self, index: int = None):
         file_to_view = os.path.join(self.data_folder, self.files[index])
         logging.info(f"Viewing: {file_to_view}")
