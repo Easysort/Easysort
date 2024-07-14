@@ -380,3 +380,9 @@ if __name__ == "__main__":
     # DataRecorder().run()
     DataExplorer()#.view(-1)
     # DataExplorer(explore = "verified").view(-1)
+
+# Todo:
+# - Make into Menu that can do both recording and exploration/verification
+# - Refactor Menu
+# - Make Menu work with other classes
+# - Make backbutton on the other classes
