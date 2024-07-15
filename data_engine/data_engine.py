@@ -377,7 +377,7 @@ class DataEngine():
     """"""
     def __init__(self):
         self.dataMenu = DataMenu()
-        self.dataRecorder = DataRecorder()
+        # self.dataRecorder = DataRecorder()
         self.run()
 
     def run(self):
@@ -472,7 +472,7 @@ class DataMenu():
             back_selected = self.selected_confirmation == len(self.confirmation_choices)
             quit_selected = self.selected_confirmation == len(self.confirmation_choices) + 1
 
-            if back_selected: self.current_step = max(self.current_step - 1, 0)
+            if back_selected: self.current_step = max(self.current_step - 1, 0) # if self.folder_to_explore
             elif quit_selected: cv2.destroyAllWindows(); exit()
             else:
                 self.explore = self.folders[self.selected_folder]
