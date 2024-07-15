@@ -198,8 +198,6 @@ class DataExplorer(BaseModel):
         # Close the options menu window
         cv2.destroyAllWindows()
 
-    # Close the options menu window
-    cv2.destroyAllWindows()
     def check_new_folder(self):
         print("Checking 'new' folder for videos too long...")
         path = os.path.join(get_top_folder(), "data", "new")
@@ -375,10 +373,145 @@ class DataExplorer(BaseModel):
             if len(unseen_files) == 0: break
             for i in range(len(self.files)): self._view(i)
 
+class DataEngine():
+    """"""
+    def __init__(self):
+        self.dataMenu = DataMenu()
+        self.dataRecorder = DataRecorder()
+        self.run()
+
+    def run(self):
+        self.dataMenu.options_menu()
+
+
+class DataMenu():
+    def __init__(self):
+        self.explore = None
+        self.editor_type = None
+
+    def options_menu(self):
+        # Create a window for the options menu
+        cv2.namedWindow("Options Menu", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("Options Menu", 640, 480)
+
+        # Initialize menu options
+        folders = ["new", "verified", "labelled"]
+        editors = ["Keyframe Editor", "Splitter", "Frame Editor"]
+        confirmation_choices = ["Proceed"]
+        selected_folder = 0
+        selected_editor = 0
+        selected_confirmation = 0
+        global_buttons = ["back", "quit"]
+
+        # Display instructions
+        instructions = "Use W and S to navigate, and Enter to proceed."
+
+        current_step = 0  # 0: folder, 1: editor, 2: confirm
+
+        while True:
+            # Create a black background
+            img = np.zeros((480, 640, 3), np.uint8)
+
+            # Draw instructions
+            cv2.putText(img, instructions, (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+            if current_step == 0:  # Folder selection
+                for i, folder in enumerate(folders + global_buttons):
+                    text = folder if i != selected_folder else f"> {folder}"
+                    add_on = 1 if i > len(folders) - 1 else 0
+                    cv2.putText(img, text, (20, 50 + (i + add_on) * 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+            elif current_step == 1:  # Editor selection
+                for i, editor in enumerate(editors + global_buttons):
+                    text = editor if i != selected_editor else f"> {editor}"
+                    add_on = 1 if i > len(editors) - 1 else 0
+                    cv2.putText(img, text, (20, 50 + (i + add_on) * 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+            elif current_step == 2:  # Confirmation popup
+                cv2.putText(img, f"Your choices", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                cv2.putText(img, f"Folder: {folders[selected_folder]}", (50, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                cv2.putText(img, f"Editor: {editors[selected_editor]}", (50, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                for i, editor in enumerate(confirmation_choices + global_buttons):
+                    text = editor if i != selected_confirmation else f"> {editor}"
+                    add_on = 1 if i > len(editors) - 1 else 0
+                    cv2.putText(img, text, (20, 170 + (i + add_on) * 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+            # Display the image
+            cv2.imshow("Options Menu", img)
+
+            # Get user input
+            key = cv2.waitKey(1) & 0xFF
+
+            if current_step == 0:  # Folder selection
+                if key == ord('w'):
+                    selected_folder = (selected_folder - 1) % (len(folders) + 2)
+                    back_selected = selected_folder == len(folders)
+                    quit_selected = selected_folder == len(folders) + 1
+                elif key == ord('s'):
+                    selected_folder = (selected_folder + 1) % (len(folders) + 2)
+                    back_selected = selected_folder == len(folders)
+                    quit_selected = selected_folder == len(folders) + 1
+                elif key == ord('\r'):
+                    if back_selected:
+                        current_step = 0
+                        selected_folder = 0
+                    elif quit_selected:
+                        cv2.destroyAllWindows()
+                        exit()
+                    else:
+                        current_step = 1
+                        selected_editor = 0
+            elif current_step == 1:  # Editor selection
+                if key == ord('w'):
+                    selected_editor = (selected_editor - 1) % (len(editors) + 2)
+                    back_selected = selected_editor == len(editors)
+                    quit_selected = selected_editor == len(editors) + 1
+                elif key == ord('s'):
+                    selected_editor = (selected_editor + 1) % (len(editors) + 2)
+                    back_selected = selected_editor == len(editors)
+                    quit_selected = selected_editor == len(editors) + 1
+                elif key == ord('\r'):
+                    if back_selected:
+                        current_step = 0
+                        selected_folder = 0
+                    elif quit_selected:
+                        cv2.destroyAllWindows()
+                        exit()
+                    else:
+                        current_step = 2
+            elif current_step == 2:  # Confirmation popup
+                if key == ord('w'):
+                    selected_confirmation = (selected_confirmation - 1) % (len(confirmation_choices) + 2)
+                    back_selected = selected_confirmation == len(confirmation_choices)
+                    quit_selected = selected_confirmation == len(confirmation_choices) + 1
+                elif key == ord('s'):
+                    selected_confirmation = (selected_confirmation + 1) % (len(confirmation_choices) + 2)
+                    back_selected = selected_confirmation == len(confirmation_choices)
+                    quit_selected = selected_confirmation == len(confirmation_choices) + 1
+                elif key == ord('\r'):
+                    if back_selected:
+                        current_step = 1
+                        selected_editor = 0
+                    elif quit_selected:
+                        cv2.destroyAllWindows()
+                        exit()
+                    else:
+                        self.explore = folders[selected_folder]
+                        self.editor_type = editors[selected_editor]
+                        print(f"Selected folder: {self.explore}, Selected editor: {self.editor_type}")
+                        break
+
+        print("NOW IS THE TIME TO GO FORTH")
+
+        # Close the options menu window
+        cv2.destroyAllWindows()
+
+
 
 if __name__ == "__main__":
+    DataEngine()
     # DataRecorder().run()
-    DataExplorer()#.view(-1)
+    # DataExplorer()#.view(-1)
     # DataExplorer(explore = "verified").view(-1)
 
 # Todo:
