@@ -33,7 +33,6 @@ class DataRecorder(BaseModel):
 
         self.fps = 10
         self.recording = False
-        self.cap = cv2.VideoCapture(0)
         self.frames_index = 0
         # self.fourcc = cv2.VideoWriter_fourcc(*'avc1')
         # self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -55,6 +54,7 @@ class DataRecorder(BaseModel):
         self.frames_index += 1
 
     def run(self):
+        self.cap = cv2.VideoCapture(0)
         while True:
             _, frame = self.cap.read()
             cv2.imshow("Camera", self.add_description(frame.copy()))
@@ -188,9 +188,9 @@ class DataExplorer(BaseModel):
                         cv2.destroyAllWindows()
                         exit()
                     else:
-                        self.explore = folders[selected_folder]
+                        self.folder_to_explore = folders[selected_folder]
                         self.editor_type = editors[selected_editor]
-                        print(f"Selected folder: {self.explore}, Selected editor: {self.editor_type}")
+                        print(f"Selected folder: {self.folder_to_explore}, Selected editor: {self.editor_type}")
                         break
 
         print("NOW IS THE TIME TO GO FORTH")
@@ -377,17 +377,28 @@ class DataEngine():
     """"""
     def __init__(self):
         self.dataMenu = DataMenu()
-        # self.dataRecorder = DataRecorder()
+        self.dataRecorder = DataRecorder()
+        self.keyframeEditor = None
+        self.splitter = None
+        self.frameEditor = None
         self.run()
 
     def run(self):
+        editor_type_to_editor_object = {
+            "Recorder": self.dataRecorder.run,
+            "Keyframe Editor": self.keyframeEditor.run,
+            "Splitter": None,
+            "Frame Editor": None,
+        }
         while True:
             self.dataMenu.options_menu()
+            editor = editor_type_to_editor_object[self.dataMenu.editor_type]
+            editor(folder = self.dataMenu.folder_to_explore)
 
 
 class DataMenu():
     def __init__(self):
-        self.explore = None
+        self.folder_to_explore = None
         self.editor_type = None
     
     def setup_menu(self):
@@ -475,9 +486,9 @@ class DataMenu():
             if back_selected: self.current_step = max(self.current_step - 1, 0) # if self.folder_to_explore
             elif quit_selected: cv2.destroyAllWindows(); exit()
             else:
-                self.explore = self.folders[self.selected_folder]
+                self.folder_to_explore = self.folders[self.selected_folder]
                 self.editor_type = self.editors[self.selected_editor]
-                print(f"Selected folder: {self.explore}, Selected editor: {self.editor_type}")
+                print(f"Selected folder: {self.folder_to_explore}, Selected editor: {self.editor_type}")
                 return True
 
     def options_menu(self):
