@@ -20,11 +20,18 @@ logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s, %(levelname)s]: %
 def get_top_folder(): return subprocess.check_output(["git", "rev-parse", "--show-toplevel"]).decode('utf-8').strip("\n")
 
 class BaseModel():
-    def __init__(self, cap): self.cap = cap; self.should_quit = False
+    def __init__(self, cap): 
+        self.cap = cap; self.should_quit = False
+
     def quit(self):
         if self.cap: self.cap.release()
         cv2.destroyAllWindows()
         self.should_quit = True
+    
+    def universal_keys(self, key):
+        if key == ord('q'): self.quit()
+
+    # All Editors has to have a .run with a folder parameter
 
 class DataRecorder(BaseModel):
     def __init__(self):
@@ -34,6 +41,7 @@ class DataRecorder(BaseModel):
         self.fps = 10
         self.recording = False
         self.frames_index = 0
+        self.cap = None # buffer for later when it is actually used in .run and .quit from BaseModel
         # self.fourcc = cv2.VideoWriter_fourcc(*'avc1')
         # self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         super().__init__(self.cap)
@@ -53,7 +61,7 @@ class DataRecorder(BaseModel):
         cv2.imwrite(os.path.join(self.frame_dir, f"frame_{self.frames_index:04d}.jpg"), frame)
         self.frames_index += 1
 
-    def run(self):
+    def run(self, folder):
         self.cap = cv2.VideoCapture(0)
         while True:
             _, frame = self.cap.read()
@@ -255,22 +263,33 @@ class DataExplorer(BaseModel):
             if len(unseen_files) == 0: break
             for i in range(len(self.files)): self._view(i)
 
+class KeyframeEditor:
+    def __init__(self): pass
+    def run(self, folder): return
+
+class Splitter:
+    def __init__(self): pass
+    def run(self, folder): return
+
+class FrameEditor:
+    def __init__(self): pass
+    def run(self, folder): return
+
 class DataEngine():
-    """"""
     def __init__(self):
         self.dataMenu = DataMenu()
         self.dataRecorder = DataRecorder()
-        self.keyframeEditor = None
-        self.splitter = None
-        self.frameEditor = None
+        self.keyframeEditor = KeyframeEditor()
+        self.splitter = Splitter()
+        self.frameEditor = FrameEditor()
         self.run()
 
     def run(self):
         editor_type_to_editor_object = {
             "Recorder": self.dataRecorder.run,
             "Keyframe Editor": self.keyframeEditor.run,
-            "Splitter": None,
-            "Frame Editor": None,
+            "Splitter": self.splitter.run,
+            "Frame Editor": self.frameEditor.run,
         }
         while True:
             self.dataMenu.options_menu()
