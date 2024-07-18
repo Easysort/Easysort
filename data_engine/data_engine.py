@@ -275,6 +275,10 @@ class FrameEditor:
     def __init__(self): pass
     def run(self, folder): return
 
+class LabelRunner:
+    def __init__(self): pass
+    def run(self, folder): return
+
 class DataEngine():
     def __init__(self):
         self.dataMenu = DataMenu()
@@ -282,6 +286,7 @@ class DataEngine():
         self.keyframeEditor = KeyframeEditor()
         self.splitter = Splitter()
         self.frameEditor = FrameEditor()
+        self.labelRunner = LabelRunner()
         self.run()
 
     def run(self):
@@ -290,6 +295,7 @@ class DataEngine():
             "Keyframe Editor": self.keyframeEditor.run,
             "Splitter": self.splitter.run,
             "Frame Editor": self.frameEditor.run,
+            "Label Runner": self.labelRunner.run
         }
         while True:
             self.dataMenu.options_menu()
@@ -309,7 +315,7 @@ class DataMenu():
         # Initialize menu options
         self.folders = ["new", "verified", "labelled"]
         self.editors_without_folder = ["Recorder"]
-        self.editors_where_folder_is_needed = ["Keyframe Editor", "Splitter", "Frame Editor"]
+        self.editors_where_folder_is_needed = ["Keyframe Editor", "Splitter", "Frame Editor", "Label Runner"]
         self.editors = self.editors_without_folder + self.editors_where_folder_is_needed
         self.confirmation_choices = ["Proceed"]
         self.selected_folder = 0
