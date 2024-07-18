@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s, %(levelname)s]: %
 
 def get_top_folder(): return subprocess.check_output(["git", "rev-parse", "--show-toplevel"]).decode('utf-8').strip("\n")
 
-class BaseModel():
+class EditorBaseModel():
     def __init__(self, cap): 
         self.cap = cap; self.should_quit = False
 
@@ -33,7 +33,7 @@ class BaseModel():
 
     # All Editors has to have a .run with a folder parameter
 
-class DataRecorder(BaseModel):
+class DataRecorder(EditorBaseModel):
     def __init__(self):
         self.top_folder = get_top_folder()
         if not os.path.exists(self.top_folder): os.makedirs(self.top_folder)
@@ -73,7 +73,7 @@ class DataRecorder(BaseModel):
             if key == ord('r'): self.record(start=True)
             if key == ord('s'): self.record(start=False)
 
-class DataExplorer(BaseModel):
+class DataExplorer(EditorBaseModel):
     def __init__(self, explore: str = "new"):
         # self.check_new_folder() # Autospit every 100 frames
         if explore not in ["new", "verified", "labelled"]:
@@ -263,28 +263,42 @@ class DataExplorer(BaseModel):
             if len(unseen_files) == 0: break
             for i in range(len(self.files)): self._view(i)
 
-class KeyframeEditor:
+class KeyframeEditor(EditorBaseModel):
+    """
+    Used to view, add and delete keyframes.
+    """
     def __init__(self): pass
     def run(self, folder): return
 
-class Splitter:
+class FrameEditor(EditorBaseModel):
+    """
+    Used to:
+    1) delete frames before or after a certain point in a video
+    2) split a long video into smaller segments
+    Also has a .automate function to split automatically
+    """
     def __init__(self): pass
     def run(self, folder): return
 
-class FrameEditor:
-    def __init__(self): pass
-    def run(self, folder): return
-
-class LabelRunner:
+class LabelRunner(EditorBaseModel):
+    """
+    Used to:
+    1) See current labels on a video
+    2) Project keyframes labels onto the rest of the video
+    3) Validate projections 
+    """
     def __init__(self): pass
     def run(self, folder): return
 
 class DataEngine():
+    """
+    Adds the logic to go between the menu and the appropriate editors
+    """
+
     def __init__(self):
         self.dataMenu = DataMenu()
         self.dataRecorder = DataRecorder()
         self.keyframeEditor = KeyframeEditor()
-        self.splitter = Splitter()
         self.frameEditor = FrameEditor()
         self.labelRunner = LabelRunner()
         self.run()
@@ -293,7 +307,6 @@ class DataEngine():
         editor_type_to_editor_object = {
             "Recorder": self.dataRecorder.run,
             "Keyframe Editor": self.keyframeEditor.run,
-            "Splitter": self.splitter.run,
             "Frame Editor": self.frameEditor.run,
             "Label Runner": self.labelRunner.run
         }
@@ -315,7 +328,7 @@ class DataMenu():
         # Initialize menu options
         self.folders = ["new", "verified", "labelled"]
         self.editors_without_folder = ["Recorder"]
-        self.editors_where_folder_is_needed = ["Keyframe Editor", "Splitter", "Frame Editor", "Label Runner"]
+        self.editors_where_folder_is_needed = ["Keyframe Editor", "Frame Editor", "Label Runner"]
         self.editors = self.editors_without_folder + self.editors_where_folder_is_needed
         self.confirmation_choices = ["Proceed"]
         self.selected_folder = 0
@@ -433,13 +446,7 @@ class DataMenu():
 
 if __name__ == "__main__":
     DataEngine()
-    # DataRecorder().run()
-    # DataExplorer()#.view(-1)
-    # DataExplorer(explore = "verified").view(-1)
 
 # Todo:
-# - Make into Menu that can do both recording and exploration/verification
-#   - Make use of first_visit to reset index
-#   - Skip folder if not necessary
 # - Make Menu work with other classes
 # - Make backbutton on the other classes
