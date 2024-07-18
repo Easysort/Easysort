@@ -321,7 +321,7 @@ class DataMenu():
         self.selected_folder = 0
         self.selected_editor = 0
         self.selected_confirmation = 0
-        self.global_buttons = ["back", "quit"] # add to last elif in each _logic if added here
+        self.global_buttons = ["back", "quit"] # add to last elif in each _logic if you add something here
 
         # If this is the first round at current menu setting:
         self.first_load_of_menu = True
@@ -329,12 +329,18 @@ class DataMenu():
         # when is what shown
         #   If you change any of these, make a _menu method and a _logic method and implement into options_menu()
         #   The last line of editor_logic also has to be changed
+        #   _update_selected should also be updated
         self.current_step = 0  # 0: editor, 1: folder (if necessary), 2: confirm
         self.editor_menu_step = 0
         self.folder_menu_step = 1
         self.confirmation_menu_step = 2
 
         self.instructions = "Use W and S to navigate, and Enter to proceed."
+
+    def _reset_appropriate_selected(self):
+        if self.current_step == self.editor_menu_step: self.selected_editor = 0
+        elif self.current_step == self.folder_menu_step: self.selected_folder = 0
+        elif self.current_step == self.confirmation_menu_step: self.selected_confirmation = 0
 
     def folder_menu(self, img):
         for i, folder in enumerate(self.folders + self.global_buttons):
@@ -346,7 +352,7 @@ class DataMenu():
         if key == ord('w'): self.selected_folder = (self.selected_folder - 1) % (len(self.folders) + len(self.global_buttons))
         elif key == ord('s'): self.selected_folder = (self.selected_folder + 1) % (len(self.folders) + len(self.global_buttons))
         elif key == ord('\r'):
-            self.first_load_of_menu = True # NOT WORKING YET, SHOULD RESET APPROPRIATE SELECETED_
+            self.first_load_of_menu = True
             back_selected = self.selected_folder == len(self.folders)
             quit_selected = self.selected_folder == len(self.folders) + 1
 
@@ -401,6 +407,8 @@ class DataMenu():
     def options_menu(self):
         self.setup_menu()
         while True:
+            if self.first_load_of_menu: self.first_load_of_menu = False; self._reset_appropriate_selected()
+
             # Create a black background
             img = np.zeros((480, 640, 3), np.uint8)
             cv2.putText(img, self.instructions, (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
@@ -419,10 +427,9 @@ class DataMenu():
             elif self.current_step == self.confirmation_menu_step: 
                 if self.confirmation_logic(key): break
 
-        print("NOW IS THE TIME TO GO FORTH")
-
         # Close the options menu window
         cv2.destroyAllWindows()
+        return
 
 if __name__ == "__main__":
     DataEngine()
