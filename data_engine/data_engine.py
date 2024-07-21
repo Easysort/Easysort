@@ -22,11 +22,23 @@ def get_top_folder(): return subprocess.check_output(["git", "rev-parse", "--sho
 class EditorBaseModel():
     def __init__(self, cap): 
         self.cap = cap; self.should_quit = False
+        self.universal_descriptions = ["Press q to quit"]
 
     def quit(self):
         if self.cap: self.cap.release()
         cv2.destroyAllWindows()
         self.should_quit = True
+
+    def add_universal_description(self, frame, description):
+        BLACK_BAR_WIDTH = 160
+        full_description = self.universal_descriptions + description
+
+        new_frame = np.zeros((frame.shape[0], frame.shape[1] + BLACK_BAR_WIDTH, 3), dtype=np.uint8)
+        new_frame[:, :frame.shape[1], :] = frame
+        new_frame[:, frame.shape[1]:, :] = (0, 0, 0)
+        for i, desc in enumerate(full_description):
+            cv2.putText(new_frame, desc, (frame.shape[1] + 10, 20 * (i + 1)), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
+        return new_frame
     
     def universal_keys(self, key):
         if key == ord('q'): self.quit()
@@ -47,7 +59,10 @@ class DataRecorder(EditorBaseModel):
         super().__init__(self.cap)
 
     def add_description(self, frame): 
-        return cv2.rectangle(frame, (10, 10), (50, 30), (0, 0, 255), 2) if self.recording else cv2.rectangle(frame, (10, 10), (50, 30), (128, 128, 128), 2)
+        description = ["Press 'r' to record", "Press 's' to stop recording"]
+        new_frame = self.add_universal_description(frame, description)
+        new_frame = cv2.rectangle(new_frame, (10, 10), (50, 30), (0, 0, 255), 2) if self.recording else cv2.rectangle(new_frame, (10, 10), (50, 30), (128, 128, 128), 2)
+        return new_frame
 
     def record(self, start): 
         if not start and self.recording: self.recording = False; self.frames_index = 0
@@ -69,9 +84,11 @@ class DataRecorder(EditorBaseModel):
             if self.recording: 
                 self.record_frame(frame)
             key = cv2.waitKey(1000//self.fps) & 0xFF
-            if key == ord('q'): self.quit(); break
             if key == ord('r'): self.record(start=True)
             if key == ord('s'): self.record(start=False)
+            
+            self.universal_keys(key)
+            if self.should_quit: break
 
 class KeyframeEditor(EditorBaseModel):
     """
@@ -256,7 +273,3 @@ class DataMenu():
 
 if __name__ == "__main__":
     DataEngine()
-
-# Todo:
-# - Make Menu work with other classes
-# - Make backbutton on the other classes
