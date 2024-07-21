@@ -97,6 +97,7 @@ class DataRecorder(EditorBaseModel):
 class KeyframeEditor(EditorBaseModel):
     """
     Used to view, add and delete keyframes.
+    Only works on verified files
     """
     def __init__(self): pass
     def run(self, folder): return
@@ -274,6 +275,32 @@ class DataMenu():
         # Close the options menu window
         cv2.destroyAllWindows()
         return
+    
+## WORKFLOW
+    
+"""
+Workflow is as follows:
+1) Record the videos
+2) Split in sections 
+2.5) Accept good splits in FrameEditor
+3) Cut each split to not have unnecessary parts
+4) Add keyframes
+5) External: Label keyframes
+6) Run labelrunner to project keyframes
+7) Confirm the labels to put into labelled (these videos will now be used for training)
+
+Todo:
+[x] Record
+[ ] Split
+[ ] Accept
+[ ] Cut splits
+[ ] Keyframes
+[ ] Label keyframes (upload and download)
+[ ] Project keyframes
+[ ] Confirm labels
+
+
+"""
 
 if __name__ == "__main__":
     DataEngine()
