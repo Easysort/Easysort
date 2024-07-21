@@ -30,14 +30,14 @@ class EditorBaseModel():
         self.should_quit = True
 
     def add_universal_description(self, frame, description):
-        BLACK_BAR_WIDTH = 160
+        BLACK_BAR_WIDTH = 500
         full_description = self.universal_descriptions + description
 
         new_frame = np.zeros((frame.shape[0], frame.shape[1] + BLACK_BAR_WIDTH, 3), dtype=np.uint8)
         new_frame[:, :frame.shape[1], :] = frame
         new_frame[:, frame.shape[1]:, :] = (0, 0, 0)
         for i, desc in enumerate(full_description):
-            cv2.putText(new_frame, desc, (frame.shape[1] + 10, 20 * (i + 1)), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
+            cv2.putText(new_frame, desc, (frame.shape[1] + 10, 40 * (i + 1)), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 255), 1)
         return new_frame
     
     def universal_keys(self, key):
@@ -59,7 +59,7 @@ class DataRecorder(EditorBaseModel):
         super().__init__(self.cap)
 
     def add_description(self, frame): 
-        description = ["Press 'r' to record", "Press 's' to stop recording"]
+        description = ["Press 'r' to record", "Press 's' to stop", "", "Red = Recording", "Grey = Not recording"]
         new_frame = self.add_universal_description(frame, description)
         new_frame = cv2.rectangle(new_frame, (10, 10), (50, 30), (0, 0, 255), 2) if self.recording else cv2.rectangle(new_frame, (10, 10), (50, 30), (128, 128, 128), 2)
         return new_frame
@@ -80,9 +80,13 @@ class DataRecorder(EditorBaseModel):
         self.cap = cv2.VideoCapture(0)
         while True:
             _, frame = self.cap.read()
+            aspect_ratio = frame.shape[1] / frame.shape[0]
+            window_height = 1200
+            window_width = int(window_height * aspect_ratio)
+            frame = cv2.resize(frame, (window_width, window_height))
             cv2.imshow("Camera", self.add_description(frame.copy()))
-            if self.recording: 
-                self.record_frame(frame)
+            if self.recording: self.record_frame(frame)
+
             key = cv2.waitKey(1000//self.fps) & 0xFF
             if key == ord('r'): self.record(start=True)
             if key == ord('s'): self.record(start=False)
