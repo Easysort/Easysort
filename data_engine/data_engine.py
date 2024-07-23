@@ -30,7 +30,7 @@ class BaseModel():
         self.should_quit = True
 
     def add_universal_description(self, frame, description):
-        BLACK_BAR_WIDTH = 500
+        BLACK_BAR_WIDTH = 850
         full_description = self.universal_descriptions + description
 
         new_frame = np.zeros((frame.shape[0], frame.shape[1] + BLACK_BAR_WIDTH, 3), dtype=np.uint8)
@@ -96,10 +96,80 @@ class DataRecorder(BaseModel):
 
 class EditorBaseModel(BaseModel):
     """
-    
+    Runs all the logic for working the editors, the specific keys and additional logic is then in each editor
     """
-    def __init__(self): pass
-    def run(self, folder): return
+    def __init__(self):
+        self._folder_to_explore = "New"
+        self.allowed_folders = ["new", "verified", "labelled"]
+        self.data_folder = os.path.join(get_top_folder(), "data", self._folder_to_explore)
+        self.fps = 10
+        self.pause = False
+
+        self.state_method = None
+        self.description_method = None
+        self._reset_state()
+        self.file_index = 0
+        self.universal_editor_description = ["", "Press 'escape' to choose editors", "Press 'r' to reset", "Press 'p' to (un)pause"
+                                             "Press 'b' to back 1 frame", "Press 'n' to next 1 frames"]
+
+        # EDITORS
+        self.keyframeEditor = KeyframeEditor()
+        self.frameEditor = FrameEditor()
+        self.labelRunner = LabelRunner()
+
+        self.editors_name_to_state_method = {
+            "Keyframes": (self.keyframeEditor.run, self.keyframeEditor.add_description),
+            "Splitting and cutting": (self.frameEditor.run, self.frameEditor.add_description),
+            "View Labels": (self.labelRunner.run, self.labelRunner.add_description)
+        }
+        super().__init__(cap = None)
+    
+    def _load(self): self.files = sorted(os.listdir(self.data_folder))
+    def _reset_state(self): self.state_method = self.choose_editor_state_logic; self.description_method = self.add_choose_editor_descrition
+
+    def change_folder_to_explore(self, folder):
+        if folder not in self.allowed_folders: raise LookupError(f"Folder has to be in {self.allowed_folders}, but is {folder}")
+        self._folder_to_explore = folder
+        self._load()
+
+    def editor_base_keys(self, key): 
+        if key == 27: self._reset_state() # if key == esc
+        if key == ord('r'): self.frame_index = 0; self.pause = False
+        if key == ord('p'): self.pause = not self.pause
+        if key == ord('b'): self.frame_index -= 1
+        if key == ord('n'): self.frame_index += 1
+
+        if not self.pause:
+            self.frame_index += 1
+
+        if self.frame_index >= len(self.frame_files): self.frame_index = len(self.frame_files) - 1
+        if self.frame_index < 0: self.frame_index = 0
+        
+    def choose_editor_state_logic(self, key):
+        for i, (editor_state_method, editor_description_method) in enumerate(self.editors_name_to_state_method.values()):
+            if key == ord(f"{i}"): self.state_method = editor_state_method; self.description_method = editor_description_method
+
+    def add_choose_editor_descrition(self, frame): 
+        description = [""] + [f"Press {i} for {editor_name}" for i, editor_name in enumerate(self.editors_name_to_state_method.keys())]
+        new_frame = self.add_universal_description(frame, self.universal_editor_description + description)
+        return new_frame
+
+    def run(self, folder):
+        self.change_folder_to_explore(folder)
+        file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
+        self.frame_files = sorted([frame for frame in os.listdir(file_to_view) if frame[-4:] == ".jpg"])
+        self.frame_index = 0
+
+        while True:
+            frame_path = os.path.join(file_to_view, self.frame_files[self.frame_index])
+            frame = cv2.imread(frame_path)
+            cv2.imshow("frame", self.description_method(frame))
+            key = cv2.waitKey(1000//self.fps) & 0xFF
+
+            self.state_method(key)
+            self.editor_base_keys(key)
+            self.universal_keys(key)
+            if self.should_quit: break
 
 class KeyframeEditor(EditorBaseModel):
     """
@@ -107,6 +177,7 @@ class KeyframeEditor(EditorBaseModel):
     Only works on verified files
     """
     def __init__(self): pass
+    def add_description(self, frame): return frame
     def run(self, folder): return
 
 class FrameEditor(EditorBaseModel):
@@ -117,6 +188,7 @@ class FrameEditor(EditorBaseModel):
     Also has a .automate function to split automatically
     """
     def __init__(self): pass
+    def add_description(self, frame): return frame
     def run(self, folder): return
 
 class LabelRunner(EditorBaseModel):
@@ -127,6 +199,7 @@ class LabelRunner(EditorBaseModel):
     3) Validate projections 
     """
     def __init__(self): pass
+    def add_description(self, frame): return frame
     def run(self, folder): return
 
 class DataEngine():
