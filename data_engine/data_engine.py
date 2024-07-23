@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s, %(levelname)s]: %
 
 def get_top_folder(): return subprocess.check_output(["git", "rev-parse", "--show-toplevel"]).decode('utf-8').strip("\n")
 
-class EditorBaseModel():
+class BaseModel():
     def __init__(self, cap): 
         self.cap = cap; self.should_quit = False
         self.universal_descriptions = ["Press q to quit"]
@@ -45,7 +45,7 @@ class EditorBaseModel():
 
     # All Editors has to have a .run with a folder parameter
 
-class DataRecorder(EditorBaseModel):
+class DataRecorder(BaseModel):
     def __init__(self):
         self.top_folder = get_top_folder()
         if not os.path.exists(self.top_folder): os.makedirs(self.top_folder)
@@ -94,6 +94,13 @@ class DataRecorder(EditorBaseModel):
             self.universal_keys(key)
             if self.should_quit: break
 
+class EditorBaseModel(BaseModel):
+    """
+    
+    """
+    def __init__(self): pass
+    def run(self, folder): return
+
 class KeyframeEditor(EditorBaseModel):
     """
     Used to view, add and delete keyframes.
@@ -130,17 +137,13 @@ class DataEngine():
     def __init__(self):
         self.dataMenu = DataMenu()
         self.dataRecorder = DataRecorder()
-        self.keyframeEditor = KeyframeEditor()
-        self.frameEditor = FrameEditor()
-        self.labelRunner = LabelRunner()
+        self.editor = EditorBaseModel()
         self.run()
 
     def run(self):
         editor_type_to_editor_object = {
-            "Recorder": self.dataRecorder.run,
-            "Keyframe Editor": self.keyframeEditor.run,
-            "Frame Editor": self.frameEditor.run,
-            "Label Runner": self.labelRunner.run
+            "Record": self.dataRecorder.run,
+            "Edit Videos": self.editor.run
         }
         while True:
             self.dataMenu.options_menu()
@@ -159,8 +162,8 @@ class DataMenu():
 
         # Initialize menu options
         self.folders = ["new", "verified", "labelled"]
-        self.editors_without_folder = ["Recorder"]
-        self.editors_where_folder_is_needed = ["Keyframe Editor", "Frame Editor", "Label Runner"]
+        self.editors_without_folder = ["Record"]
+        self.editors_where_folder_is_needed = ["Edit Videos"]
         self.editors = self.editors_without_folder + self.editors_where_folder_is_needed
         self.confirmation_choices = ["Proceed"]
         self.selected_folder = 0
@@ -221,7 +224,9 @@ class DataMenu():
 
             if back_selected: self.current_step = max(self.current_step - 1, 0)
             elif quit_selected: cv2.destroyAllWindows(); exit()
-            else: self.current_step += 1 if self.editors[self.selected_editor] in self.editors_where_folder_is_needed else 2
+            else: 
+                self.current_step += 1 if self.editors[self.selected_editor] in self.editors_where_folder_is_needed else 2
+                self.selected_folder = 0 if self.editors[self.selected_editor] in self.editors_without_folder else self.selected_folder
 
     def confirmation_menu(self, img):
         cv2.putText(img, f"Your choices", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
@@ -241,7 +246,9 @@ class DataMenu():
             back_selected = self.selected_confirmation == len(self.confirmation_choices)
             quit_selected = self.selected_confirmation == len(self.confirmation_choices) + 1
 
-            if back_selected: self.current_step = max(self.current_step - 1, 0) # if self.folder_to_explore
+            if back_selected: 
+                to_subtract = 2 if self.editors[self.selected_editor] in self.editors_without_folder else 1
+                self.current_step = max(self.current_step - to_subtract, 0) 
             elif quit_selected: cv2.destroyAllWindows(); exit()
             else:
                 self.folder_to_explore = self.folders[self.selected_folder]
@@ -298,8 +305,6 @@ Todo:
 [ ] Label keyframes (upload and download)
 [ ] Project keyframes
 [ ] Confirm labels
-
-
 """
 
 if __name__ == "__main__":
