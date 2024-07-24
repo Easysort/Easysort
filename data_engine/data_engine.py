@@ -99,10 +99,9 @@ class EditorBaseModel(BaseModel):
     Runs all the logic for working the editors, the specific keys and additional logic is then in each editor
     """
     def __init__(self):
-        self._folder_to_explore = "New"
+        self._folder_to_explore = "new"
         self.allowed_folders = ["new", "verified", "labelled"]
         self.data_folder = os.path.join(get_top_folder(), "data", self._folder_to_explore)
-        print("Data folder is", self.data_folder)
         self.fps = 10
         self.pause = False
 
@@ -122,8 +121,7 @@ class EditorBaseModel(BaseModel):
         self.description_method = None
         self._reset_state()
         self.file_index = 0
-        self.universal_editor_description = ["", "Press 'escape' to choose editors", "Press 'r' to reset", "Press 'p' to (un)pause",
-                                             "Press 'b' to back 1 frame", "Press 'n' to next 1 frames"]
+        self.files = []
 
         super().__init__(cap = None)
     
@@ -132,9 +130,15 @@ class EditorBaseModel(BaseModel):
         self.state_method = self.choose_editor_state_logic
         self.description_method = [f"Press {i} for {editor_name}" for i, editor_name in enumerate(self.editors_name_to_state_method.keys())]
 
+    def universal_editor_description(self): return ["", "Press 'escape' to choose editors", "Press 'r' to reset", "Press 'p' to (un)pause",
+            "Press 'b' to back 1 frame", "Press 'n' to next 1 frames", "Press 'i' to go to previous video", "Press 'o' to go to the next video",
+            f"Playing video {self.file_index + 1}/{len(self.files)}"]
+
     def change_folder_to_explore(self, folder):
         if folder not in self.allowed_folders: raise LookupError(f"Folder has to be in {self.allowed_folders}, but is {folder}")
         self._folder_to_explore = folder
+        self.data_folder = os.path.join(get_top_folder(), "data", self._folder_to_explore)
+        self.file_index = 0
         self._load()
 
     def editor_base_keys(self, key): 
@@ -143,9 +147,10 @@ class EditorBaseModel(BaseModel):
         if key == ord('p'): self.pause = not self.pause
         if key == ord('b'): self.frame_index -= 1
         if key == ord('n'): self.frame_index += 1
+        if key == ord("i"): self.file_index = max(0, self.file_index - 1)
+        if key == ord("o"): self.file_index = min(self.file_index + 1, len(self.files) - 1)
 
-        if not self.pause:
-            self.frame_index += 1
+        if not self.pause: self.frame_index += 1
 
         if self.frame_index >= len(self.frame_files): self.frame_index = len(self.frame_files) - 1
         if self.frame_index < 0: self.frame_index = 0
@@ -156,13 +161,16 @@ class EditorBaseModel(BaseModel):
 
     def add_descrition(self, frame, editor_description = [""]): 
         description = [""] + editor_description
-        new_frame = self.add_universal_description(frame, self.universal_editor_description + description)
+        new_frame = self.add_universal_description(frame, self.universal_editor_description() + description)
         return new_frame
+    
+    def _load_frame_files(self, file_to_view): self.frame_files = sorted([frame for frame in os.listdir(file_to_view) if frame[-4:] == ".jpg"])
 
     def run(self, folder):
         self.change_folder_to_explore(folder)
+        current_file = self.file_index
         file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
-        self.frame_files = sorted([frame for frame in os.listdir(file_to_view) if frame[-4:] == ".jpg"])
+        self._load_frame_files(file_to_view)
         self.frame_index = 0
 
         while True:
@@ -175,6 +183,11 @@ class EditorBaseModel(BaseModel):
             self.editor_base_keys(key)
             self.universal_keys(key)
             if self.should_quit: self.should_quit = False; break
+            if self.file_index != current_file:
+                current_file = self.file_index
+                file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
+                self.frame_index = 0
+                self._load_frame_files(file_to_view)
 
 class KeyframeEditor(BaseModel):
     """
