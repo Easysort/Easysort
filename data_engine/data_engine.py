@@ -216,13 +216,19 @@ class FrameEditor(BaseModel):
     Also has a .automate function to split automatically
     """
     def description(self): return [
-            "Press 'd' to delete previous frames",
-            "Press 'f' to delete future frames",
-            "Press 's' to split the video"
-        ]
+        "Press 'd' to delete previous frames",
+        "Press 'f' to delete future frames",
+        "Press 's' to split future frames",
+    ]
     
+    def delete_previous_frames(self, EditorBaseModel: EditorBaseModel, from_index: int):
+        files_to_delete = EditorBaseModel.frame_files[:from_index]
+        file_to_view = os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index])
+        for file in files_to_delete:
+            os.remove(os.path.join(file_to_view, file))
+
     def delete_future_frames(self, EditorBaseModel: EditorBaseModel, from_index: int):
-        files_to_delete = EditorBaseModel.frame_files[from_index:]
+        files_to_delete = EditorBaseModel.frame_files[from_index + 1:]
         file_to_view = os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index])
         for file in files_to_delete:
             os.remove(os.path.join(file_to_view, file))
@@ -232,7 +238,7 @@ class FrameEditor(BaseModel):
         folder = EditorBaseModel.data_folder
         new_filename = get_free_filename(file_to_view.split("_")[-2])
         filename = os.path.basename(new_filename)
-        files_to_move = EditorBaseModel.frame_files[from_index:]
+        files_to_move = EditorBaseModel.frame_files[from_index + 1:]
 
         new_dir = os.path.join(folder, filename)
         if not os.path.exists(new_dir):
@@ -242,8 +248,13 @@ class FrameEditor(BaseModel):
             shutil.move(os.path.join(file_to_view, file), new_dir)
 
     def run(self, key, EditorBaseModel: EditorBaseModel): 
-        if key == ord("d"): None
-        if key == ord("f"): None
+        if key == ord("d"): 
+            self.delete_previous_frames(EditorBaseModel, EditorBaseModel.frame_index)
+            EditorBaseModel._reload_files_and_frames()
+
+        if key == ord("f"): 
+            self.delete_future_frames(EditorBaseModel, EditorBaseModel.frame_index)
+            EditorBaseModel._reload_files_and_frames()
 
         if key == ord("s"): 
             self.copy_future_frames(EditorBaseModel, EditorBaseModel.frame_index)
@@ -436,7 +447,7 @@ Todo:
 [x] Record
 [x] Split
 [ ] Accept
-[ ] Cut splits
+[x] Cut splits
 [ ] Keyframes
 [ ] Label keyframes (upload and download)
 [ ] Project keyframes
