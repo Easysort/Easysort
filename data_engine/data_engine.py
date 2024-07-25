@@ -194,8 +194,12 @@ class KeyframeEditor(BaseModel):
     Used to view, add and delete keyframes.
     Only works on verified files
     """
-    def description(self): return ["hey"]
-    def run(self, folder): return
+    def description(self): return [
+            "hey"
+        ]
+    def run(self, key): 
+        
+        return
 
 class FrameEditor(BaseModel):
     """
@@ -204,8 +208,12 @@ class FrameEditor(BaseModel):
     2) split a long video into smaller segments
     Also has a .automate function to split automatically
     """
-    def description(self): return ["hey"]
-    def run(self, folder): return
+    def description(self): return [
+            "hey"
+        ]
+    def run(self, key): 
+        
+        return
 
 class LabelRunner(BaseModel):
     """
@@ -214,8 +222,13 @@ class LabelRunner(BaseModel):
     2) Project keyframes labels onto the rest of the video
     3) Validate projections 
     """
-    def description(self): return ["hey"]
-    def run(self, folder): return
+    def description(self): return [
+            "hey"
+        ]
+    
+    def run(self, key): 
+        
+        return
 
 class DataEngine():
     """
