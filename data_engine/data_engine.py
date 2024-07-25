@@ -155,7 +155,7 @@ class EditorBaseModel(BaseModel):
         if self.frame_index >= len(self.frame_files): self.frame_index = len(self.frame_files) - 1
         if self.frame_index < 0: self.frame_index = 0
         
-    def choose_editor_state_logic(self, key):
+    def choose_editor_state_logic(self, key, file_to_view, folder):
         for i, (editor_state_method, editor_description_method) in enumerate(self.editors_name_to_state_method.values()):
             if key == ord(f"{i}"): self.state_method = editor_state_method; self.description_method = editor_description_method
 
@@ -179,7 +179,7 @@ class EditorBaseModel(BaseModel):
             cv2.imshow("frame", self.add_descrition(frame, self.description_method))
             key = cv2.waitKey(1000//self.fps) & 0xFF
 
-            self.state_method(key)
+            self.state_method(key, file_to_view, folder)
             self.editor_base_keys(key)
             self.universal_keys(key)
             if self.should_quit: self.should_quit = False; break
@@ -197,7 +197,7 @@ class KeyframeEditor(BaseModel):
     def description(self): return [
             "hey"
         ]
-    def run(self, key): 
+    def run(self, key, file_to_view, folder): 
         
         return
 
@@ -209,10 +209,19 @@ class FrameEditor(BaseModel):
     Also has a .automate function to split automatically
     """
     def description(self): return [
-            "hey"
+            "",
+            "Press 'd' for delete all previous frames"
+            "Press 'f' for delete all future frames"
+            "Press 's' for split the video"
         ]
-    def run(self, key): 
-        
+    def run(self, key, file_to_view, folder): 
+        if key == ord("d"): None
+        if key == ord("f"): None
+        if key == ord("s"): 
+            file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
+            folder = self.
+            filename = get_free_filename(file_to_view.split("_")[-2])
+
         return
 
 class LabelRunner(BaseModel):
@@ -226,7 +235,7 @@ class LabelRunner(BaseModel):
             "hey"
         ]
     
-    def run(self, key): 
+    def run(self, key, file_to_view, folder): 
         
         return
 
