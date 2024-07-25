@@ -130,9 +130,14 @@ class EditorBaseModel(BaseModel):
         self.state_method = self.choose_editor_state_logic
         self.description_method = [f"Press {i} for {editor_name}" for i, editor_name in enumerate(self.editors_name_to_state_method.keys())]
 
+    def _reload_files_and_frames(self):
+        self.frame_index = 0
+        self._load()
+        self._load_frame_files()
+
     def universal_editor_description(self): return ["", "Press 'escape' to choose editors", "Press 'r' to reset", "Press 'p' to (un)pause",
             "Press 'b' to back 1 frame", "Press 'n' to next 1 frames", "Press 'i' to go to previous video", "Press 'o' to go to the next video",
-            f"Playing video {self.file_index + 1}/{len(self.files)}"]
+            "", f"Playing video {self.file_index + 1}/{len(self.files)}", f"Frame: {self.frame_index + 1}/{len(self.frame_files)}"]
 
     def change_folder_to_explore(self, folder):
         if folder not in self.allowed_folders: raise LookupError(f"Folder has to be in {self.allowed_folders}, but is {folder}")
@@ -155,7 +160,7 @@ class EditorBaseModel(BaseModel):
         if self.frame_index >= len(self.frame_files): self.frame_index = len(self.frame_files) - 1
         if self.frame_index < 0: self.frame_index = 0
         
-    def choose_editor_state_logic(self, key, file_to_view, folder):
+    def choose_editor_state_logic(self, key, EditorBaseModel):
         for i, (editor_state_method, editor_description_method) in enumerate(self.editors_name_to_state_method.values()):
             if key == ord(f"{i}"): self.state_method = editor_state_method; self.description_method = editor_description_method
 
@@ -164,13 +169,15 @@ class EditorBaseModel(BaseModel):
         new_frame = self.add_universal_description(frame, self.universal_editor_description() + description)
         return new_frame
     
-    def _load_frame_files(self, file_to_view): self.frame_files = sorted([frame for frame in os.listdir(file_to_view) if frame[-4:] == ".jpg"])
+    def _load_frame_files(self): 
+        file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
+        self.frame_files = sorted([frame for frame in os.listdir(file_to_view) if frame[-4:] == ".jpg"])
 
     def run(self, folder):
         self.change_folder_to_explore(folder)
         current_file = self.file_index
         file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
-        self._load_frame_files(file_to_view)
+        self._load_frame_files()
         self.frame_index = 0
 
         while True:
@@ -179,7 +186,7 @@ class EditorBaseModel(BaseModel):
             cv2.imshow("frame", self.add_descrition(frame, self.description_method))
             key = cv2.waitKey(1000//self.fps) & 0xFF
 
-            self.state_method(key, file_to_view, folder)
+            self.state_method(key, self)
             self.editor_base_keys(key)
             self.universal_keys(key)
             if self.should_quit: self.should_quit = False; break
@@ -187,7 +194,7 @@ class EditorBaseModel(BaseModel):
                 current_file = self.file_index
                 file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
                 self.frame_index = 0
-                self._load_frame_files(file_to_view)
+                self._load_frame_files()
 
 class KeyframeEditor(BaseModel):
     """
@@ -197,7 +204,7 @@ class KeyframeEditor(BaseModel):
     def description(self): return [
             "hey"
         ]
-    def run(self, key, file_to_view, folder): 
+    def run(self, key, EditorBaseModel): 
         
         return
 
@@ -209,20 +216,39 @@ class FrameEditor(BaseModel):
     Also has a .automate function to split automatically
     """
     def description(self): return [
-            "",
-            "Press 'd' for delete all previous frames"
-            "Press 'f' for delete all future frames"
-            "Press 's' for split the video"
+            "Press 'd' to delete previous frames",
+            "Press 'f' to delete future frames",
+            "Press 's' to split the video"
         ]
-    def run(self, key, file_to_view, folder): 
+    
+    def delete_future_frames(self, EditorBaseModel: EditorBaseModel, from_index: int):
+        files_to_delete = EditorBaseModel.frame_files[from_index:]
+        file_to_view = os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index])
+        for file in files_to_delete:
+            os.remove(os.path.join(file_to_view, file))
+    
+    def copy_future_frames(self, EditorBaseModel: EditorBaseModel, from_index: int):
+        file_to_view = os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index])
+        folder = EditorBaseModel.data_folder
+        new_filename = get_free_filename(file_to_view.split("_")[-2])
+        filename = os.path.basename(new_filename)
+        files_to_move = EditorBaseModel.frame_files[from_index:]
+
+        new_dir = os.path.join(folder, filename)
+        if not os.path.exists(new_dir):
+            os.makedirs(new_dir)
+            
+        for file in files_to_move:
+            shutil.move(os.path.join(file_to_view, file), new_dir)
+
+    def run(self, key, EditorBaseModel: EditorBaseModel): 
         if key == ord("d"): None
         if key == ord("f"): None
-        if key == ord("s"): 
-            file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
-            folder = self.
-            filename = get_free_filename(file_to_view.split("_")[-2])
 
-        return
+        if key == ord("s"): 
+            self.copy_future_frames(EditorBaseModel, EditorBaseModel.frame_index)
+            # self.delete_future_frames(EditorBaseModel, EditorBaseModel.frame_index)
+            EditorBaseModel._reload_files_and_frames()
 
 class LabelRunner(BaseModel):
     """
@@ -235,7 +261,7 @@ class LabelRunner(BaseModel):
             "hey"
         ]
     
-    def run(self, key, file_to_view, folder): 
+    def run(self, key, EditorBaseModel): 
         
         return
 
@@ -408,7 +434,7 @@ Workflow is as follows:
 
 Todo:
 [x] Record
-[ ] Split
+[x] Split
 [ ] Accept
 [ ] Cut splits
 [ ] Keyframes
