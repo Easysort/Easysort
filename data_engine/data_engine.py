@@ -498,7 +498,7 @@ Workflow is as follows:
 Todo:
 [x] Record
 [x] Split
-[ ] Accept
+[x] Accept
 [x] Cut splits
 [ ] Keyframes
 [ ] Label keyframes (upload and download)
