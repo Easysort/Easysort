@@ -111,9 +111,9 @@ class EditorBaseModel(BaseModel):
         self.labelRunner = LabelRunner(cap = None)
 
         self.editors_name_to_state_method = {
-            "Keyframes": (self.keyframeEditor.run, self.keyframeEditor.description()),
-            "Splitting and cutting": (self.frameEditor.run, self.frameEditor.description()),
-            "View Labels": (self.labelRunner.run, self.labelRunner.description())
+            "Keyframes": (self.keyframeEditor.run, self.keyframeEditor.description),
+            "Splitting and cutting": (self.frameEditor.run, self.frameEditor.description),
+            "View Labels": (self.labelRunner.run, self.labelRunner.description)
         }
 
         ## Choose editor
@@ -165,7 +165,7 @@ class EditorBaseModel(BaseModel):
             if key == ord(f"{i}"): self.state_method = editor_state_method; self.description_method = editor_description_method
 
     def add_descrition(self, frame, editor_description = [""]): 
-        description = [""] + editor_description
+        description = [""] + editor_description(self)
         new_frame = self.add_universal_description(frame, self.universal_editor_description() + description)
         return new_frame
     
@@ -201,7 +201,7 @@ class KeyframeEditor(BaseModel):
     Used to view, add and delete keyframes.
     Only works on verified files
     """
-    def description(self): return [
+    def description(self, EditorBaseModel): return [
             "hey"
         ]
     def run(self, key, EditorBaseModel): 
@@ -215,7 +215,7 @@ class FrameEditor(BaseModel):
     2) split a long video into smaller segments
     Also has a .automate function to split automatically
     """
-    def description(self): return [
+    def description(self, EditorBaseModel): return [
         "Press 'd' to delete previous frames",
         "Press 'f' to delete future frames",
         "Press 's' to split future frames",
@@ -268,12 +268,64 @@ class LabelRunner(BaseModel):
     2) Project keyframes labels onto the rest of the video
     3) Validate projections 
     """
-    def description(self): return [
-            "hey"
+    def description(self, EditorBaseModel): return [
+            ""
         ]
     
     def run(self, key, EditorBaseModel): 
         
+        return
+
+class Auditer(BaseModel):
+    """
+    Used to move the videos:
+    1) from new to verified
+    2) delete from new
+    3) from verified to new
+    """
+
+    def description(self, EditorBaseModel: EditorBaseModel):
+        if EditorBaseModel._folder_to_explore == "new": return self.description_new()
+        if EditorBaseModel._folder_to_explore == "verified": return self.description_verified()
+        return []
+
+    def description_new(self): return [
+        "A: Move video to 'Verified'",
+        "D: Delete"
+    ]
+    
+    def description_verified(self): return [
+        "A: Move video to 'Labelled'",
+        "D: Move back to 'New'"
+    ]
+    
+    def run_new(self, key, EditorBaseModel: EditorBaseModel):
+        if key == ord("a"):
+            file_path = os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index])
+            verified_file_path = os.path.join(get_top_folder(), "data", "verified")
+            new_file_path = os.path.join(verified_file_path, EditorBaseModel.files[EditorBaseModel.file_index])
+            shutil.move(file_path, new_file_path)
+            EditorBaseModel._reload_files_and_frames()
+        if key == ord("d"): 
+            file_path = os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index])
+            if os.path.exists(file_path): 
+                shutil.rmtree(file_path)
+                EditorBaseModel._reload_files_and_frames()
+    
+    def run_verified(self, key, EditorBaseModel: EditorBaseModel):
+        if key == ord("a"):
+            # check if video has ben projectet with keyframes
+            pass
+        if key == ord("d"): 
+            file_path = os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index])
+            new_folder_file_path = os.path.join(get_top_folder(), "data", "new")
+            new_file_path = os.path.join(new_folder_file_path, EditorBaseModel.files[EditorBaseModel.file_index])
+            shutil.move(file_path, new_file_path)
+            EditorBaseModel._reload_files_and_frames()
+
+    def run(self, key, EditorBaseModel: EditorBaseModel): 
+        if EditorBaseModel._folder_to_explore == "new": return self.run_new(key, EditorBaseModel)
+        if EditorBaseModel._folder_to_explore == "verified": return self.run_verified(key, EditorBaseModel)        
         return
 
 class DataEngine():
