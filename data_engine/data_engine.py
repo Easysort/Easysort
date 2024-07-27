@@ -145,8 +145,8 @@ class EditorBaseModel(BaseModel):
         "I:    go to previous video", 
         "O:    go to the next video",
         "", 
-        f"Playing video {self.file_index + 1}/{len(self.files)}", 
-        f"Frame:        {self.frame_index + 1}/{len(self.frame_files)}"
+        f"Playing video: {self.file_index + 1}/{len(self.files)}", 
+        f"Frame:         {self.frame_index + 1}/{len(self.frame_files)}"
     ]
 
     def change_folder_to_explore(self, folder):
@@ -160,8 +160,8 @@ class EditorBaseModel(BaseModel):
         if key == 27: self._reset_state() # if key == esc
         if key == ord('r'): self.frame_index = 0; self.pause = False
         if key == ord('p'): self.pause = not self.pause
-        if key == ord('b'): self.frame_index -= 1
-        if key == ord('n'): self.frame_index += 1
+        if key == ord('b'): self.pause = True; self.frame_index -= 1
+        if key == ord('n'): self.pause = True; self.frame_index += 1
         if key == ord("i"): self.file_index = max(0, self.file_index - 1)
         if key == ord("o"): self.file_index = min(self.file_index + 1, len(self.files) - 1)
 
