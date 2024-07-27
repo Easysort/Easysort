@@ -108,12 +108,12 @@ class EditorBaseModel(BaseModel):
         # EDITORS
         self.keyframeEditor = KeyframeEditor(cap = None)
         self.frameEditor = FrameEditor(cap = None)
-        self.labelRunner = LabelRunner(cap = None)
+        self.auditer = Auditer(cap = None)
 
         self.editors_name_to_state_method = {
             "Keyframes": (self.keyframeEditor.run, self.keyframeEditor.description),
             "Splitting and cutting": (self.frameEditor.run, self.frameEditor.description),
-            "View Labels": (self.labelRunner.run, self.labelRunner.description)
+            "View Labels": (self.auditer.run, self.auditer.description)
         }
 
         ## Choose editor
@@ -261,27 +261,17 @@ class FrameEditor(BaseModel):
             # self.delete_future_frames(EditorBaseModel, EditorBaseModel.frame_index)
             EditorBaseModel._reload_files_and_frames()
 
-class LabelRunner(BaseModel):
-    """
-    Used to:
-    1) See current labels on a video
-    2) Project keyframes labels onto the rest of the video
-    3) Validate projections 
-    """
-    def description(self, EditorBaseModel): return [
-            ""
-        ]
-    
-    def run(self, key, EditorBaseModel): 
-        
-        return
-
 class Auditer(BaseModel):
     """
     Used to move the videos:
     1) from new to verified
     2) delete from new
     3) from verified to new
+
+    Used to:
+    1) See current labels on a video
+    2) Project keyframes labels onto the rest of the video
+    3) Validate projections 
     """
 
     def description(self, EditorBaseModel: EditorBaseModel):
