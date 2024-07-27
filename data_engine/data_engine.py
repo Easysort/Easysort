@@ -135,9 +135,19 @@ class EditorBaseModel(BaseModel):
         self._load()
         self._load_frame_files()
 
-    def universal_editor_description(self): return ["", "Press 'escape' to choose editors", "Press 'r' to reset", "Press 'p' to (un)pause",
-            "Press 'b' to back 1 frame", "Press 'n' to next 1 frames", "Press 'i' to go to previous video", "Press 'o' to go to the next video",
-            "", f"Playing video {self.file_index + 1}/{len(self.files)}", f"Frame: {self.frame_index + 1}/{len(self.frame_files)}"]
+    def universal_editor_description(self): return [
+        "", 
+        "ESC: choose editors", 
+        "R: reset", 
+        "P: (un)pause",
+        "B: back 1 frame", 
+        "N: next 1 frames", 
+        "I: go to previous video", 
+        "O: go to the next video",
+        "", 
+        f"Playing video {self.file_index + 1}/{len(self.files)}", 
+        f"Frame: {self.frame_index + 1}/{len(self.frame_files)}"
+    ]
 
     def change_folder_to_explore(self, folder):
         if folder not in self.allowed_folders: raise LookupError(f"Folder has to be in {self.allowed_folders}, but is {folder}")
@@ -202,7 +212,8 @@ class KeyframeEditor(BaseModel):
     Only works on verified files
     """
     def description(self, EditorBaseModel): return [
-            "hey"
+            "A: Add keyframe on current frame",
+            "D: Delete keyframe on current frame"
         ]
     def run(self, key, EditorBaseModel): 
         
@@ -216,9 +227,9 @@ class FrameEditor(BaseModel):
     Also has a .automate function to split automatically
     """
     def description(self, EditorBaseModel): return [
-        "Press 'd' to delete previous frames",
-        "Press 'f' to delete future frames",
-        "Press 's' to split future frames",
+        "D: delete previous frames",
+        "F: delete future frames",
+        "S: split future frames",
     ]
     
     def delete_previous_frames(self, EditorBaseModel: EditorBaseModel, from_index: int):
