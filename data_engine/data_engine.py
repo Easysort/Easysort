@@ -59,7 +59,7 @@ class DataRecorder(BaseModel):
         super().__init__(self.cap)
 
     def add_description(self, frame): 
-        description = ["Press 'r' to record", "Press 's' to stop", "", "Red = Recording", "Grey = Not recording"]
+        description = ["R:    to record", "S:    to stop", "", "Red = Recording", "Grey = Not recording"]
         new_frame = self.add_universal_description(frame, description)
         new_frame = cv2.rectangle(new_frame, (10, 10), (50, 30), (0, 0, 255), 2) if self.recording else cv2.rectangle(new_frame, (10, 10), (50, 30), (128, 128, 128), 2)
         return new_frame
@@ -106,7 +106,7 @@ class EditorBaseModel(BaseModel):
         self.pause = False
 
         # EDITORS
-        self.keyframeEditor = KeyframeEditor(cap = None)
+        self.keyframeEditor = KeyframeEditor()
         self.frameEditor = FrameEditor(cap = None)
         self.auditer = Auditer(cap = None)
 
@@ -128,7 +128,7 @@ class EditorBaseModel(BaseModel):
     def _load(self): self.files = sorted(os.listdir(self.data_folder))
     def _reset_state(self): 
         self.state_method = self.choose_editor_state_logic
-        self.description_method = [f"Press {i} for {editor_name}" for i, editor_name in enumerate(self.editors_name_to_state_method.keys())]
+        self.description_method = lambda x: [f"{i}:   for {editor_name}" for i, editor_name in enumerate(self.editors_name_to_state_method.keys())]
 
     def _reload_files_and_frames(self):
         self.frame_index = 0
@@ -137,16 +137,16 @@ class EditorBaseModel(BaseModel):
 
     def universal_editor_description(self): return [
         "", 
-        "ESC: choose editors", 
-        "R: reset", 
-        "P: (un)pause",
-        "B: back 1 frame", 
-        "N: next 1 frames", 
-        "I: go to previous video", 
-        "O: go to the next video",
+        "ESC:  choose editors", 
+        "R:    reset", 
+        "P:    (un)pause",
+        "B:    back 1 frame", 
+        "N:    next 1 frames", 
+        "I:    go to previous video", 
+        "O:    go to the next video",
         "", 
         f"Playing video {self.file_index + 1}/{len(self.files)}", 
-        f"Frame: {self.frame_index + 1}/{len(self.frame_files)}"
+        f"Frame:        {self.frame_index + 1}/{len(self.frame_files)}"
     ]
 
     def change_folder_to_explore(self, folder):
@@ -174,7 +174,7 @@ class EditorBaseModel(BaseModel):
         for i, (editor_state_method, editor_description_method) in enumerate(self.editors_name_to_state_method.values()):
             if key == ord(f"{i}"): self.state_method = editor_state_method; self.description_method = editor_description_method
 
-    def add_descrition(self, frame, editor_description = [""]): 
+    def add_descrition(self, frame, editor_description): 
         description = [""] + editor_description(self)
         new_frame = self.add_universal_description(frame, self.universal_editor_description() + description)
         return new_frame
@@ -211,9 +211,35 @@ class KeyframeEditor(BaseModel):
     Used to view, add and delete keyframes.
     Only works on verified files
     """
-    def description(self, EditorBaseModel): return [
-            "A: Add keyframe on current frame",
-            "D: Delete keyframe on current frame"
+    def __init__(self):
+        self.keyframes = None
+        super().__init__(cap = None)
+
+    def add_keyframe(self, EditorBaseModel: EditorBaseModel):
+
+        self.load_keyframes()
+
+    def delete_keyframe(self, EditorBaseModel: EditorBaseModel):
+
+        self.load_keyframes()
+
+    def load_keyframes(self): 
+        return []
+    
+    def description(self, EditorBaseModel: EditorBaseModel): 
+        self.keyframes = self.load_keyframes() if self.keyframes is None else self.keyframes
+        is_current_frame_keyframe = EditorBaseModel.frame_index in self.keyframes
+        return [
+            "",
+            "--------------------",
+            f"Current frame {"is" if is_current_frame_keyframe else "not"} a keyframe",
+            "--------------------",
+            ""
+            "A: Add current frame as keyframe",
+            "D: Delete current keyfranme",
+            "", 
+            "Current keyframes:",
+            f"{self.keyframes}"
         ]
     def run(self, key, EditorBaseModel): 
         
@@ -227,9 +253,9 @@ class FrameEditor(BaseModel):
     Also has a .automate function to split automatically
     """
     def description(self, EditorBaseModel): return [
-        "D: delete previous frames",
-        "F: delete future frames",
-        "S: split future frames",
+        "D:    delete previous frames",
+        "F:    delete future frames",
+        "S:    split future frames",
     ]
     
     def delete_previous_frames(self, EditorBaseModel: EditorBaseModel, from_index: int):
@@ -291,13 +317,13 @@ class Auditer(BaseModel):
         return []
 
     def description_new(self): return [
-        "A: Move video to 'Verified'",
-        "D: Delete"
+        "A:    Move video to 'Verified'",
+        "D:    Delete"
     ]
     
     def description_verified(self): return [
-        "A: Move video to 'Labelled'",
-        "D: Move back to 'New'"
+        "A:    Move video to 'Labelled'",
+        "D:    Move back to 'New'"
     ]
     
     def run_new(self, key, EditorBaseModel: EditorBaseModel):
