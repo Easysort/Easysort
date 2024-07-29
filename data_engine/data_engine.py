@@ -213,21 +213,48 @@ class KeyframeEditor(BaseModel):
     """
     def __init__(self):
         self.keyframes = None
-        super().__init__(cap = None)
+        super().__init__(cap=None)
+
+    def get_keyframes_path(self, EditorBaseModel: EditorBaseModel):
+        return os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index], "keyframes.txt")
 
     def add_keyframe(self, EditorBaseModel: EditorBaseModel):
-
-        self.load_keyframes()
+        keyframe_to_add = EditorBaseModel.frame_index
+        
+        if keyframe_to_add not in self.keyframes:
+            self.keyframes.append(keyframe_to_add)
+            self.save_keyframes(EditorBaseModel)
+        
+        self.load_keyframes(EditorBaseModel)  # Load existing keyframes
 
     def delete_keyframe(self, EditorBaseModel: EditorBaseModel):
+        keyframe_to_delete = EditorBaseModel.frame_index
+        
+        if keyframe_to_delete in self.keyframes:
+            self.keyframes.remove(keyframe_to_delete)
+            self.save_keyframes(EditorBaseModel)
 
-        self.load_keyframes()
+        self.load_keyframes(EditorBaseModel)  # Load existing keyframes
 
-    def load_keyframes(self): 
-        return []
+    def save_keyframes(self, EditorBaseModel: EditorBaseModel):
+        keyframes_path = self.get_keyframes_path(EditorBaseModel)
+        with open(keyframes_path, 'w') as f:
+            for keyframe in self.keyframes:
+                f.write(f"{keyframe}\n")
+
+    def load_keyframes(self, EditorBaseModel: EditorBaseModel):
+        if self.keyframes is not None: return
+        keyframes_path = self.get_keyframes_path(EditorBaseModel)
+        if not os.path.exists(keyframes_path):
+            self.keyframes = []
+            with open(keyframes_path, 'w') as f: pass
+        else:
+            with open(keyframes_path, 'r') as f:
+                self.keyframes = [int(line.strip()) for line in f.readlines()]
+
     
     def description(self, EditorBaseModel: EditorBaseModel): 
-        self.keyframes = self.load_keyframes() if self.keyframes is None else self.keyframes
+        self.load_keyframes(EditorBaseModel)
         is_current_frame_keyframe = EditorBaseModel.frame_index in self.keyframes
         return [
             "",
@@ -239,10 +266,11 @@ class KeyframeEditor(BaseModel):
             "D: Delete current keyfranme",
             "", 
             "Current keyframes:",
-            f"{self.keyframes}"
+            f"{[i+1 for i in self.keyframes]}"
         ]
     def run(self, key, EditorBaseModel): 
-        
+        if key == ord("a"): self.add_keyframe(EditorBaseModel)
+        if key == ord("d"): self.delete_keyframe(EditorBaseModel)
         return
 
 class FrameEditor(BaseModel):
