@@ -555,7 +555,7 @@ Todo:
 [x] Split
 [x] Accept
 [x] Cut splits
-[ ] Keyframes
+[x] Keyframes
 [ ] Label keyframes (upload and download)
 [ ] Project keyframes
 [ ] Confirm labels
