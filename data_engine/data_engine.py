@@ -213,7 +213,21 @@ class KeyframeEditor(BaseModel):
     """
     def __init__(self):
         self.keyframes = None
+        self.uploaded_keyframes = None
         super().__init__(cap=None)
+
+    def save_file(self, path: str, content: list): 
+        with open(path, 'w') as f:
+            for obj in content:
+                f.write(f"{obj}\n")
+
+    def read_file(self, path: str):
+        if not os.path.exists(path):
+            with open(path, 'w') as f: pass
+            return []
+        else:
+            with open(path, 'r') as f:
+                return [int(line.strip()) for line in f.readlines()]
 
     def get_keyframes_path(self, EditorBaseModel: EditorBaseModel):
         return os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index], "keyframes.txt")
@@ -223,9 +237,10 @@ class KeyframeEditor(BaseModel):
         
         if keyframe_to_add not in self.keyframes:
             self.keyframes.append(keyframe_to_add)
+            self.keyframes.sort()
             self.save_keyframes(EditorBaseModel)
         
-        self.load_keyframes(EditorBaseModel)  # Load existing keyframes
+        self.load_keyframes(EditorBaseModel, force = True)
 
     def delete_keyframe(self, EditorBaseModel: EditorBaseModel):
         keyframe_to_delete = EditorBaseModel.frame_index
@@ -234,23 +249,23 @@ class KeyframeEditor(BaseModel):
             self.keyframes.remove(keyframe_to_delete)
             self.save_keyframes(EditorBaseModel)
 
-        self.load_keyframes(EditorBaseModel)  # Load existing keyframes
+        self.load_keyframes(EditorBaseModel, force = True)
 
     def save_keyframes(self, EditorBaseModel: EditorBaseModel):
         keyframes_path = self.get_keyframes_path(EditorBaseModel)
-        with open(keyframes_path, 'w') as f:
-            for keyframe in self.keyframes:
-                f.write(f"{keyframe}\n")
+        self.save_file(keyframes_path, self.keyframes)
 
-    def load_keyframes(self, EditorBaseModel: EditorBaseModel):
-        if self.keyframes is not None: return
+    def load_keyframes(self, EditorBaseModel: EditorBaseModel, force: bool = False):
+        if self.keyframes is not None and not force: return
         keyframes_path = self.get_keyframes_path(EditorBaseModel)
-        if not os.path.exists(keyframes_path):
-            self.keyframes = []
-            with open(keyframes_path, 'w') as f: pass
-        else:
-            with open(keyframes_path, 'r') as f:
-                self.keyframes = [int(line.strip()) for line in f.readlines()]
+        self.keyframes = self.read_file(keyframes_path)
+
+    def prepare_upload(self, EditorBaseModel: EditorBaseModel):
+        for file in EditorBaseModel.files:
+            path = os.path.join(EditorBaseModel.data_folder, file, "keyframes.txt")
+
+            self.uploaded_keyframes = list(set(self.keyframes + self.uploaded_keyframes))
+        pass
 
     
     def description(self, EditorBaseModel: EditorBaseModel): 
@@ -258,12 +273,14 @@ class KeyframeEditor(BaseModel):
         is_current_frame_keyframe = EditorBaseModel.frame_index in self.keyframes
         return [
             "",
-            "--------------------",
+            "| -------------------------- |",
             f"Current frame {"is" if is_current_frame_keyframe else "not"} a keyframe",
-            "--------------------",
+            "| -------------------------- |",
             ""
             "A: Add current frame as keyframe",
             "D: Delete current keyfranme",
+            "P: Prep for upload",
+            "L: Project labels from labelled keyframes"
             "", 
             "Current keyframes:",
             f"{[i+1 for i in self.keyframes]}"
@@ -271,6 +288,7 @@ class KeyframeEditor(BaseModel):
     def run(self, key, EditorBaseModel): 
         if key == ord("a"): self.add_keyframe(EditorBaseModel)
         if key == ord("d"): self.delete_keyframe(EditorBaseModel)
+        if key == ord("p"): self.prepare_upload(EditorBaseModel)
         return
 
 class FrameEditor(BaseModel):
