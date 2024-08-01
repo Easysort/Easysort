@@ -263,7 +263,8 @@ class KeyframeEditor(BaseModel):
     def prepare_upload(self, EditorBaseModel: EditorBaseModel):
         for file in EditorBaseModel.files:
             path = os.path.join(EditorBaseModel.data_folder, file, "keyframes.txt")
-
+            to_upload = [n for n in self.keyframes if n not in self.uploaded_keyframes]
+            if len(to_upload) == 0: continue
             self.uploaded_keyframes = list(set(self.keyframes + self.uploaded_keyframes))
         pass
 
