@@ -267,6 +267,7 @@ class KeyframeEditor(BaseModel):
         return to_upload_path
 
     def prepare_upload(self, EditorBaseModel: EditorBaseModel):
+        if EditorBaseModel._folder_to_explore != "verified": return
         to_upload_path = self.prep_to_upload_folder()
 
         for file in EditorBaseModel.files:
@@ -294,7 +295,7 @@ class KeyframeEditor(BaseModel):
             ""
             "A: Add current frame as keyframe",
             "D: Delete current keyfranme",
-            "P: Prep for upload",
+            "P: Prep for upload" if EditorBaseModel._folder_to_explore == "verified" else "",
             "L: Project labels from labelled keyframes"
             "", 
             "Current keyframes:",
