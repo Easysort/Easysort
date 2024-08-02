@@ -102,6 +102,7 @@ class EditorBaseModel(BaseModel):
         self.data_folder = os.path.join(get_top_folder(), "data", self._folder_to_explore)
         self.fps = 10
         self.pause = False
+        self.file_to_view = None
 
         # EDITORS
         self.keyframeEditor = KeyframeEditor()
@@ -111,7 +112,7 @@ class EditorBaseModel(BaseModel):
         self.editors_name_to_state_method = {
             "Keyframes": (self.keyframeEditor.run, self.keyframeEditor.description),
             "Splitting and cutting": (self.frameEditor.run, self.frameEditor.description),
-            "View Labels": (self.auditer.run, self.auditer.description)
+            "Approve or deny": (self.auditer.run, self.auditer.description)
         }
 
         ## Choose editor
@@ -123,13 +124,14 @@ class EditorBaseModel(BaseModel):
 
         super().__init__(cap = None)
     
-    def _load(self): self.files = sorted(os.listdir(self.data_folder))
+    def _load(self): self.files = sorted(os.listdir(self.data_folder)); print("SELF.FILES \n ", self.files)
     def _reset_state(self): 
         self.state_method = self.choose_editor_state_logic
         self.description_method = lambda x: [f"{i}:   for {editor_name}" for i, editor_name in enumerate(self.editors_name_to_state_method.keys())]
 
     def _reload_files_and_frames(self):
         self.frame_index = 0
+        self.file_index = 0
         self._load()
         self._load_frame_files()
 
@@ -178,19 +180,21 @@ class EditorBaseModel(BaseModel):
         return new_frame
     
     def _load_frame_files(self): 
-        file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
-        self.frame_files = sorted([frame for frame in os.listdir(file_to_view) if frame[-4:] == ".jpg"])
+        self.file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
+        self.frame_files = sorted([frame for frame in os.listdir(self.file_to_view) if frame[-4:] == ".jpg"])
+
 
     def run(self, folder):
         self.change_folder_to_explore(folder)
         current_file = self.file_index
-        file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
+        self.file_to_view = os.path.join(self.data_folder, self.files[self.file_index])
         self._load_frame_files()
         self.frame_index = 0
 
         while True:
-            frame_path = os.path.join(file_to_view, self.frame_files[self.frame_index])
+            frame_path = os.path.join(self.file_to_view, self.frame_files[self.frame_index])
             frame = cv2.imread(frame_path)
+            if frame is None: self.error()
             cv2.imshow("frame", self.add_descrition(frame, self.description_method))
             key = cv2.waitKey(1000//self.fps) & 0xFF
 
@@ -325,20 +329,17 @@ class FrameEditor(BaseModel):
     
     def delete_previous_frames(self, EditorBaseModel: EditorBaseModel, from_index: int):
         files_to_delete = EditorBaseModel.frame_files[:from_index]
-        file_to_view = os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index])
         for file in files_to_delete:
-            os.remove(os.path.join(file_to_view, file))
+            os.remove(os.path.join(EditorBaseModel.file_to_view, file))
 
     def delete_future_frames(self, EditorBaseModel: EditorBaseModel, from_index: int):
         files_to_delete = EditorBaseModel.frame_files[from_index + 1:]
-        file_to_view = os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index])
         for file in files_to_delete:
-            os.remove(os.path.join(file_to_view, file))
+            os.remove(os.path.join(EditorBaseModel.file_to_view, file))
     
     def copy_future_frames(self, EditorBaseModel: EditorBaseModel, from_index: int):
-        file_to_view = os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index])
         folder = EditorBaseModel.data_folder
-        new_filename = get_free_filename(file_to_view.split("_")[-2])
+        new_filename = get_free_filename(EditorBaseModel.file_to_view.split("_")[-2])
         filename = os.path.basename(new_filename)
         files_to_move = EditorBaseModel.frame_files[from_index + 1:]
 
@@ -347,7 +348,7 @@ class FrameEditor(BaseModel):
             os.makedirs(new_dir)
             
         for file in files_to_move:
-            shutil.move(os.path.join(file_to_view, file), new_dir)
+            shutil.move(os.path.join(EditorBaseModel.file_to_view, file), new_dir)
 
     def run(self, key, EditorBaseModel: EditorBaseModel): 
         if key == ord("d"): 
