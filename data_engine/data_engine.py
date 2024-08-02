@@ -1,7 +1,5 @@
 """
 Data Engine classes
-- DataRecorder: Used to record and store new videos         (POST)
-- DataExplorer: Used to load, get, sort and explore data    (GET)
 """
 
 import subprocess
@@ -280,7 +278,7 @@ class KeyframeEditor(BaseModel):
             self.save_file(uploaded_keyframes_path, uploaded_keyframes)
             for i in to_upload:
                 src_path = EditorBaseModel.files[i]
-                dst_path = os.path.join(to_upload_path, src_path.split("/")[-1])
+                dst_path = os.path.join(to_upload_path, src_path.split("/")[-2] + "__" + src_path.split("/")[-1])
                 shutil.copy(src_path, dst_path)
 
     
@@ -304,7 +302,6 @@ class KeyframeEditor(BaseModel):
     
     def project_labels(self, EditorBaseModel: EditorBaseModel):
         return
-
 
     def run(self, key, EditorBaseModel): 
         if key == ord("a"): self.add_keyframe(EditorBaseModel)
