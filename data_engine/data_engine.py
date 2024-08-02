@@ -301,10 +301,16 @@ class KeyframeEditor(BaseModel):
             "Current keyframes:",
             f"{[i+1 for i in self.keyframes]}"
         ]
+    
+    def project_labels(self, EditorBaseModel: EditorBaseModel):
+        return
+
+
     def run(self, key, EditorBaseModel): 
         if key == ord("a"): self.add_keyframe(EditorBaseModel)
         if key == ord("d"): self.delete_keyframe(EditorBaseModel)
         if key == ord("p"): self.prepare_upload(EditorBaseModel)
+        if key == ord("l"): self.project_labels(EditorBaseModel)
         return
 
 class FrameEditor(BaseModel):
