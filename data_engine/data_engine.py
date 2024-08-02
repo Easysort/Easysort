@@ -260,13 +260,27 @@ class KeyframeEditor(BaseModel):
         keyframes_path = self.get_keyframes_path(EditorBaseModel)
         self.keyframes = self.read_file(keyframes_path)
 
+    def prep_to_upload_folder(self) -> str:
+        to_upload_path = os.path.join(get_top_folder(), "data", "to_upload")
+        if not os.path.exists: os.makedirs(to_upload_path)
+        for file in os.listdir(to_upload_path): os.remove(file)
+        return to_upload_path
+
     def prepare_upload(self, EditorBaseModel: EditorBaseModel):
+        to_upload_path = self.prep_to_upload_folder()
+
         for file in EditorBaseModel.files:
-            path = os.path.join(EditorBaseModel.data_folder, file, "keyframes.txt")
-            to_upload = [n for n in self.keyframes if n not in self.uploaded_keyframes]
+            self.load_keyframes(EditorBaseModel, force = True)
+            uploaded_keyframes_path = os.path.join(EditorBaseModel.data_folder, file, "uploaded_keyframes.txt")
+            uploaded_keyframes = self.read_file(uploaded_keyframes_path)
+            to_upload = [n for n in self.keyframes if n not in uploaded_keyframes]
             if len(to_upload) == 0: continue
-            self.uploaded_keyframes = list(set(self.keyframes + self.uploaded_keyframes))
-        pass
+            self.uploaded_keyframes = list(set(self.keyframes + uploaded_keyframes))
+            self.save_file(uploaded_keyframes_path, uploaded_keyframes)
+            for i in to_upload:
+                src_path = EditorBaseModel.files[i]
+                dst_path = os.path.join(to_upload_path, src_path.split("/")[-1])
+                shutil.copy(src_path, dst_path)
 
     
     def description(self, EditorBaseModel: EditorBaseModel): 
