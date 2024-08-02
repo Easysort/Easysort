@@ -407,7 +407,10 @@ class Auditer(BaseModel):
     
     def run_verified(self, key, EditorBaseModel: EditorBaseModel):
         if key == ord("a"):
+            # TODO:
             # check if video has ben projectet with keyframes
+            # if not then maybe project and inform the user
+            # and let them potentially approve again
             pass
         if key == ord("d"): 
             file_path = os.path.join(EditorBaseModel.data_folder, EditorBaseModel.files[EditorBaseModel.file_index])
