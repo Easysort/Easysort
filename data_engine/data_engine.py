@@ -289,11 +289,6 @@ class KeyframeEditor(BaseModel):
             if len(to_upload) == 0: continue
             self.uploaded_keyframes = list(set(self.keyframes + uploaded_keyframes))
 
-            #
-            print(to_upload)
-            print(self.keyframes)
-            print(file)
-
             for i in to_upload:
                 frame_file = frame_files[i]
                 src_path = os.path.join(EditorBaseModel.data_folder, file, frame_file)
