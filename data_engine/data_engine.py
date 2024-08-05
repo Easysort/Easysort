@@ -216,6 +216,7 @@ class KeyframeEditor(BaseModel):
     def __init__(self):
         self.keyframes = None
         self.uploaded_keyframes = None
+        self.loaded_keyframes_path = None
         super().__init__(cap=None)
 
     def save_file(self, path: str, content: list): 
@@ -236,6 +237,7 @@ class KeyframeEditor(BaseModel):
 
     def add_keyframe(self, EditorBaseModel: EditorBaseModel):
         keyframe_to_add = EditorBaseModel.frame_index
+        self.load_keyframes(EditorBaseModel)
         
         if keyframe_to_add not in self.keyframes:
             self.keyframes.append(keyframe_to_add)
@@ -246,6 +248,7 @@ class KeyframeEditor(BaseModel):
 
     def delete_keyframe(self, EditorBaseModel: EditorBaseModel):
         keyframe_to_delete = EditorBaseModel.frame_index
+        self.load_keyframes(EditorBaseModel)
         
         if keyframe_to_delete in self.keyframes:
             self.keyframes.remove(keyframe_to_delete)
@@ -260,7 +263,12 @@ class KeyframeEditor(BaseModel):
     def load_keyframes(self, EditorBaseModel: EditorBaseModel, force: bool = False):
         if self.keyframes is not None and not force: return
         keyframes_path = self.get_keyframes_path(EditorBaseModel)
+        self.loaded_keyframes_path = keyframes_path
         self.keyframes = self.read_file(keyframes_path)
+        print("-------------")
+        print(keyframes_path)
+        print(self.keyframes)
+        print("-------------")
 
     def prep_to_upload_folder(self) -> str:
         to_upload_path = os.path.join(get_top_folder(), "data", "to_upload")
@@ -307,7 +315,9 @@ class KeyframeEditor(BaseModel):
     def project_labels(self, EditorBaseModel: EditorBaseModel):
         return
 
-    def run(self, key, EditorBaseModel): 
+    def run(self, key, EditorBaseModel):
+        if self.loaded_keyframes_path != self.get_keyframes_path(EditorBaseModel): 
+            self.load_keyframes(EditorBaseModel, force = True)
         if key == ord("a"): self.add_keyframe(EditorBaseModel)
         if key == ord("d"): self.delete_keyframe(EditorBaseModel)
         if key == ord("p"): self.prepare_upload(EditorBaseModel)
