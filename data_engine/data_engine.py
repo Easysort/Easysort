@@ -277,16 +277,17 @@ class KeyframeEditor(BaseModel):
         to_upload_path = self.prep_to_upload_folder()
 
         for file in EditorBaseModel.files:
-            # Reading this specific files keyframes and uploaded_keyframes
+            # Reading this specific files keyframes, uploaded_keyframes and frame_files
             keyframes_path = os.path.join(EditorBaseModel.data_folder, file, "keyframes.txt")
             self.keyframes = self.read_file(keyframes_path)
             uploaded_keyframes_path = os.path.join(EditorBaseModel.data_folder, file, "uploaded_keyframes.txt")
             uploaded_keyframes = self.read_file(uploaded_keyframes_path)
             to_upload = [n for n in self.keyframes if n not in uploaded_keyframes]
+            frame_files_path = os.path.join(EditorBaseModel.data_folder, file)
+            frame_files = sorted([frame for frame in os.listdir(frame_files_path) if frame[-4:] == ".jpg"])
 
             if len(to_upload) == 0: continue
             self.uploaded_keyframes = list(set(self.keyframes + uploaded_keyframes))
-            self.save_file(uploaded_keyframes_path, self.uploaded_keyframes)
 
             #
             print(to_upload)
@@ -294,11 +295,12 @@ class KeyframeEditor(BaseModel):
             print(file)
 
             for i in to_upload:
-                frame_file = EditorBaseModel.frame_files[i]
+                frame_file = frame_files[i]
                 src_path = os.path.join(EditorBaseModel.data_folder, file, frame_file)
                 dst_path = os.path.join(to_upload_path, file + "__" + frame_file)
-                # The src path is still wrong sometimes, I do now know why
                 shutil.copy(src_path, dst_path)
+
+            self.save_file(uploaded_keyframes_path, self.uploaded_keyframes)
 
     
     def description(self, EditorBaseModel: EditorBaseModel): 
