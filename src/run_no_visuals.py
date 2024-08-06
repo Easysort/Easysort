@@ -3,7 +3,10 @@
 # When an object is found
 # it returns the type and midpoint.
 
-# NOT DONE
+# TODO:
+# - Be able to give arduino position and speed of object to catch.
+# - Be able to listen to incoming call from arduino when ready again.
+# - Be able to store the type sorted and how many in db
 
 import cv2
 import torch
