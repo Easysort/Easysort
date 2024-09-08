@@ -317,6 +317,7 @@ class KeyframeEditor(BaseModel):
         ]
     
     def project_labels(self, EditorBaseModel: EditorBaseModel):
+        # open the yolo dataset, get all keyframes and save their respective labels, project them onto the full videos, delete yolo dataset
         return
 
     def run(self, key, EditorBaseModel):
