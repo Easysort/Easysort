@@ -21,20 +21,20 @@ while True:
     ret, frame = cap.read()
 
     # Perform inference
-    inputs = processor(images=frame, return_tensors="pt")
-    outputs = model(**inputs)
+    # inputs = processor(images=frame, return_tensors="pt")
+    # outputs = model(**inputs)
     
     # Post-process the predictions
     target_sizes = torch.tensor([frame.shape[:2]])
-    results = processor.post_process_object_detection(outputs, target_sizes=target_sizes)[0]
+    # results = processor.post_process_object_detection(outputs, target_sizes=target_sizes)[0]
 
-    # Draw bounding boxes on the frame
-    for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
-        box = [int(b) for b in box]
-        label_text = model.config.id2label[label.item()]
-        frame = cv2.rectangle(frame, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
-        frame = cv2.putText(frame, f"Label: {label_text}, Score: {score:.2f}", (box[0], box[1] - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    # # Draw bounding boxes on the frame
+    # for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
+    #     box = [int(b) for b in box]
+    #     label_text = model.config.id2label[label.item()]
+    #     frame = cv2.rectangle(frame, (box[0], box[1]), (box[2], box[3]), (0, 255, 0), 2)
+    #     frame = cv2.putText(frame, f"Label: {label_text}, Score: {score:.2f}", (box[0], box[1] - 10),
+    #                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
     # Display the resulting frame
     cv2.imshow('DETR Object Detection', frame)
