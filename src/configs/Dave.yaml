@@ -1,0 +1,20 @@
+# Dave is the first robot to be deployed
+# Dave was demoed on:
+# And in production on: 
+
+name: Dave
+motor_arduino: /dev/cu.usbmodem1401
+suction_cup_arduino: /dev/cu.usbserial-110
+
+sort_containers: ["plastic", "metal", "metal-can", "plastic-can", "paper"] 
+sleep_position: [0, 0]
+ready_position: [0, 0]
+plastic_position: [0, 0]
+plastic_cans_position: [0, 0]
+metal_position: [0, 0]
+metal_cans_position: [0, 0]
+paper_position: [0, 0]
+
+max_x: 1000
+max_y: 1000
+
