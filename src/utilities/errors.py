@@ -1,10 +1,12 @@
+from serial.tools import list_ports
+
+from src.utilities.config import load_robot_overview_config, RobotConfig
 
 # Arduino
-from src.utilities.environment import Environment
 
 class ArduinoConnectionError(Exception):
     def __init__(self, name: str, port: str, error: str):
-        super().__init__(f"Failed to connect to {name} at {port}, {error}")
+        super().__init__(f"Failed to connect to {name} at {port}, possible ports are: {[port.device for port in list_ports.comports()]}")
 
 class ArduinoCommunicationError(Exception):
     def __init__(self, name: str, port: str, error: str):
@@ -14,9 +16,9 @@ class ArduinoCommunicationError(Exception):
 
 class InvalidRobotIdError(Exception):
     def __init__(self, robot_id: str):
-        super().__init__(f"Invalid robot_id: {robot_id}. Must be one of {Environment.POSSIBLE_ROBOT_IDS}")
+        super().__init__(f"Invalid robot_id: {robot_id}. Must be one of {load_robot_overview_config().names}")
 
 class InvalidContainerError(Exception):
-    def __init__(self, container: str, robot_config: dict):
+    def __init__(self, container: str, robot_config: RobotConfig):
         super().__init__(f"Invalid container: {container}. This robot cannot sort this type of trash. Must be one of {robot_config.SORT_CONTAINERS}")
 
