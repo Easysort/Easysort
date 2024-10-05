@@ -13,7 +13,7 @@ plastic_position: [0, 0]
 plastic_cans_position: [0, 0]
 metal_position: [0, 0]
 metal_cans_position: [0, 0]
-paper_position: [0, 0]
+paper_position: [20, 5]
 
 max_x: 1000
 max_y: 1000
