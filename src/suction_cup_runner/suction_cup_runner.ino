@@ -19,8 +19,10 @@ void loop()
     int command = Serial.read();
     if (command == '1') {
       myservo0.write(180);  // Turn on the pump
+      // Serial.println("on");
     } else if (command == '0') {
       myservo0.write(0);    // Turn off the pump
+      // Serial.println("off");
     }
   }
 }
