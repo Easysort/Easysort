@@ -18,3 +18,13 @@ paper_position: [20, 5]
 max_x: 1000
 max_y: 1000
 
+xy_max_speed: 2000
+xy_acceleration: 1000
+xy_steps_per_rev: 800
+
+z_max_speed: 1000
+z_acceleration: 500
+z_steps_per_rev: 800
+
+conveyor_speed: 8.727 # cm/s
+cms_for_10_revolutions: 60
