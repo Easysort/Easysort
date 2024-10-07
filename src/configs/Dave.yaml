@@ -26,5 +26,5 @@ z_max_speed: 1000
 z_acceleration: 500
 z_steps_per_rev: 800
 
-conveyor_speed: 8.727 # cm/s
+conveyor_speed_cm_per_s: 8.727 # cm/s
 cms_for_10_revolutions: 60

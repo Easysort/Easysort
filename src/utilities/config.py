@@ -35,7 +35,7 @@ class RobotConfig:
     z_max_speed: int
     z_acceleration: int
     z_steps_per_rev: int
-    conveyor_speed: int
+    conveyor_speed_cm_per_s: int
     cms_for_10_revolutions: int
 
 
