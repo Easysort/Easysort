@@ -2,7 +2,7 @@ from typing import List, Optional
 from dataclasses import asdict
 
 from src.utilities.arduino import ArduinoMotorConnector, ArduinoSuctionCupConnector
-from src.utilities.config import load_robot_config, load_robot_overview_config
+from src.utilities.config import load_robot_config, load_robot_overview_config, get_matching_config_string
 from src.utilities.logger import EasySortLogger
 from src.helpers.datasaver import DataSaver
 from src.utilities.config import RobotConfig
@@ -32,11 +32,16 @@ class Orchestrator:
             container is the container to put the item in
         """
         if container not in self.robot_config.sort_containers: _LOGGER.error(f"Invalid container: {container}. Must be one of {self.robot_config.sort_containers}"); return
-        self.motor_arduino.navigate_to(x, y)
+        arduino_response_pickup = self.motor_arduino.navigate_to(x, y)
+        if arduino_response_pickup == "fail":
+            self.database.save(self.get_database_representation(container, arduino_response_pickup, {"fail": "Failed to pick up item"}))
+            return
         self.suction_cup_arduino.on()
-        arduino_response = self.motor_arduino.navigate_to(*container)
-        self.suction_cup_arduino.off()
-        self.database.decode_and_save(arduino_response)
+        arduino_response_place = self.motor_arduino.navigate_to(*container)
+        self.database.save(
+            self.get_database_representation(container, arduino_response_place, {"fail": "Failed to place item", "success": "none"})
+        )
+        # self.suction_cup_arduino.off()
         return
     
     def quit(self):
@@ -44,3 +49,12 @@ class Orchestrator:
         if self.suction_cup_arduino: self.suction_cup_arduino.quit()
         if self.database: self.database.quit()
         return
+    
+    def get_database_representation(self, container: List[int], arduino_response: str, reason: dict) -> str:
+        """
+        Translates Arduino response of "success"/"fail" into database representation:
+        Generally the format is {material}__{success/fail}__{reason}
+        """
+        container_str = get_matching_config_string(self.robot_config, container)
+        return f"{container_str}__{arduino_response}__{reason}"
+        

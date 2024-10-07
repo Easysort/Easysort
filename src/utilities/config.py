@@ -42,3 +42,4 @@ class RobotConfig:
 def load_config(path: str, config_type: Type[T]) -> T: return config_type(**yaml.safe_load(open(path, 'r')))
 def load_robot_config(robot_name: str) -> RobotConfig: return load_config(Path(ROBOT_CONFIG_PATH) / (robot_name + ".yaml"), RobotConfig)
 def load_robot_overview_config() -> RobotOverviewConfig: return load_config(Path(ROBOT_OVERVIEW_PATH), RobotOverviewConfig)
+def get_matching_config_string(robot_config: RobotConfig, value: str | int | List[int]) -> str: return next((key for key, config in robot_config.items() if config == value), None)
