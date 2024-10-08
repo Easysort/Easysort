@@ -55,6 +55,7 @@ class Orchestrator:
         Translates Arduino response of "success"/"fail" into database representation:
         Generally the format is {material}__{success/fail}__{reason}
         """
-        container_str = get_matching_config_string(self.robot_config, container)
+        # Just want paper, not paper_position
+        container_str = get_matching_config_string(self.robot_config, container).replace("_position", "")
         return f"{container_str}__{arduino_response}__{reason}"
         
