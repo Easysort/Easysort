@@ -36,7 +36,7 @@ class Orchestrator:
         if arduino_response_pickup == "fail":
             self.database.save(self.get_database_representation(container, arduino_response_pickup, {"fail": "Failed to pick up item"}))
             return
-        self.suction_cup_arduino.on()
+        # self.suction_cup_arduino.on()
         arduino_response_place = self.motor_arduino.navigate_to(*container)
         self.database.save(
             self.get_database_representation(container, arduino_response_place, {"fail": "Failed to place item", "success": "none"})
