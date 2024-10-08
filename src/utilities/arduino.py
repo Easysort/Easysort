@@ -88,6 +88,7 @@ class ArduinoSuctionCupConnector(ArduinoBaseConnector):
     def __init__(self, robot_config: RobotConfig):
         super().__init__(robot_config.suction_cup_arduino, robot_config)
     
-    async def on(self) -> None: await self.send_information(b'1')
-    async def off(self) -> None: await self.send_information(b'0')
+    # Suction Arduino now connected to motor arduino, therefore no need for on/off, 8/10/2024
+    # async def on(self) -> None: await self.send_information(b'1')
+    # async def off(self) -> None: await self.send_information(b'0')
 
