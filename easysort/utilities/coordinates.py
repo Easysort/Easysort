@@ -1,5 +1,5 @@
-from src.utilities.config import RobotConfig
-from src.utilities.math import get_conveyor_speed
+from easysort.utilities.config import RobotConfig
+from easysort.utilities.math import get_conveyor_speed
 
 import time
 

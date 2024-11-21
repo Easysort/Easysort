@@ -1,5 +1,5 @@
-from src.utilities.config import RobotConfig
-from src.utilities.coordinates import Coordinate
+from easysort.utilities.config import RobotConfig
+from easysort.utilities.coordinates import Coordinate
 
 class PickupCalculater():
     def __init__(self, robot_config: RobotConfig):

@@ -1,11 +1,11 @@
 from typing import List, Optional
 from dataclasses import asdict
 
-from src.utilities.arduino import ArduinoMotorConnector, ArduinoSuctionCupConnector
-from src.utilities.config import load_robot_config, load_robot_overview_config, get_matching_config_string
-from src.utilities.logger import EasySortLogger
-from src.helpers.datasaver import DataSaver
-from src.utilities.config import RobotConfig
+from easysort.utilities.arduino import ArduinoMotorConnector, ArduinoSuctionCupConnector
+from easysort.utilities.config import load_robot_config, load_robot_overview_config, get_matching_config_string
+from easysort.utilities.logger import EasySortLogger
+from easysort.helpers.datasaver import DataSaver
+from easysort.utilities.config import RobotConfig
 
 _LOGGER = EasySortLogger()
 

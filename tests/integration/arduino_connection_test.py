@@ -15,7 +15,7 @@ import time
 
 
 import asyncio
-from src.helpers.orchestrator import Orchestrator
+from easysort.helpers.orchestrator import Orchestrator
 
 
 MOTOR_ARDUINO = "/dev/cu.usbmodem1401"

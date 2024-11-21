@@ -2,21 +2,23 @@
 
 <h1>EasySort</h1>
 
-EasySort: An open-source trash sorting system. Maintained by [Lucas Vilsen](https://github.com/Apros7).
+EasySort: An open-source sorting system. Maintained by [Lucas Vilsen](https://github.com/Apros7).
 </div>
 
 ---
 
 # What is EasySort
-Given a picture it will give the center location, a descriptive label and the corresponding subcategory for sorting of all known materials in the picture.
-
-...
+EasySort makes you go from a sorting problem to a solution in just a couple of hours. Collect data, annotate it, train a model and you are ready to go.
 
 # How to setup EasySort
 ...
 
 # Why open-source?
-I believe this is a positive-sum game. The market is so large that we can all win. This technology should be so cheap that it exists everywhere on earth helping everyone better take of their trash.
+I believe this is a positive-sum game. The market is so large that we can all win. This technology should be so cheap that it exists everywhere on earth helping everyone better sort items and improve the average quality of products running through their system.
+
+This could be applied 
+
+You can use EasySort as you like, copy it, modify it, sell it, do whatever you like with it. The project is in active development, so issues and pull requests are welcome.
 
 
 

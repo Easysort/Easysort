@@ -1,6 +1,6 @@
 from serial.tools import list_ports
 
-from src.utilities.config import load_robot_overview_config, RobotConfig
+from easysort.utilities.config import load_robot_overview_config, RobotConfig
 
 # Arduino
 

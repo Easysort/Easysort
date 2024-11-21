@@ -3,9 +3,9 @@ import time
 import asyncio
 from dataclasses import dataclass
 
-from src.utilities.errors import ArduinoConnectionError, ArduinoCommunicationError
-from src.utilities.config import RobotConfig
-from src.utilities.logger import EasySortLogger
+from easysort.utilities.errors import ArduinoConnectionError, ArduinoCommunicationError
+from easysort.utilities.config import RobotConfig
+from easysort.utilities.logger import EasySortLogger
 
 _LOGGER = EasySortLogger()
 _MAX_TIME_TO_WAIT_FOR_MOVEMENT_MESSAGE = 5 # seconds
