@@ -6,8 +6,8 @@
 import cv2
 import supervision as sv
 
-from tqdm import tqdm
 from inference.models.yolo_world.yolo_world import YOLOWorld
+import time
 
 class Classifier: 
     def __init__(self):
@@ -16,9 +16,12 @@ class Classifier:
         self.model.set_classes(self.classes)
 
     def __call__(self, image):
+        process_time = time.time()
         results = self.model.infer(image)
         detections = sv.Detections.from_inference(results)
-        return self.cam_view_to_world_view(detections)
+        world_view_detections = self.cam_view_to_world_view(detections)
+        print(f"Time taken: {round(time.time() - process_time, 2)} seconds")
+        return world_view_detections
     
     def cam_view_to_world_view(self, detections):
         # Do computations hehe..
