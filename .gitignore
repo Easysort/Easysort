@@ -217,3 +217,4 @@ runs
 data
 yolov8n.pt
 db.json
+playground/

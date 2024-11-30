@@ -5,9 +5,13 @@
 
 import cv2
 import supervision as sv
+from typing import Union
+from pathlib import Path
 
 from inference.models.yolo_world.yolo_world import YOLOWorld
 import time
+
+SOURCE_IMAGE_PATH = "easysort/helpers/test.jpg"
 
 class Classifier: 
     def __init__(self):
@@ -16,12 +20,16 @@ class Classifier:
         self.model.set_classes(self.classes)
 
     def __call__(self, image):
-        process_time = time.time()
         results = self.model.infer(image)
         detections = sv.Detections.from_inference(results)
         world_view_detections = self.cam_view_to_world_view(detections)
-        print(f"Time taken: {round(time.time() - process_time, 2)} seconds")
         return world_view_detections
+    
+    def test_speed(self) -> None: time0 = time.time(); self(SOURCE_IMAGE_PATH); print(f"Time taken: {round(time.time() - time0, 2)} seconds")
+
+    def visualize(self, image_path: Union[Path, str]) -> None:
+        image = cv2.imread(image_path); detections = self(image)
+        sv.plot_image(sv.BoundingBoxAnnotator(thickness=2).annotate(image, detections), (10, 10))
     
     def cam_view_to_world_view(self, detections):
         # Do computations hehe..
