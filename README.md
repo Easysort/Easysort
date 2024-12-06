@@ -9,6 +9,7 @@ EasySort: An open-source sorting system. Maintained by [Lucas Vilsen](https://gi
 
 # What is EasySort
 EasySort makes you go from a sorting problem to a solution in just a couple of hours. Collect data, annotate it, train a model and you are ready to go.
+In Extra we provide a set of tools to make it easier to get started.
 
 # How to setup EasySort
 ...
