@@ -8,21 +8,24 @@ import supervision as sv
 from typing import Union
 from pathlib import Path
 
+from easysort.common.logger import EasySortLogger
 from inference.models.yolo_world.yolo_world import YOLOWorld
 import time
 
+LOGGER = EasySortLogger()
 SOURCE_IMAGE_PATH = "easysort/helpers/test.jpg"
 
 class Classifier: 
     def __init__(self):
         self.model = YOLOWorld(model_id="yolo_world/l")
         self.classes = ["plastic-bottle", "cardboard-box", "plastic-packaging", "other"]
-        self.model.set_classes(self.classes)
+        self.model.set_classes(self.classes); LOGGER.info("Classifier initialized")
 
     def __call__(self, image):
         results = self.model.infer(image)
         detections = sv.Detections.from_inference(results)
         world_view_detections = self.cam_view_to_world_view(detections)
+        LOGGER.info("Inference done")
         return world_view_detections
     
     def test_speed(self) -> None: time0 = time.time(); self(SOURCE_IMAGE_PATH); print(f"Time taken: {round(time.time() - time0, 2)} seconds")
@@ -36,7 +39,7 @@ class Classifier:
         return detections
 
 if __name__ == "__main__":
-    SOURCE_IMAGE_PATH = "easysort/helpers/test.jpg"
+    SOURCE_IMAGE_PATH = "_old/helpers/test.jpg"
     image = cv2.imread(SOURCE_IMAGE_PATH)
     classifier = Classifier()
     detections = classifier(image)
