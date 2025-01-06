@@ -40,7 +40,7 @@ class Classifier:
         return detections
 
 if __name__ == "__main__":
-    SOURCE_IMAGE_PATH = "_old/helpers/test.jpg"
+    SOURCE_IMAGE_PATH = "_old/test.jpg"
     image = cv2.imread(SOURCE_IMAGE_PATH)
     classifier = Classifier()
     detections = classifier(image)
