@@ -2,7 +2,7 @@
 
 <h1>EasySort</h1>
 
-EasySort: An open-source waste sorting system. Maintained by [Lucas Vilsen](https://github.com/Apros7).
+EasySort: An open-source waste sorting system. Maintained by [EasySort](https://github.com/Easysort).
 </div>
 
 ---
