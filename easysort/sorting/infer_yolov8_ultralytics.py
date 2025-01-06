@@ -17,13 +17,8 @@ class Classifier:
         LOGGER.info("Classifier initialized")
 
     def __call__(self, image):
-        results = self.model(image, stream=True) # You can pass multiple images, we have one, so we take the first results object.
-        results_unlisted = list(results)[0]
-        # detections = sv.Detections.from_inference(results)
-        # world_view_detections = self.cam_view_to_world_view(detections)
-        # LOGGER.info("Inference done")
-        # return world_view_detections
-        print(results_unlisted)
+        results = self.model(image, stream=True)
+        results_unlisted = list(results)[0] # You can pass multiple images, we have one, so we take the first results object.
         return results_unlisted
     
     def test_speed(self) -> None: time0 = time.time(); self(RANDOM_IMAGE_TENSOR); print(f"Time taken: {round(time.time() - time0, 2)} seconds")
@@ -47,7 +42,6 @@ if __name__ == "__main__":
     BOUNDING_BOX_ANNOTATOR = sv.BoundingBoxAnnotator(thickness=2)
     LABEL_ANNOTATOR = sv.LabelAnnotator(text_thickness=2, text_scale=1, text_color=sv.Color.BLACK)
     
-    # Convert Results object to Detections format
     boxes = detections.boxes.xyxy.cpu().numpy()
     class_ids = detections.boxes.cls.cpu().numpy().astype(int)
     confidences = detections.boxes.conf.cpu().numpy()
