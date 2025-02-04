@@ -16,7 +16,7 @@ from torch import rand
 LOGGER = EasySortLogger()
 RANDOM_IMAGE_TENSOR = rand((980, 1280, 3))
 
-class Classifier: 
+class ClassifierYoloWorld: 
     def __init__(self, classes: list[str]):
         self.model = YOLOWorld(model_id="yolo_world/l")
         self.classes = classes; self.model.set_classes(self.classes); LOGGER.info("Classifier initialized")
@@ -41,7 +41,7 @@ class Classifier:
 if __name__ == "__main__":
     SOURCE_IMAGE_PATH = "_old/test.jpg"
     image = cv2.imread(SOURCE_IMAGE_PATH)
-    classifier = Classifier()
+    classifier = ClassifierYoloWorld()
     detections = classifier(image)
     annotated_image = image.copy()
 
