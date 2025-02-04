@@ -17,10 +17,9 @@ LOGGER = EasySortLogger()
 RANDOM_IMAGE_TENSOR = rand((980, 1280, 3))
 
 class Classifier: 
-    def __init__(self):
+    def __init__(self, classes: list[str]):
         self.model = YOLOWorld(model_id="yolo_world/l")
-        self.classes = ["plastic-bottle", "cardboard-box", "plastic-packaging", "other"]
-        self.model.set_classes(self.classes); LOGGER.info("Classifier initialized")
+        self.classes = classes; self.model.set_classes(self.classes); LOGGER.info("Classifier initialized")
 
     def __call__(self, image):
         results = self.model.infer(image)
@@ -36,7 +35,7 @@ class Classifier:
         sv.plot_image(sv.BoundingBoxAnnotator(thickness=2).annotate(image, detections), (10, 10))
     
     def cam_view_to_world_view(self, detections):
-        # Do computations hehe..
+        # Do computations...
         return detections
 
 if __name__ == "__main__":

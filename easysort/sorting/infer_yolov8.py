@@ -33,7 +33,7 @@ class Classifier:
         sv.plot_image(sv.BoundingBoxAnnotator(thickness=2).annotate(image, detections), (10, 10))
     
     def cam_view_to_world_view(self, detections):
-        # Do computations hehe..
+        # Do computations...
         return detections
 
 if __name__ == "__main__":
