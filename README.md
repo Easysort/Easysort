@@ -7,11 +7,11 @@ EasySort: An open-source waste sorting system. Maintained by [EasySort](https://
 
 ---
 
-To clone: ```git clone --recurse-submodules https://github.com/apros7/easysort```
+To clone: ```git clone --recurse-submodules https://github.com/EasySort/easysort```
 
 # What is EasySort
 EasySort makes you go from a sorting problem to a solution in just a couple of hours. Collect data, annotate it, train a model and you are ready to go.
-In Extra we provide a set of tools to make it easier to get started.
+Our annotation tool we use at EasySort is also open-source and called [EasyLabeler](https://github.com/EasySort/easylabeler).
 
 # How to setup EasySort
 ...

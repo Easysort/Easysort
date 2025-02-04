@@ -1,3 +1,0 @@
-- https://www.youtube.com/watch?v=8ukmVbyjgJA&ab_channel=GRIPWIQ-ExpertsinGrippersforhandlingfood
-- https://www.youtube.com/watch?v=g7xa9a76zoU&t=7s&ab_channel=TunMaker
-- https://www.youtube.com/watch?v=1aBubz6Mk2M&ab_channel=ProtoGEngineering

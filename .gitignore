@@ -218,3 +218,5 @@ data
 yolov8n.pt
 db.json
 playground/
+__old__/
+*.yolov8

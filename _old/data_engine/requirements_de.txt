@@ -1,3 +1,0 @@
-# Requirements.txt for Data Engine (de)
-
-opencv-python==4.8.0.76
