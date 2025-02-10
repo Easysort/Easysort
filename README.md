@@ -7,6 +7,8 @@ EasySort: An open-source waste sorting system. Maintained by [EasySort](https://
 
 ---
 
+![Lint](https://github.com/easysort/easysort/workflows/Lint/badge.svg)
+
 To clone: ```git clone --recurse-submodules https://github.com/EasySort/easysort```
 
 # What is EasySort
