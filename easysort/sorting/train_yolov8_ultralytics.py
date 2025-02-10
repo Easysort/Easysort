@@ -1,5 +1,4 @@
 from ultralytics import YOLO
-import os
 
 model = YOLO("easysort/sorting/yolov8n.pt")  # load a pretrained model (recommended for training)
 
@@ -8,7 +7,7 @@ data_yaml = "/Users/lucasvilsen/Documents/Documents/EasySort/easysort/sorting/27
 save_dir = "/Users/lucasvilsen/Documents/Documents/EasySort/easysort/sorting"
 
 model.train(
-    data=data_yaml, 
+    data=data_yaml,
     verbose= True,
     val = False,
     epochs=50,

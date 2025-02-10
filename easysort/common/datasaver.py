@@ -19,21 +19,22 @@ class Fails:
     other: int = 0
 
 @dataclass
+@dataclass
 class Database:
-    fails: Fails = field(default_factory=lambda: Fails())
-    paper: SortType = field(default_factory=lambda: SortType(name = "paper"))
-    cardboard: SortType = field(default_factory=lambda: SortType(name = "cardboard"))
-    plastic: SortType = field(default_factory=lambda: SortType(name = "plastic"))
-    metal: SortType = field(default_factory=lambda: SortType(name = "metal"))
-    glass: SortType = field(default_factory=lambda: SortType(name = "glass"))
-    other: SortType = field(default_factory=lambda: SortType(name = "other"))
-    unknown: SortType = field(default_factory=lambda: SortType(name = "unknown"))
+    fails: Fails = field(default_factory=Fails)
+    paper: SortType = field(default_factory=lambda: SortType(name="paper"))
+    cardboard: SortType = field(default_factory=lambda: SortType(name="cardboard"))
+    plastic: SortType = field(default_factory=lambda: SortType(name="plastic"))
+    metal: SortType = field(default_factory=lambda: SortType(name="metal"))
+    glass: SortType = field(default_factory=lambda: SortType(name="glass"))
+    other: SortType = field(default_factory=lambda: SortType(name="other"))
+    unknown: SortType = field(default_factory=lambda: SortType(name="unknown"))
 
 APPROVED_STATUSES = ["fail", "success"]
 APPROVED_MATERIALS = [field.name for field in fields(Database) if field.name not in ["path", "fails"]]
 APPROVED_FAILS_REASONS = [field.name for field in fields(Fails)]
 
-class DataSaver():
+class DataSaver:
     """
     Takes in a response from arduino and logs the data to database
 
@@ -60,22 +61,32 @@ class DataSaver():
 
     def decode(self, response: bytes, save: bool = False) -> Tuple[str, str, str]:
         """
-        Decodes the response from robot. Has the option to save the reponse.
+        Decodes the response from robot. Has the option to save the response.
         Generally the format is {success/fail}__{material}__{reason}
 
         Responses could be:
             success__paper__none
             fail__glass__pickup_failure
         """
-        splits = response.split("__")
-        if len(splits) != 3: return False
-        status, material, reason = splits[0], splits[1], splits[2]
-        if status not in APPROVED_STATUSES or material not in APPROVED_MATERIALS: return ("", "", "")
-        if save:    
-            self._save_status_and_material(status, material, save=save)
-            self._save_reason(reason, save=save)
+        try:
+            decoded_response = response.decode("utf-8")  # Convert bytes to string
+        except UnicodeDecodeError:
+            return ("", "", "")
+
+        splits = decoded_response.split("__")
+        if len(splits) != 3:
+            return ("", "", "")
+
+        status, material, reason = splits
+        if status not in APPROVED_STATUSES or material not in APPROVED_MATERIALS:
+            return ("", "", "")
+
+        if save:
+            self._save_status_and_material(status, material)
+            self._save_reason(reason)
+
         return status, material, reason
-    
+
     def encode(self, status: str, container: str, reason: dict) -> str:
         """
         Translates Arduino response of "success"/"fail" into database representation:
@@ -85,23 +96,29 @@ class DataSaver():
         # container_str = get_matching_config_string(self.robot_config, container).replace("_position", "")
         return f"{status}__{container}__{reason}"
 
-    def _save_status_and_material(self, status: str, material: str) -> None: 
+    def _save_status_and_material(self, status: str, material: str) -> None:
         decoded_status = "n_fail" if status == "fail" else "n_success"
         material_attribute = getattr(self.database, material)
         current_count = getattr(material_attribute, decoded_status)
         setattr(material_attribute, decoded_status, current_count + 1)
-    
+
     def _save_reason(self, reason: str) -> None:
         if reason not in APPROVED_FAILS_REASONS or reason == "none": return
         current_count = getattr(self.database.fails, reason)
         setattr(self.database.fails, reason, current_count + 1)
 
     def is_valid_movement_message(self, response: bytes) -> bool:
-        if len(response.split("__")) != 3: return False
-        if response.split("__")[1] not in APPROVED_STATUSES: return False
-        if response.split("__")[0] not in APPROVED_MATERIALS: return False
+        try:
+            decoded_response = response.decode("utf-8")  # Convert bytes to string
+        except UnicodeDecodeError:
+            return False
+
+        splits = decoded_response.split("__")
+        if len(splits) != 3: return False
+        if splits[1] not in APPROVED_STATUSES: return False
+        if splits[0] not in APPROVED_MATERIALS: return False
         return True
-    
+
     def quit(self): self.save()
 
 

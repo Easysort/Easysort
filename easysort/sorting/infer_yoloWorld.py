@@ -5,21 +5,20 @@
 
 import cv2
 import supervision as sv
-from typing import Union
-from pathlib import Path
 
 from easysort.common.logger import EasySortLogger
 from inference.models.yolo_world.yolo_world import YOLOWorld
 import time
-from torch import rand
+import torch
 
 LOGGER = EasySortLogger()
-RANDOM_IMAGE_TENSOR = rand((980, 1280, 3))
+RANDOM_IMAGE_TENSOR = torch.rand((980, 1280, 3))
 
-class ClassifierYoloWorld: 
+class ClassifierYoloWorld:
     def __init__(self, classes: list[str]):
         self.model = YOLOWorld(model_id="yolo_world/l")
-        self.classes = classes; self.model.set_classes(self.classes); LOGGER.info("Classifier initialized")
+        self.classes = classes
+        self.model.set_classes(self.classes)
 
     def __call__(self, image):
         results = self.model.infer(image)
@@ -27,13 +26,17 @@ class ClassifierYoloWorld:
         world_view_detections = self.cam_view_to_world_view(detections)
         LOGGER.info("Inference done")
         return world_view_detections
-    
-    def test_speed(self) -> None: time0 = time.time(); self(RANDOM_IMAGE_TENSOR); print(f"Time taken: {round(time.time() - time0, 2)} seconds")
 
-    def visualize(self, image_path: Union[Path, str]) -> None:
-        image = cv2.imread(image_path); detections = self(image)
+    def test_speed(self) -> None:
+        time0 = time.time()
+        self(RANDOM_IMAGE_TENSOR)
+        LOGGER.info(f"Time taken: {round(time.time() - time0, 2)} seconds")
+
+    def visualize(self, image_path: str) -> None:
+        image = cv2.imread(image_path)
+        detections = self(image)
         sv.plot_image(sv.BoundingBoxAnnotator(thickness=2).annotate(image, detections), (10, 10))
-    
+
     def cam_view_to_world_view(self, detections):
         # Do computations...
         return detections
@@ -41,7 +44,7 @@ class ClassifierYoloWorld:
 if __name__ == "__main__":
     SOURCE_IMAGE_PATH = "_old/test.jpg"
     image = cv2.imread(SOURCE_IMAGE_PATH)
-    classifier = ClassifierYoloWorld()
+    classifier = ClassifierYoloWorld(classes=["bottle", "cardboard", "metal", "class", "paper", "plastic"])
     detections = classifier(image)
     annotated_image = image.copy()
 
