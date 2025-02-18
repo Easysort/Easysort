@@ -1,5 +1,9 @@
 #include <AccelStepper.h>
 
+// TODO:
+// - Fix straight line movement problem
+// - Fix max speed at 20.000: Should go much faster!!!
+
 // Steps per cm for each axis (adjust based on your setup)
 const float CMS_FOR_10_REVOLUTIONS = 60;
 const float CM_PER_REVOLUTION = CMS_FOR_10_REVOLUTIONS / 10;

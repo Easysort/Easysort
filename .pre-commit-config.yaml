@@ -10,9 +10,10 @@ repos:
         pass_filenames: true
       - id: mypy
         name: mypy
-        entry: python3 -m mypy easysort/ --strict-equality --follow-imports=silent
+        entry: python3 -m mypy --strict-equality --follow-imports=silent
         language: system
         types: [python]
+        files: ^easysort/.*\.py$
         pass_filenames: true
       - id: tests
         name: subset of tests

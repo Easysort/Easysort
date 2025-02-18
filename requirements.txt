@@ -1,1 +1,4 @@
 serial
+pytest
+pytest-mock
+pyserial

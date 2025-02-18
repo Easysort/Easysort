@@ -1,5 +1,4 @@
 
-import serial
 import time
 
 import serial.errors
@@ -14,7 +13,7 @@ class GantryConnector:
         self.name = name
         self.ser = self.establish_connection()
 
-    def __call__(self, x, y) -> None: pass
+    def __call__(self, x: float, y: float) -> None: pass
     def is_ready(self) -> bool: return True
 
     def establish_connection(self) -> serial.Serial:
