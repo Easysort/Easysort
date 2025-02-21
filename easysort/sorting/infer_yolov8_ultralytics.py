@@ -11,7 +11,7 @@ RANDOM_IMAGE_TENSOR = torch.rand((980, 1280, 3))
 
 class Classifier:
     def __init__(self):
-        self.model = YOLO("/Users/lucasvilsen/Documents/Documents/EasySort/_old/runs/train4/weights/best.pt")
+        self.model = YOLO("/Users/lucasvilsen/Documents/Documents/EasySort/__old__/_old/runs/train4/weights/best.pt")
         LOGGER.info("Classifier initialized")
 
     def __call__(self, image):
