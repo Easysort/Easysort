@@ -2,10 +2,13 @@ import cv2
 import supervision as sv
 
 from easysort.common.logger import EasySortLogger
+from easysort.common.timer import timeit
+from easysort.common.detections import Detection
 from ultralytics import YOLO
 import time
 import torch
-
+from typing import List
+import numpy as np
 LOGGER = EasySortLogger()
 RANDOM_IMAGE_TENSOR = torch.rand((980, 1280, 3))
 
@@ -14,10 +17,11 @@ class Classifier:
         self.model = YOLO("/Users/lucasvilsen/Documents/Documents/EasySort/__old__/_old/runs/train4/weights/best.pt")
         LOGGER.info("Classifier initialized")
 
-    def __call__(self, image):
+    @timeit("Bbox classification")
+    def __call__(self, image) -> List[Detection]:
         results = self.model(image, stream=True)
         results_unlisted = list(results)[0] # You can pass multiple images, we have one, so we take the first results object.
-        return results_unlisted
+        return Detection.from_ultralytics(results_unlisted)
 
     def test_speed(self) -> None:
         time0 = time.time()
@@ -34,9 +38,8 @@ class Classifier:
         return detections
 
 if __name__ == "__main__":
-    SOURCE_IMAGE_PATH = "_old/test.jpg"
+    SOURCE_IMAGE_PATH = "__old__/_old/test.jpg"
     image = cv2.imread(SOURCE_IMAGE_PATH)
-    print(image.shape)
     classifier = Classifier()
     detections = classifier(image)
     annotated_image = image.copy()
@@ -44,17 +47,16 @@ if __name__ == "__main__":
     BOUNDING_BOX_ANNOTATOR = sv.BoundingBoxAnnotator(thickness=2)
     LABEL_ANNOTATOR = sv.LabelAnnotator(text_thickness=2, text_scale=1, text_color=sv.Color.BLACK)
 
-    boxes = detections.boxes.xyxy.cpu().numpy()
-    class_ids = detections.boxes.cls.cpu().numpy().astype(int)
-    confidences = detections.boxes.conf.cpu().numpy()
-
     detections_formatted = sv.Detections(
-        xyxy=boxes,
-        class_id=class_ids,
-        confidence=confidences
+        xyxy=np.array([d.box for d in detections]),
+        class_id=np.array([d.class_id for d in detections]),
+        confidence=np.array([d.confidence for d in detections])
     )
 
     annotated_image = BOUNDING_BOX_ANNOTATOR.annotate(annotated_image, detections_formatted)
-    annotated_image = LABEL_ANNOTATOR.annotate(annotated_image, detections_formatted, labels=[detections.names[class_id] for class_id in class_ids])
-    sv.plot_image(annotated_image, (10, 10))
+    annotated_image = LABEL_ANNOTATOR.annotate(
+        annotated_image, detections_formatted,
+        labels=[detections[0].names[class_id] for class_id in detections_formatted.class_id]
+    )
+    sv.plot_image(annotated_image)
 
