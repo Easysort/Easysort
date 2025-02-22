@@ -10,7 +10,7 @@ from easysort.sorting.sam_utils.build_sam import sam_model_registry
 from easysort.sorting.infer_yolov8_ultralytics import Classifier
 
 
-# !wget -q https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth -P {HOME}/weights
+# !wget -q https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth -P .../easysort
 
 class Segmentation:
     def __init__(self, model_path: str):
@@ -37,7 +37,6 @@ class Segmentation:
         return masks, scores, logits
     
     def visualize(self, image_path: str, box: np.ndarray, class_id: int):
-
         image_bgr = cv2.imread(image_path)
         image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
@@ -52,14 +51,12 @@ class Segmentation:
         )
         detections = detections[detections.area == np.max(detections.area)]
         detections.class_id = [class_id] * len(detections)
-        source_image = box_annotator.annotate(scene=image_bgr.copy(), detections=detections)
-        segmented_image = mask_annotator.annotate(scene=image_bgr.copy(), detections=detections)
+        
+        annotated_image = image_bgr.copy()
+        annotated_image = box_annotator.annotate(scene=annotated_image, detections=detections)
+        annotated_image = mask_annotator.annotate(scene=annotated_image, detections=detections)
 
-        sv.plot_images_grid(
-            images=[source_image, segmented_image],
-            grid_size=(1, 2),
-            titles=['source image', 'segmented image']
-        )
+        sv.plot_image(annotated_image, (10, 10))
 
 if __name__ == "__main__":
     segmentation = Segmentation(model_path="sam_vit_h_4b8939.pth")
