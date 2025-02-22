@@ -220,3 +220,5 @@ db.json
 playground/
 __old__/
 *.yolov8
+weights/
+*.pt
