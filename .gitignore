@@ -222,3 +222,4 @@ __old__/
 *.yolov8
 weights/
 *.pt
+rendered_videos/
