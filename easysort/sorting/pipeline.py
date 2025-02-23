@@ -18,7 +18,7 @@ class SortingPipeline:
         detections = self.segmentation(image, detections)
         return detections
 
-    def visualize(self, image: np.ndarray, detections: List[Detection]) -> np.ndarray:
+    def visualize(self, image: np.ndarray, detections: List[Detection], show_plot: bool = True) -> np.ndarray:
         def draw_detection(img: np.ndarray, detection: Detection, color: tuple=(0,255,0)) -> np.ndarray:
             cv2.rectangle(img, (int(detection.xyxy[0]), int(detection.xyxy[1])),
                          (int(detection.xyxy[2]), int(detection.xyxy[3])), color, 2)
@@ -36,24 +36,25 @@ class SortingPipeline:
             return img
 
         n_plots = len(detections) + 1
-        plt.figure(figsize=(12, 4))
-
         main_view = image.copy()
         for det in detections: main_view = draw_detection(main_view, det)
-        plt.subplot(1, n_plots, 1)
-        plt.imshow(cv2.cvtColor(main_view, cv2.COLOR_BGR2RGB))
-        plt.title('All Detections')
-        plt.axis('off')
 
-        for idx, det in enumerate(detections, 1):
-            plt.subplot(1, n_plots, idx + 1)
-            det_view = draw_detection(image.copy(), det)
-            plt.imshow(cv2.cvtColor(det_view, cv2.COLOR_BGR2RGB))
-            plt.title(f'Detection {idx}')
+        if show_plot:
+            plt.figure(figsize=(12, 4))
+            plt.subplot(1, n_plots, 1)
+            plt.imshow(cv2.cvtColor(main_view, cv2.COLOR_BGR2RGB))
+            plt.title('All Detections')
             plt.axis('off')
 
-        plt.tight_layout()
-        plt.show()
+            for idx, det in enumerate(detections, 1):
+                plt.subplot(1, n_plots, idx + 1)
+                det_view = draw_detection(image.copy(), det)
+                plt.imshow(cv2.cvtColor(det_view, cv2.COLOR_BGR2RGB))
+                plt.title(f'Detection {idx}')
+                plt.axis('off')
+
+            plt.tight_layout()
+            plt.show()
         return main_view
 
 if __name__ == "__main__":

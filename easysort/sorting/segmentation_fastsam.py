@@ -25,6 +25,7 @@ class Segmentation:
 
     @timeit("Segmentation")
     def __call__(self, image: np.ndarray, detections: List[Detection]):
+        if len(detections) == 0: return detections
         midpoints = [((det.xyxy[0] + det.xyxy[2]) / 2, (det.xyxy[1] + det.xyxy[3]) / 2) for det in detections]
         results = self.fast_sam(image, points=midpoints)
         detections = self.match_mask_to_detection(detections, Mask.from_ultralytics(results, image.shape))
