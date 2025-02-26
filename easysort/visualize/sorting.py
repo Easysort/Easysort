@@ -27,7 +27,6 @@ def visualize_video(uuid: str, low: int = 0, high: int = 1000):
         detections = pipeline(image)
         main_view = pipeline.visualize(image, detections, show_plot=False)
         rendered_images.append(main_view)
-        # cv2.imwrite(str(rendered_images_path / Path(image_path).name), main_view)
 
     fourcc = cv2.VideoWriter.fourcc(*"mp4v")
     video_writer = cv2.VideoWriter(str(rendered_images_path / f"{uuid}.mp4"), fourcc, 10, (rendered_images[0].shape[1], rendered_images[0].shape[0]))
@@ -36,4 +35,4 @@ def visualize_video(uuid: str, low: int = 0, high: int = 1000):
 
 
 if __name__ == "__main__":
-    visualize_video("d_2024-08-14_1", low=121, high=219)
+    visualize_video("d_2024-06-27_2", low=28, high=69)

@@ -1,10 +1,8 @@
 #include <AccelStepper.h>
 
-// TODO:
-// - Fix straight line movement problem
-// - Fix max speed at 20.000: Should go much faster!!!
+// Todo:
+// - Slight speed bug when near end of point, where one motor stops before the other.
 
-// Steps per cm for each axis (adjust based on your setup)
 const float CMS_FOR_10_REVOLUTIONS = 60;
 const float CM_PER_REVOLUTION = CMS_FOR_10_REVOLUTIONS / 10;
 const float STEPS_PER_CM_X = 800 / CM_PER_REVOLUTION;
@@ -18,11 +16,8 @@ const float CONVEYOR_SPEED = 8.727;  // cm/s
 // const int SUCTION_CUP_READ_PIN = 13;
 // const int LIMIT_SWITCH_READ_PIN = 11;
 
-// const int MaxSpeed = 10000000;
-// const int Acceleration = 10000000;
-
-const long MaxSpeed = 50000;
-const long Acceleration = 50000;
+const long MaxSpeed = 8000;
+const long Acceleration = 8000;
 
 const long XMaxSpeed = MaxSpeed;
 const long XAcceleration = Acceleration;
@@ -101,27 +96,40 @@ void moveCoordinated(float future_x, float future_y) {
   long target_x = future_x * STEPS_PER_CM_X;
   long target_y = future_y * STEPS_PER_CM_Y;
   
-  Serial.print("Target steps before reverse kinematics - X: ");
-  Serial.print(target_x);
-  Serial.print(" Y: ");
-  Serial.println(target_y);
+  // Serial.print("Target steps before reverse kinematics - X: ");
+  // Serial.print(target_x);
+  // Serial.print(" Y: ");
+  // Serial.println(target_y);
   
   Coordinates coords = reverseKinematics(target_x, target_y);
+  
+  // Serial.print("Current position - X: ");
+  // Serial.print(stepperX.currentPosition());
+  // Serial.print(" Y: ");
+  // Serial.println(stepperY.currentPosition());
+  
+  // Serial.print("Target position - X: ");
+  // Serial.print(coords.x);
+  // Serial.print(" Y: ");
+  // Serial.println(coords.y);
+  
+  // Calculate the actual distance to move
   long x = coords.x - stepperX.currentPosition();
   long y = coords.y - stepperY.currentPosition();
   
-  Serial.print("Motor steps after reverse kinematics - X: ");
-  Serial.print(x);
-  Serial.print(" Y: ");
-  Serial.println(y);
+  // Serial.print("Distance to move - X: ");
+  // Serial.print(x);
+  // Serial.print(" Y: ");
+  // Serial.println(y);
   
   float abs_x = abs(x);
   float abs_y = abs(y);
   float max_distance = max(abs_x, abs_y);
   
   if (max_distance > 0) {
-    float x_ratio = abs_x / max_distance;
-    float y_ratio = abs_y / max_distance;
+    float total_distance = sqrt(abs_x * abs_x + abs_y * abs_y);
+    float x_ratio = abs_x / total_distance;
+    float y_ratio = abs_y / total_distance;
     
     float x_speed = x_ratio * MaxSpeed * (x >= 0 ? 1 : -1);
     float y_speed = y_ratio * MaxSpeed * (y >= 0 ? 1 : -1);
@@ -131,23 +139,76 @@ void moveCoordinated(float future_x, float future_y) {
     Serial.print(" Y: ");
     Serial.println(y_speed);
     
-    stepperX.moveTo(x);
-    stepperY.moveTo(y);
-
+    stepperX.moveTo(coords.x);
+    stepperY.moveTo(coords.y);
+    
     stepperX.setSpeed(x_speed);
     stepperY.setSpeed(y_speed);
-
-    Serial.print("Actual X speed: ");
-    Serial.println(stepperX.speed());
-    Serial.print("Actual Y speed: ");
-    Serial.println(stepperY.speed());
-
-    // Run motors and continuously monitor speed
+    
+    // Calculate step intervals in microseconds
+    unsigned long x_interval = abs(1000000.0 / x_speed);  // microseconds between steps
+    unsigned long y_interval = abs(1000000.0 / y_speed);  // microseconds between steps
+    
+    unsigned long last_x_step = micros();
+    unsigned long last_y_step = micros();
+    // unsigned long last_debug = millis();
+    
+    // Store initial directions and targets
+    int x_dir = x >= 0 ? 1 : -1;
+    int y_dir = y >= 0 ? 1 : -1;
+    long x_target = coords.x;
+    long y_target = coords.y;
+    
     while (stepperX.distanceToGo() != 0 || stepperY.distanceToGo() != 0) {
-      // Distance to go er 1999 selvom den burde at være 0?????????
-      stepperX.runSpeed();
-      stepperY.runSpeed();
+      unsigned long now = micros();
+      unsigned long now_millis = millis();
+      
+      // Only step if we haven't reached the target yet
+      if (stepperX.distanceToGo() != 0 && (now - last_x_step) >= x_interval) {
+        if ((x_dir > 0 && stepperX.currentPosition() < x_target) ||
+            (x_dir < 0 && stepperX.currentPosition() > x_target)) {
+          stepperX.runSpeed();
+        }
+        last_x_step = now;
+      }
+      
+      if (stepperY.distanceToGo() != 0 && (now - last_y_step) >= y_interval) {
+        if ((y_dir > 0 && stepperY.currentPosition() < y_target) ||
+            (y_dir < 0 && stepperY.currentPosition() > y_target)) {
+          stepperY.runSpeed();
+        }
+        last_y_step = now;
+      }
+      
+      // Debug every 100ms
+      // if (now_millis - last_debug >= 100) {
+      //   Serial.print("X - Target: ");
+      //   Serial.print(x_target);
+      //   Serial.print(" Current: ");
+      //   Serial.print(stepperX.currentPosition());
+      //   Serial.print(" Distance: ");
+      //   Serial.print(stepperX.distanceToGo());
+      //   Serial.print(" | Y - Target: ");
+      //   Serial.print(y_target);
+      //   Serial.print(" Current: ");
+      //   Serial.print(stepperY.currentPosition());
+      //   Serial.print(" Distance: ");
+      //   Serial.println(stepperY.distanceToGo());
+      //   last_debug = now_millis;
+      // }
     }
+    // Serial.print("X - Target: ");
+    // Serial.print(x_target);
+    // Serial.print(" Current: ");
+    // Serial.print(stepperX.currentPosition());
+    // Serial.print(" Distance: ");
+    // Serial.print(stepperX.distanceToGo());
+    // Serial.print(" | Y - Target: ");
+    // Serial.print(y_target);
+    // Serial.print(" Current: ");
+    // Serial.print(stepperY.currentPosition());
+    // Serial.print(" Distance: ");
+    // Serial.println(stepperY.distanceToGo());
   }
 
   unsigned long time_taken = millis() - start_time;
