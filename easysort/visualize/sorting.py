@@ -2,13 +2,14 @@
 import os
 import cv2
 import glob
+import argparse
 from pathlib import Path
 from tqdm import tqdm
 
 from easysort.sorting.pipeline import SortingPipeline
 
 
-def visualize_video(uuid: str, low: int = 0, high: int = 1000):
+def visualize_video(uuid: str, low: int = 0, high: int = 1000, save_images: bool = False):
     pipeline = SortingPipeline()
     video_new_path = f"/Users/lucasvilsen/Documents/Documents/easylabeller/data/new/{uuid}"
     video_verified_path = f"/Users/lucasvilsen/Documents/Documents/easylabeller/data/verified/{uuid}"
@@ -28,6 +29,10 @@ def visualize_video(uuid: str, low: int = 0, high: int = 1000):
         main_view = pipeline.visualize(image, detections, show_plot=False)
         rendered_images.append(main_view)
 
+    if save_images:
+        for i, image in enumerate(rendered_images):
+            cv2.imwrite(str(rendered_images_path / f"{i}.jpg"), image)
+
     fourcc = cv2.VideoWriter.fourcc(*"mp4v")
     video_writer = cv2.VideoWriter(str(rendered_images_path / f"{uuid}.mp4"), fourcc, 10, (rendered_images[0].shape[1], rendered_images[0].shape[0]))
     for image in rendered_images: video_writer.write(image)
@@ -35,4 +40,11 @@ def visualize_video(uuid: str, low: int = 0, high: int = 1000):
 
 
 if __name__ == "__main__":
-    visualize_video("d_2024-06-27_2", low=28, high=69)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("uuid", type=str, help="UUID of the video to visualize")
+    parser.add_argument("--low", type=int, default=0, help="Start frame number")
+    parser.add_argument("--high", type=int, default=1000, help="End frame number")
+    parser.add_argument("--save-images", action="store_true", help="Save individual frames as images")
+    args = parser.parse_args()
+
+    visualize_video(args.uuid, low=args.low, high=args.high, save_images=args.save_images)
