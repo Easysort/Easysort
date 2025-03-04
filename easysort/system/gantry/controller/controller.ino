@@ -96,31 +96,10 @@ void moveCoordinated(float future_x, float future_y) {
   long target_x = future_x * STEPS_PER_CM_X;
   long target_y = future_y * STEPS_PER_CM_Y;
   
-  // Serial.print("Target steps before reverse kinematics - X: ");
-  // Serial.print(target_x);
-  // Serial.print(" Y: ");
-  // Serial.println(target_y);
-  
   Coordinates coords = reverseKinematics(target_x, target_y);
   
-  // Serial.print("Current position - X: ");
-  // Serial.print(stepperX.currentPosition());
-  // Serial.print(" Y: ");
-  // Serial.println(stepperY.currentPosition());
-  
-  // Serial.print("Target position - X: ");
-  // Serial.print(coords.x);
-  // Serial.print(" Y: ");
-  // Serial.println(coords.y);
-  
-  // Calculate the actual distance to move
   long x = coords.x - stepperX.currentPosition();
   long y = coords.y - stepperY.currentPosition();
-  
-  // Serial.print("Distance to move - X: ");
-  // Serial.print(x);
-  // Serial.print(" Y: ");
-  // Serial.println(y);
   
   float abs_x = abs(x);
   float abs_y = abs(y);
@@ -151,9 +130,7 @@ void moveCoordinated(float future_x, float future_y) {
     
     unsigned long last_x_step = micros();
     unsigned long last_y_step = micros();
-    // unsigned long last_debug = millis();
     
-    // Store initial directions and targets
     int x_dir = x >= 0 ? 1 : -1;
     int y_dir = y >= 0 ? 1 : -1;
     long x_target = coords.x;
@@ -180,35 +157,7 @@ void moveCoordinated(float future_x, float future_y) {
         last_y_step = now;
       }
       
-      // Debug every 100ms
-      // if (now_millis - last_debug >= 100) {
-      //   Serial.print("X - Target: ");
-      //   Serial.print(x_target);
-      //   Serial.print(" Current: ");
-      //   Serial.print(stepperX.currentPosition());
-      //   Serial.print(" Distance: ");
-      //   Serial.print(stepperX.distanceToGo());
-      //   Serial.print(" | Y - Target: ");
-      //   Serial.print(y_target);
-      //   Serial.print(" Current: ");
-      //   Serial.print(stepperY.currentPosition());
-      //   Serial.print(" Distance: ");
-      //   Serial.println(stepperY.distanceToGo());
-      //   last_debug = now_millis;
-      // }
     }
-    // Serial.print("X - Target: ");
-    // Serial.print(x_target);
-    // Serial.print(" Current: ");
-    // Serial.print(stepperX.currentPosition());
-    // Serial.print(" Distance: ");
-    // Serial.print(stepperX.distanceToGo());
-    // Serial.print(" | Y - Target: ");
-    // Serial.print(y_target);
-    // Serial.print(" Current: ");
-    // Serial.print(stepperY.currentPosition());
-    // Serial.print(" Distance: ");
-    // Serial.println(stepperY.distanceToGo());
   }
 
   unsigned long time_taken = millis() - start_time;
@@ -216,13 +165,3 @@ void moveCoordinated(float future_x, float future_y) {
   Serial.print(time_taken);
   Serial.println(" ms");
 }
-
-  // if (x >= y) {
-  //   float speedRatio = static_cast<float>(x) / y;
-  //   stepperX.setSpeed(XMaxSpeed * speedRatio);
-  //   stepperY.setSpeed(XMaxSpeed);
-  // } else {
-  //   float speedRatio = static_cast<float>(x) / y;
-  //   stepperX.setSpeed(XMaxSpeed * speedRatio);
-  //   stepperY.setSpeed(XMaxSpeed);
-  // }
