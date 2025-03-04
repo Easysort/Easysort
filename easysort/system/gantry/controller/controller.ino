@@ -1,8 +1,5 @@
 #include <AccelStepper.h>
 
-// Todo:
-// - Slight speed bug when near end of point, where one motor stops before the other.
-
 const float CMS_FOR_10_REVOLUTIONS = 60;
 const float CM_PER_REVOLUTION = CMS_FOR_10_REVOLUTIONS / 10;
 const float STEPS_PER_CM_X = 800 / CM_PER_REVOLUTION;
@@ -16,8 +13,8 @@ const float CONVEYOR_SPEED = 8.727;  // cm/s
 // const int SUCTION_CUP_READ_PIN = 13;
 // const int LIMIT_SWITCH_READ_PIN = 11;
 
-const long MaxSpeed = 8000;
-const long Acceleration = 8000;
+const long MaxSpeed = 4000; // 2000
+const long Acceleration = 4000; //
 
 const long XMaxSpeed = MaxSpeed;
 const long XAcceleration = Acceleration;
@@ -51,34 +48,37 @@ void setup() {
 
   // Starting point is (0, 0)
   Serial.println("0/3...");
-  moveCoordinated(15, 0);
+  moveCoordinated(5, 0);
   moveCoordinated(0, 0);
   Serial.println("1/3...");
-  moveCoordinated(0, 15);
+  moveCoordinated(0, 5);
   moveCoordinated(0, 0);
   Serial.println("2/3...");
-  moveCoordinated(15, 10);
-  moveCoordinated(10, 15);
+  moveCoordinated(5, 5);
+  moveCoordinated(5, -5);
+  moveCoordinated(-5, -5);
+  moveCoordinated(-5, 5);
   moveCoordinated(0, 0);
   Serial.println("3/3...");
   Serial.println("Done!");
 }
 
 void loop() {
-  // if (Serial.available() > 0) {
-  //   String data = Serial.readStringUntil('\n'); // input is x,y\n
-  //   int comma = data.indexOf(',');
-  //   if (comma != -1) {
-  //     int num1 = data.substring(0, comma).toInt();
-  //     int num2 = data.substring(comma + 1).toInt();
+  if (Serial.available() > 0) {
+    String data = Serial.readStringUntil('\n'); // input is x,y\n
+    int comma = data.indexOf(',');
+    if (comma != -1) {
+      int num1 = data.substring(0, comma).toInt();
+      int num2 = data.substring(comma + 1).toInt();
 
-  //     moveCoordinated(num1, num2)
-  //     // add error handling
-  //     Serial.println("success") // or "fail" if error
-  //     // error could be:
-  //     // - Cannot lift item
-  //     // - Dropped item on the way
-  // }
+      moveCoordinated(num1, num2);
+      // add error handling
+      Serial.println("success"); // or "fail" if error
+      // error could be:
+      // - Cannot lift item
+      // - Dropped item on the way
+    }
+  }
 }
 
 Coordinates reverseKinematics(int input_x, int input_y) {  // Position -> robot movements

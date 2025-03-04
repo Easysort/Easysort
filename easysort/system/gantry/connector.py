@@ -2,19 +2,27 @@
 import time
 
 import serial.errors
+import serial.tools.list_ports
 from easysort.common.logger import EasySortLogger
 
 _LOGGER = EasySortLogger()
 _MAX_TIME_TO_WAIT_FOR_MOVEMENT_MESSAGE = 5 # seconds
 
 class GantryConnector:
+    """
+    TODO:
+    - Test with Jetson + AI
+    - Add calibration calls to controller via connector
+    - Add is_ready()
+    """
+
     def __init__(self, port: str, name: str = "Arduino") -> None:
         self.port = port
         self.name = name
         self.ser = self.establish_connection()
 
-    def __call__(self, x: float, y: float) -> None: pass
-    def is_ready(self) -> bool: return True
+    def __call__(self, x: float, y: float) -> None: self.send_information((x, y))
+    def is_ready(self) -> bool: return True # TODO: Implement this
 
     def establish_connection(self) -> serial.Serial:
         try:
@@ -44,3 +52,11 @@ class GantryConnector:
 
     def clear_buffer(self) -> None: self.ser.reset_input_buffer()
     def quit(self) -> None: self.ser.close()
+
+if __name__ == "__main__":
+    connector = GantryConnector("/dev/cu.usbmodem11401")
+    while True:
+        x = float(input("Enter x: "))
+        y = float(input("Enter y: "))
+        connector(x, y)
+        time.sleep(1)
