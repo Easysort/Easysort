@@ -35,6 +35,25 @@ class Detection:
         self._center_point = center_point
         return center_point
 
+    def to_json(self):
+        return {
+            "box": self.box.tolist(),
+            "mask": self.mask.tolist() if self.mask is not None else None,
+            "class_id": self.class_id,
+            "conf": self.confidence,
+            "names": self.names,
+        }
+
+    @staticmethod
+    def from_json(json_data):
+        return Detection(
+            box=np.array(json_data["box"]),
+            mask=np.array(json_data["mask"]) if json_data["mask"] is not None else None,
+            class_id=json_data["class_id"],
+            conf=json_data["conf"],
+            names=json_data["names"],
+        )
+
 class Mask(np.ndarray):
     def __new__(cls, mask: np.ndarray):
         obj = np.asarray(mask).view(cls)

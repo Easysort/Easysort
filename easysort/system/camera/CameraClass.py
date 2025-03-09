@@ -3,7 +3,7 @@ import cv2 as cv
 def start_streaming(port):
     try:
         return cv.VideoCapture(port)
-    except cv.error as e:
+    except Exception as e:
         print("[Camera init error]: {}".format(e))
 
 class Camera:
@@ -18,6 +18,4 @@ class Camera:
                 return image
         else:
             print("Camera is not ready!")
-
-
 
