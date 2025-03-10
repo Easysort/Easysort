@@ -1,7 +1,7 @@
 import numpy as np
 from ultralytics import FastSAM
-from easysort.common.timer import timeit
-from easysort.common.detections import Detection, Mask
+from easysort.common.timer import TimeIt
+from easysort.utils.detections import Detection, Mask
 from typing import List
 
 class Segmentation:
@@ -23,7 +23,7 @@ class Segmentation:
             det.mask = overlaps[best_score] if overlaps and best_score > 0.35 else None
         return detections
 
-    @timeit("Segmentation")
+    @TimeIt("Segmentation")
     def __call__(self, image: np.ndarray, detections: List[Detection]):
         if len(detections) == 0: return detections
         midpoints = [((det.xyxy[0] + det.xyxy[2]) / 2, (det.xyxy[1] + det.xyxy[3]) / 2) for det in detections]

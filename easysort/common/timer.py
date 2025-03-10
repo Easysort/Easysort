@@ -1,13 +1,8 @@
-import time, os
+import time, contextlib
 
-def timeit(name):
-    def decorator(f):
-        def wrapper(*args, **kwargs):
-            if int(os.getenv('DEBUG') or '0') > 0:
-                start = time.time()
-                result = f(*args, **kwargs)
-                print(f"{name} took {time.time() - start:.4f} seconds.")
-                return result
-            return f(*args, **kwargs)
-        return wrapper
-    return decorator
+class TimeIt(contextlib.ContextDecorator):
+    def __init__(self, prefix="", on_exit=None, enabled=True): self.prefix, self.on_exit, self.enabled = prefix, on_exit, enabled
+    def __enter__(self): self.st = time.perf_counter_ns()
+    def __exit__(self, *exc):
+        self.et = time.perf_counter_ns() - self.st
+        if self.enabled: print(f"{self.prefix}{self.et*1e-6:6.2f} ms"+(self.on_exit(self.et) if self.on_exit else ""))

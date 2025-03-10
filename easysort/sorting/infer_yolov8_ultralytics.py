@@ -2,8 +2,8 @@ import cv2
 import supervision as sv
 
 from easysort.common.logger import EasySortLogger
-from easysort.common.timer import timeit
-from easysort.common.detections import Detection
+from easysort.common.timer import TimeIt
+from easysort.utils.detections import Detection
 from ultralytics import YOLO
 import time
 import torch
@@ -17,7 +17,7 @@ class Classifier:
         self.model = YOLO("/Users/lucasvilsen/Documents/Documents/EasySort/__old__/_old/runs/train4/weights/best.pt")
         LOGGER.info("Classifier initialized")
 
-    @timeit("Bbox classification")
+    @TimeIt("Bbox classification")
     def __call__(self, image) -> List[Detection]:
         results = self.model(image, stream=True)
         results_unlisted = list(results)[0] # You can pass multiple images, we have one, so we take the first results object.

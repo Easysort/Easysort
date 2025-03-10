@@ -1,7 +1,7 @@
 
 from easysort.sorting.infer_yolov8_ultralytics import Classifier
 from easysort.sorting.segmentation_fastsam import Segmentation
-from easysort.common.detections import Detection
+from easysort.utils.detections import Detection
 
 import numpy as np
 import matplotlib.pyplot as plt
