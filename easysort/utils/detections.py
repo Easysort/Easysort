@@ -3,7 +3,7 @@ from ultralytics.engine.results import Results
 from typing import List, Optional, Tuple, Dict
 import cv2
 
-class Detection:
+class Detection: # TODO: Add frame?
     def __init__(self, box: np.ndarray, mask: Optional[np.ndarray] = None, class_id: int = -1,
                  conf: Optional[float] = None, names: Optional[Dict[int, str]] = None) -> None:
         self.box = box
@@ -17,7 +17,7 @@ class Detection:
         self._center_point: Optional[Tuple[float, float]] = None
 
     @staticmethod
-    def from_ultralytics(result: Results) -> List["Detection"]:
+    def from_ultralytics(result: Results) -> List["Detection"]: # Returns multiple detections
         return [
             Detection(box=box.cpu().numpy(), mask=None, class_id=int(class_id.cpu().numpy()), conf=confidence.cpu().numpy(), names=result.names)
             for box, class_id, confidence in zip(result.boxes.xyxy, result.boxes.cls, result.boxes.conf)
