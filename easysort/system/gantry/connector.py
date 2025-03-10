@@ -1,9 +1,10 @@
 
 import time
 
-import serial.errors
+import serial
 import serial.tools.list_ports
 from easysort.common.logger import EasySortLogger
+from easysort.common.environment import Environment
 
 _LOGGER = EasySortLogger()
 _MAX_TIME_TO_WAIT_FOR_MOVEMENT_MESSAGE = 5 # seconds
@@ -54,7 +55,7 @@ class GantryConnector:
     def quit(self) -> None: self.ser.close()
 
 if __name__ == "__main__":
-    connector = GantryConnector("/dev/cu.usbmodem11401")
+    connector = GantryConnector(Environment.GANTRY_PORT)
     while True:
         x = float(input("Enter x: "))
         y = float(input("Enter y: "))

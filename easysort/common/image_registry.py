@@ -13,7 +13,7 @@ class BaseMetadata:
 class SupabaseHelper:
     def __init__(self, bucket_name: str):
         self.bucket_name: str = bucket_name
-        self.client = supabase.create_client(Environment.SUPABASE_URL or "", Environment.SUPABASE_KEY or "")
+        self.client = supabase.create_client(Environment.SUPABASE_URL, Environment.SUPABASE_KEY)
 
     def upload_sample(self, sample: DetectionSample) -> None:
         file_obj = sample.to_json().encode('utf-8')
