@@ -18,6 +18,10 @@ Our annotation tool we use at EasySort is also open-source and called [EasyLabel
 # How to setup EasySort
 ...
 
+```
+pip install -r requirements.txt
+```
+
 # Why open-source?
 I believe this is a positive-sum game. The market is so large that we can all win. This technology should be so cheap that it exists everywhere on earth helping everyone better sort items and improve the average quality of products running through their system.
 
