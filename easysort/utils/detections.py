@@ -14,7 +14,7 @@ class Detection: # TODO: Add frame?
         self.class_name = names[class_id] if names is not None else ""
         self.xyxy = [int(x) for x in self.box]
         self.area = (self.xyxy[2] - self.xyxy[0]) * (self.xyxy[3] - self.xyxy[1])
-        self._center_point: Optional[Tuple[float, float]] = None
+        self._center_point: Optional[Tuple[float, float, float]] = None
 
     @staticmethod
     def from_ultralytics(result: Results) -> List["Detection"]: # Returns multiple detections
@@ -23,17 +23,20 @@ class Detection: # TODO: Add frame?
             for box, class_id, confidence in zip(result.boxes.xyxy, result.boxes.cls, result.boxes.conf)
         ]
 
+    def set_center_point(self, center_point: Tuple[float, float, float]) -> None:
+        self._center_point = center_point
+
     @property
-    def center_point(self) -> Tuple[float, float]:
+    def center_point(self) -> Tuple[float, float, float]:
         if self._center_point is not None:
             return self._center_point
         if self.mask is None:
-            center_point = ((self.xyxy[0] + self.xyxy[2]) / 2, (self.xyxy[1] + self.xyxy[3]) / 2)
+            center_point = ((self.xyxy[0] + self.xyxy[2]) / 2, (self.xyxy[1] + self.xyxy[3]) / 2, 0)
         else:
             center_point = np.mean(np.argwhere(self.mask), axis=0)
-            center_point = (center_point[1], center_point[0]) # for some reason this is reversed
+            center_point = (center_point[1], center_point[0], 0) # for some reason this is reversed
         self._center_point = center_point
-        return center_point
+        return center_point # (x, y, z)
 
     def to_json(self):
         return {
