@@ -29,8 +29,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install ruff mypy pylint pytest
           pip install pillow numpy  # Adding required packages for tests
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install -e .  # Install the package itself in editable mode
 
       - name: Run Ruff
         run: python -m ruff check easysort/ tests/ --fix
