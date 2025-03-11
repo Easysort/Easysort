@@ -4,14 +4,12 @@ import os
 from PIL import Image
 import numpy as np
 
-from easysort.common.image_registry import SupabaseHelper
-from easysort.utils.image_sample import DetectionSample, DetectionMetadata
-from easysort.utils.detections import Detection
-
-
 @unittest.skipIf(os.getenv("DEEP_TEST") is None, "Skipping deep test")
 class TestImageRegistry(unittest.TestCase):
     def test_image_registry_connection(self):
+        from easysort.common.image_registry import SupabaseHelper
+        from easysort.utils.image_sample import DetectionSample, DetectionMetadata
+        from easysort.utils.detections import Detection
         helper = SupabaseHelper("ai-images")
         sample = DetectionSample(
             images=[Image.open("__old__/_old/test.jpg"), Image.open("__old__/_old/test.jpg")],
