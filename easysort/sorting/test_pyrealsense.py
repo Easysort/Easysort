@@ -1,4 +1,4 @@
-
+# To run do: sudo python easysort/sorting/test_pyrealsense.py
 
 import pyrealsense2 as rs
 import numpy as np
@@ -23,7 +23,7 @@ def run():
 
         color_image = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
-        depth_image = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+        depth_image = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.5), cv2.COLORMAP_JET)
 
         cv2.imshow("Color", color_image)
         cv2.imshow("Depth", depth_image)
@@ -71,15 +71,21 @@ def list_devices():
                 logger.info("Pipeline started successfully")
                 pipeline.stop()
                 logger.info("Pipeline stopped successfully")
+                return True
 
             except Exception as e:
                 logger.error(f"Error accessing device {i}: {str(e)}")
 
     except Exception as e:
         logger.error(f"Error in list_devices: {str(e)}")
+    return False
 
 if __name__ == "__main__":
-    list_devices()
+    if list_devices():
+        print("Device found, running...")
+        run()
+    else:
+        print("No device found, exiting...")
 
 
 
