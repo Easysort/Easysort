@@ -17,7 +17,7 @@ repos:
         pass_filenames: true
       - id: tests
         name: subset of tests
-        entry: env PYTHONPATH="." python3 -m pytest tests/
+        entry: env PYTHONPATH="." python3 -m pytest tests/ --ignore=setup.py
         language: system
         types: [python]
         pass_filenames: true

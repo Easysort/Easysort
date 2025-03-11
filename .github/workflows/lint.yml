@@ -29,6 +29,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install ruff mypy pylint pytest
           pip install pillow numpy  # Adding required packages for tests
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install -e .  # Install the package itself in editable mode
 
       - name: Run Ruff
@@ -40,7 +41,7 @@ jobs:
       - name: Run Tests
         env:
           PYTHONPATH: ${{ github.workspace }}
-        run: python -m pytest tests/
+        run: python -m pytest tests/ --ignore=setup.py
 
       - name: Run Pylint
         run: python -m pylint easysort/ 
