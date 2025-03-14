@@ -10,3 +10,6 @@ supervision==0.19.0rc3
 pillow
 pyrealsense2; platform_system == "Windows" or platform_system == "Linux"
 pyrealsense2-macosx; platform_system == "Darwin"
+scipy
+PyQt6
+

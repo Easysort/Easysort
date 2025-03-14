@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <!-- Window Properties -->
+  <property name="geometry">
+   <rect>
+    <x>100</x>
+    <y>100</y>
+    <width>1000</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>PyQt6 Layout Example</string>
+  </property>
+
+  <widget class="QWidget" name="centralwidget">
+   <!-- Main horizontal layout -->
+   <layout class="QHBoxLayout" name="horizontalLayout_main">
+
+    <!-- Left Panel (Logo + Buttons) -->
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout_left">
+      <!-- Logo Label -->
+      <item>
+       <widget class="QLabel" name="labelLogo">
+        <property name="text">
+         <string>LOGO</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Box</enum>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>100</width>
+          <height>80</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+
+      <!-- Button 1 -->
+      <item>
+       <widget class="QPushButton" name="pushButton1">
+        <property name="text">
+         <string>BUTTON 1</string>
+        </property>
+       </widget>
+      </item>
+      <!-- Button 2 -->
+      <item>
+       <widget class="QPushButton" name="pushButton2">
+        <property name="text">
+         <string>BUTTON 2</string>
+        </property>
+       </widget>
+      </item>
+      <!-- Button 3 -->
+      <item>
+       <widget class="QPushButton" name="pushButton3">
+        <property name="text">
+         <string>BUTTON 3</string>
+        </property>
+       </widget>
+      </item>
+
+     </layout>
+    </item>
+
+    <!-- Camera Window in the center -->
+    <item>
+     <widget class="QLabel" name="labelCamera">
+      <property name="text">
+       <string>CAMERA WINDOW</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::Box</enum>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>600</width>
+        <height>400</height>
+       </size>
+      </property>
+     </widget>
+    </item>
+
+    <!-- Right Panel (Status Label at top, Label 1 in middle) -->
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout_right">
+      <!-- Status Label at top -->
+      <item>
+       <widget class="QLabel" name="labelStatus">
+        <property name="text">
+         <string>STATUS LABEL</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Box</enum>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>120</width>
+          <height>40</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+
+
+      <!-- Label 1 (middle) -->
+      <item>
+       <widget class="QLabel" name="label1">
+        <property name="text">
+         <string>LABEL 1</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Box</enum>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>100</width>
+          <height>40</height>
+         </size>
+        </property>a
+       </widget>
+      </item>
+
+
+     </layout>
+    </item>
+   </layout>
+  </widget>
+
+  <widget class="QMenuBar" name="menubar"/>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
