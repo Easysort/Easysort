@@ -2,6 +2,8 @@
 from easysort.sorting.infer_yolov8_ultralytics import Classifier
 from easysort.sorting.segmentation_fastsam import Segmentation
 from easysort.utils.detections import Detection
+from easysort.common.environment import Environment
+from easysort.system.camera.realsense_connector import RealSenseConnector
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,11 +14,27 @@ class SortingPipeline:
     def __init__(self):
         self.classifier = Classifier()
         self.segmentation = Segmentation()
+        self.camera = RealSenseConnector()
 
-    def __call__(self, image: np.ndarray):
+    def __call__(self, image: np.ndarray, timestamp: float) -> List[Detection]:
         detections = self.classifier(image)
         detections = self.segmentation(image, detections)
+        for detection in detections:
+            detection.timestamp = timestamp
         return detections
+
+    def stream(self): # Need to have test with RealSenseConnector stability being checked
+        self.camera.setup()
+        while True:
+            color_image, timestamp = self.camera.get_color_image()
+            detections = self(color_image, timestamp)
+            for d in detections:
+                d.set_center_point((d.center_point[0], d.center_point[1], self.camera.get_depth_for_detection(d)))
+            if Environment.DEBUG:
+                main_view = self.visualize(color_image, detections, show_plot=False)
+                cv2.imshow("Main View", main_view)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
 
     def visualize(self, image: np.ndarray, detections: List[Detection], show_plot: bool = True) -> np.ndarray:
         def get_color_for_class(class_name: str) -> tuple:
@@ -40,7 +58,7 @@ class SortingPipeline:
                                (int(detection.xyxy[2]), int(detection.xyxy[3])), color, 2)
 
             text_pos = (int(detection.xyxy[0]), int(detection.xyxy[1] - 10))
-            cv2.putText(img, detection.class_name, text_pos,
+            cv2.putText(img, f"{detection.class_name} (z={detection.center_point[2]})", text_pos,
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
             if detection.mask is not None and len(detection.mask) > 0:
@@ -49,7 +67,7 @@ class SortingPipeline:
                 overlay[mask > 0] = color
                 img = cv2.addWeighted(overlay, 0.5, img, 0.5, 0)
 
-            cx, cy = map(int, detection.center_point)
+            cx, cy, _ = map(int, detection.center_point)
             size = 10
             cv2.line(img, (cx - size, cy - size), (cx + size, cy + size), (0, 0, 255), 2)
             cv2.line(img, (cx - size, cy + size), (cx + size, cy - size), (0, 0, 255), 2)
@@ -78,8 +96,12 @@ class SortingPipeline:
         return main_view
 
 if __name__ == "__main__":
+    # Has to be run with sudo
     pipeline = SortingPipeline()
-    SOURCE_IMAGE_PATH = "/Users/lucasvilsen/Documents/Documents/EasySort/__old__/_old/test.jpg"
-    image = cv2.imread(SOURCE_IMAGE_PATH)
-    detections = pipeline(image)
-    pipeline.visualize(image, detections)
+    pipeline.stream()
+
+    # To run image:
+    # SOURCE_IMAGE_PATH = "/Users/lucasvilsen/Documents/Documents/EasySort/__old__/_old/test.jpg"
+    # image = cv2.imread(SOURCE_IMAGE_PATH)
+    # detections = pipeline(image)
+    # pipeline.visualize(image, detections)
