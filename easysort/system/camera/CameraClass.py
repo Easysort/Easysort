@@ -2,43 +2,115 @@ import cv2 as cv
 import time  # Import time for delay
 import pyrealsense2 as rs
 import numpy as np
-from PyQt6.QtCore import (QThread, Qt, pyqtSignal, )
+from PyQt6.QtCore import (QThread, Qt, pyqtSignal)
 from PyQt6.QtGui import (QPixmap, QImage)
+from scipy.spatial.transform import Rotation as R
+import math
 import cv2
 
-class Camera(QThread):
-    emitImages = pyqtSignal(QImage)
 
-    def __init__(self, config):
-        super().__init__()
+# Dictionary that was used to generate the ArUco marker
+aruco_dictionary_name = "DICT_ARUCO_ORIGINAL"
+
+# The different ArUco dictionaries built into the OpenCV library.
+ARUCO_DICT = {
+    "DICT_4X4_50": cv2.aruco.DICT_4X4_50,
+    "DICT_4X4_100": cv2.aruco.DICT_4X4_100,
+    "DICT_4X4_250": cv2.aruco.DICT_4X4_250,
+    "DICT_4X4_1000": cv2.aruco.DICT_4X4_1000,
+    "DICT_5X5_50": cv2.aruco.DICT_5X5_50,
+    "DICT_5X5_100": cv2.aruco.DICT_5X5_100,
+    "DICT_5X5_250": cv2.aruco.DICT_5X5_250,
+    "DICT_5X5_1000": cv2.aruco.DICT_5X5_1000,
+    "DICT_6X6_50": cv2.aruco.DICT_6X6_50,
+    "DICT_6X6_100": cv2.aruco.DICT_6X6_100,
+    "DICT_6X6_250": cv2.aruco.DICT_6X6_250,
+    "DICT_6X6_1000": cv2.aruco.DICT_6X6_1000,
+    "DICT_7X7_50": cv2.aruco.DICT_7X7_50,
+    "DICT_7X7_100": cv2.aruco.DICT_7X7_100,
+    "DICT_7X7_250": cv2.aruco.DICT_7X7_250,
+    "DICT_7X7_1000": cv2.aruco.DICT_7X7_1000,
+    "DICT_ARUCO_ORIGINAL": cv2.aruco.DICT_ARUCO_ORIGINAL
+}
+
+# Side length of the ArUco marker in meters
+aruco_marker_side_length = 0.03
+
+def euler_from_quaternion(x, y, z, w):
+    """
+    Convert a quaternion into euler angles (roll, pitch, yaw)
+    roll is rotation around x in radians (counterclockwise)
+    pitch is rotation around y in radians (counterclockwise)
+    yaw is rotation around z in radians (counterclockwise)
+    """
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    roll_x = math.atan2(t0, t1)
+
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    pitch_y = math.asin(t2)
+
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    yaw_z = math.atan2(t3, t4)
+
+    return roll_x, pitch_y, yaw_z  # in radians
+
+
+class CameraClass(QThread):
+    emitImages = pyqtSignal(QImage)
+    robot_pose = pyqtSignal(list)
+
+    def __init__(self, config, parent=None):
+        super().__init__(parent)  # Correct way to initialize QThread
+        self.config = config  # Store config for later use
         self.pipeline = rs.pipeline()
         self.rs_config = rs.config()
-        self.rs_config.enable_stream(rs.stream.color, config.get('Camera', 'rgb_res_x'),
-                                                         config.get('Camera', 'rgb_res_y'),
-                                                         rs.format.bgr8,
-                                                         config.get('Camera', 'max_fps'))
+        self.pipeline = rs.pipeline()
+        self.rs_config = rs.config()
 
-        self.rs_config.enable_stream(rs.stream.depth, config.get('Camera', 'depth_res_x'),
-                                                         config.get('Camera', 'depth_res_y'),
+
+        self.rs_config.enable_stream(rs.stream.color, int(config.get('Camera', 'rgb_res_x')),
+                                                         int(config.get('Camera', 'rgb_res_y')),
+                                                         rs.format.bgr8,
+                                                         int(config.get('Camera', 'max_fps')))
+
+        self.rs_config.enable_stream(rs.stream.depth, int(config.get('Camera', 'depth_res_x')),
+                                                         int(config.get('Camera', 'depth_res_y')),
                                                          rs.format.z16,
-                                                         config.get('Camera', 'max_fps'))
+                                                         int(config.get('Camera', 'max_fps')))
         self.rs_frames = None
         self.rgb_frame = None
         self.depth_frame = None
         self.camera_run = True
 
-        pipe_profile = self.pipeline.start(config)
+        pipe_profile = self.pipeline.start(self.rs_config)
         depth_sensor = pipe_profile.get_device().first_depth_sensor()
         depth_sensor.set_option(rs.option.visual_preset, 3)
 
-        s = pipe_profile.query_sensors()[1]
-        s.set_option(rs.option.enable_auto_exposure, True)
+        self.mtx =  np.array([
+                                [config.get('Camera', 'f_x'), 0., config.get('Camera', 'c_x')],
+                                [0., config.get('Camera', 'f_y'), config.get('Camera', 'c_y')],
+                                [0., 0., 1.]
+                            ]).astype(float)
+        self.dst = np.array([['-0.011645', '2.151450', '0.003982', '-0.006386', '-10.850711']]).astype(float)
 
-    def stream_frames(self):
+        print("[INFO] detecting '{}' markers...".format(
+            aruco_dictionary_name))
+        self.this_aruco_dictionary = cv2.aruco.getPredefinedDictionary(ARUCO_DICT[aruco_dictionary_name])
+        self.this_aruco_parameters = cv2.aruco.DetectorParameters()
+
+
+        #s = pipe_profile.query_sensors()[1]
+        #s.set_option(rs.option.enable_auto_exposure, True)
+
+    def run(self):
         while self.camera_run:
             try:
                 self.rs_frames = self.pipeline.wait_for_frames()
-                # Prevent from freezing
+                # This is preventing camera from occasional freezing
                 self.rs_frames.keep()
 
                 self.rgb_frame = self.rs_frames.get_color_frame()
@@ -51,6 +123,51 @@ class Camera(QThread):
                 break
 
             color_image = np.asanyarray(self.rgb_frame.get_data())
+
+            corners, marker_ids, rejected = cv2.aruco.detectMarkers(
+                color_image, self.this_aruco_dictionary, parameters=self.this_aruco_parameters
+            )
+
+            transform_translation_x = 0.0
+            transform_translation_y = 0.0
+            transform_translation_z = 0.0
+
+            if marker_ids is not None:
+                rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
+                    corners, .03, self.mtx, self.dst  # Now cameraMatrix and distCoeff are used
+                )
+
+                for i, marker_id in enumerate(marker_ids):
+                    # Store the translation (i.e. position) information
+                    transform_translation_x = tvecs[i][0][0]
+                    transform_translation_y = tvecs[i][0][1]
+                    transform_translation_z = tvecs[i][0][2]
+
+                    # Store the rotation information
+                    rotation_matrix = np.eye(4)
+                    rotation_matrix[0:3, 0:3] = cv2.Rodrigues(np.array(rvecs[i][0]))[0]
+                    r = R.from_matrix(rotation_matrix[0:3, 0:3])
+                    quat = r.as_quat()
+
+                    # Quaternion format
+                    #transform_rotation_x = quat[0]
+                    #transform_rotation_y = quat[1]
+                    #transform_rotation_z = quat[2]
+                    #transform_rotation_w = quat[3]
+
+                    # Euler angle format in radians
+                    #roll_x, pitch_y, yaw_z = euler_from_quaternion(transform_rotation_x,
+                    #                                               transform_rotation_y,
+                    #                                               transform_rotation_z,
+                    #                                               transform_rotation_w)
+
+                    #roll_x = math.degrees(roll_x)
+                    #pitch_y = math.degrees(pitch_y)
+                    #yaw_z = math.degrees(yaw_z)
+
+                    # Draw the axes on the marker
+                    cv2.drawFrameAxes(color_image, self.mtx, self.dst, rvecs[i], tvecs[i], 0.05)
+
             # percent of original size
             width = int(color_image.shape[1])
             height = int(color_image.shape[0])
@@ -60,9 +177,12 @@ class Camera(QThread):
             h, w, ch = color_image.shape
 
             bytesPerLine = ch * w
-            convertToQtFormat = QImage(color_image.data, w, h, bytesPerLine, QImage.Format_RGB888)
-            p = convertToQtFormat.scaled(w, h, Qt.KeepAspectRatio)
+            convertToQtFormat = QImage(color_image.data, w, h, bytesPerLine, QImage.Format.Format_RGB888)
+            p = convertToQtFormat.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatio)
             self.emitImages.emit(p)
+            self.robot_pose.emit([transform_translation_x,
+                                  transform_translation_y,
+                                  transform_translation_z])
 
     def get_image(self):
         if self.cam.isOpened():
@@ -73,6 +193,9 @@ class Camera(QThread):
                 return image
         else:
             print("Camera is not ready!")
+
+    def track_robot(self):
+        pass
 
 
     def save_images(self, number):

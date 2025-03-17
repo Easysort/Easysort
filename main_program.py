@@ -5,13 +5,14 @@ from PyQt6.QtGui import (QPixmap, QImage, QTransform)
 from easysort.system.camera import CameraClass
 import configparser
 
+from easysort.system.camera.CameraClass import CameraClass
+
 # read config file
 config = configparser.ConfigParser()
 config.read('config.ini')
 
 # startup camera
-camera = CameraClass.Camera(config)
-
+camera = CameraClass(config=config)
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -21,15 +22,17 @@ class MainWindow(QtWidgets.QMainWindow):
         uic.loadUi("easysort_gui.ui", self)
 
         # Set the logo
-        self.set_logo("assets/logo.png")
+        self.set_logo("docs/Easysort_logo.png")
 
         # Connect button signals if needed
         self.pushButton1.clicked.connect(self.on_button1_clicked)
         self.pushButton2.clicked.connect(self.on_button2_clicked)
         self.pushButton3.clicked.connect(self.on_button3_clicked)
 
-        self.camera.emitImages.connect(lambda p: self.setImage(p))
-        self.camera.start()
+        camera.emitImages.connect(lambda p: self.setImage(p))
+        camera.robot_pose.connect(self.setRobotPose)
+
+        camera.start()
         self.camImage1 = self.findChild(QtWidgets.QLabel, 'labelCamera')
 
         # Update status label, etc.
@@ -45,13 +48,16 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_button3_clicked(self):
         self.label1.setText("Button 3 clicked")
 
+    def setRobotPose(self, pose):
+        self.labelStatus.setText(f"{pose[0]:.2f}, {pose[1]:.2f}, {pose[2]:.2f}")
+
 
     def setImage(self, p):
         p = QPixmap.fromImage(p)
-        p = p.scaled(int(config.get('Camera', 'rgb_resolution_x')),
-                     int(config.get('Camera', 'rgb_resolution_y')),
-                     Qt.KeepAspectRatio)
-        self.camImage1.setImage(p)
+        p = p.scaled(int(config.get('Camera', 'rgb_res_x')),
+                     int(config.get('Camera', 'rgb_res_y')),
+                     Qt.AspectRatioMode.KeepAspectRatio)
+        self.camImage1.setPixmap(p)
 
 
     def set_logo(self, filepath):
