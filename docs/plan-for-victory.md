@@ -14,13 +14,14 @@ This plan is updated every sunday by @Apros7 (Lucas Vilsen)
 2. Rewrite arduino controls to be able to pick up and object and sort in under 2 seconds.
 3. Fix robot stabilization issues with regards to Z axis to under 1cm each direction.
 4. Have a complete pipeline for recognizing and calculating object 3d positions running faster than 30it/min on macbook.
-5. Be able to visualize robot movements using PyQt6 to better debug movement/image recognition issues.
-6. Autoupload information (Weight, CO2, classification) to supabase at least every 6 hours and show it on the EasyView Dashboard for DTU as a test user.
+5. Get Jetson working and running the pipeline faster than 20it/min and communcating with Ardunio.
+6. Be able to visualize robot movements using PyQt6 to better debug movement/image recognition issues.
+7. Autoupload information (Weight, CO2, classification) to supabase at least every 6 hours and show it on the EasyView Dashboard for DTU as a test user.
 
 
 ## Who is working on what?
 - Lucas: 1, 3, 4
-- Erik: 2, 5
+- Erik: 2, 5, 6
 
 
 ## Links:
