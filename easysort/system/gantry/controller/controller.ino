@@ -13,8 +13,8 @@ const float CONVEYOR_SPEED = 8.727;  // cm/s
 // const int SUCTION_CUP_READ_PIN = 13;
 // const int LIMIT_SWITCH_READ_PIN = 11;
 
-const long MaxSpeed = 4000; // 2000
-const long Acceleration = 4000; //
+const long MaxSpeed = 4000; // Can go to 8000 at least
+const long Acceleration = 4000; // Can go to 8000 at least
 
 const long XMaxSpeed = MaxSpeed;
 const long XAcceleration = Acceleration;
