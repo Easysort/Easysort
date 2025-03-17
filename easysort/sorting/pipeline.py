@@ -7,8 +7,9 @@ from easysort.system.camera.realsense_connector import RealSenseConnector
 
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import List
+from typing import List, Optional
 import cv2
+import time
 
 class SortingPipeline:
     def __init__(self):
@@ -16,7 +17,8 @@ class SortingPipeline:
         self.segmentation = Segmentation()
         self.camera = RealSenseConnector()
 
-    def __call__(self, image: np.ndarray, timestamp: float) -> List[Detection]:
+    def __call__(self, image: np.ndarray, timestamp: Optional[float] = None) -> List[Detection]:
+        if timestamp is None: timestamp = time.time()
         detections = self.classifier(image)
         detections = self.segmentation(image, detections)
         for detection in detections:
