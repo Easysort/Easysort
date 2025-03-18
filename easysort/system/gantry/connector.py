@@ -21,9 +21,20 @@ class GantryConnector:
         self.port = port
         self.name = name
         self.ser = self.establish_connection()
+        self.position = (0, 0)
+        self.suction_state = 0
 
-    def __call__(self, x: float, y: float) -> None: self.send_information((x, y))
-    def is_ready(self) -> bool: return True # TODO: Implement this
+    def go_to(self, x: int, y: int) -> None:
+        self.position = (x, y)
+        self.send_information((x, y, self.suction_state))
+
+    def suction_on(self) -> None:
+        self.suction_state = 1
+        self.send_information((self.position[0], self.position[1], self.suction_state))
+
+    def suction_off(self) -> None:
+        self.suction_state = 0
+        self.send_information((self.position[0], self.position[1], self.suction_state))
 
     def establish_connection(self) -> serial.Serial:
         try:
@@ -37,7 +48,7 @@ class GantryConnector:
 
     def send_information(self, msg: str | bytes | tuple) -> None:
         if isinstance(msg, str): msg = msg.encode()
-        elif isinstance(msg, tuple): msg = f"{msg[0]},{msg[1]}\n".encode()
+        elif isinstance(msg, tuple): msg = f"{msg[0]},{msg[1]},{msg[2]}\n".encode()
         try: self.ser.write(msg)
         except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
 
@@ -51,13 +62,18 @@ class GantryConnector:
         _LOGGER.warning(f"Timeout occurred while waiting for response from {self.port}")
         return '' # TODO: How to handle this?
 
+    def is_ready(self) -> bool: return True # TODO: Implement this
     def clear_buffer(self) -> None: self.ser.reset_input_buffer()
     def quit(self) -> None: self.ser.close()
 
 if __name__ == "__main__":
     connector = GantryConnector(Environment.GANTRY_PORT)
     while True:
-        x = float(input("Enter x: "))
-        y = float(input("Enter y: "))
-        connector(x, y)
-        time.sleep(1)
+        press_enter = input("Press enter to continue")
+        if press_enter == "":
+            if connector.suction_state: connector.suction_off()
+            else: connector.suction_on()
+            # x = float(input("Enter x: "))
+            # y = float(input("Enter y: "))
+            # connector(x, y)
+            # time.sleep(1)
