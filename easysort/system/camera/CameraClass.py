@@ -70,7 +70,9 @@ class CameraClass(QThread):
         self.rs_config = rs.config()
         self.pipeline = rs.pipeline()
         self.rs_config = rs.config()
-
+        self.robot_x = 0
+        self.robot_y = 0
+        self.robot_z = 0
 
         self.rs_config.enable_stream(rs.stream.color, int(config.get('Camera', 'rgb_res_x')),
                                                          int(config.get('Camera', 'rgb_res_y')),
@@ -142,6 +144,11 @@ class CameraClass(QThread):
                     transform_translation_x = tvecs[i][0][0]
                     transform_translation_y = tvecs[i][0][1]
                     transform_translation_z = tvecs[i][0][2]
+
+
+                    self.robot_x = tvecs[i][0][0]
+                    self.robot_y = tvecs[i][0][1]
+                    self.robot_z = tvecs[i][0][2]
 
                     # Store the rotation information
                     rotation_matrix = np.eye(4)

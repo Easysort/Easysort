@@ -1,6 +1,6 @@
 
 import time
-
+import numpy as np
 import serial
 import serial.tools.list_ports
 from easysort.common.logger import EasySortLogger
@@ -21,9 +21,19 @@ class GantryConnector:
         self.port = port
         self.name = name
         self.ser = self.establish_connection()
+        self.x = 0
+        self.y = 0
+        self.z = 0
 
     def __call__(self, x: float, y: float) -> None: self.send_information((x, y))
     def is_ready(self) -> bool: return True # TODO: Implement this
+
+
+    def calibrate(self, camera_position):
+        return np.array(camera_position)
+
+    def robot_to_camera(self, robot_movement, T):
+        return robot_movement + T
 
     def establish_connection(self) -> serial.Serial:
         try:
@@ -54,10 +64,16 @@ class GantryConnector:
     def clear_buffer(self) -> None: self.ser.reset_input_buffer()
     def quit(self) -> None: self.ser.close()
 
-if __name__ == "__main__":
-    connector = GantryConnector(Environment.GANTRY_PORT)
-    while True:
-        x = float(input("Enter x: "))
-        y = float(input("Enter y: "))
-        connector(x, y)
-        time.sleep(1)
+#if __name__ == "__main__":
+#    connector = GantryConnector(Environment.GANTRY_PORT)
+#    while True:
+        #x = float(input("Enter x: "))
+        #y = float(input("Enter y: "))
+        #connector(x, y)
+        #time.sleep(1)
+
+
+
+
+
+
