@@ -10,18 +10,18 @@ Our primary concern is going fast and staying on the track we consciously choose
 This plan is updated every Sunday by @Apros7 (Lucas Vilsen)
 
 ## Plan (in ranked order of priority)
-1. Be able to turn suction on/off from Arduino
-2. Rewrite Arduino controls to be able to pick up an object and sort it in under 2 seconds.
-3. Fix robot stabilization issues with regards to the Z axis to under 1cm in each direction.
-4. Have a complete pipeline for recognizing and calculating object 3d positions running faster than 30it/min on MacBook.
-5. Get Jetson working and running the pipeline faster than 20it/min and communicating with Arduino.
-6. Be able to visualize robot movements using PyQt6 to better debug movement/image recognition issues.
+1. Rewrite Arduino controls to be able to pick up an object and sort it in under 2 seconds.
+2. Fix robot stabilization issues with regards to the Z axis to under 1cm in each direction.
+3. Have a complete pipeline for recognizing and calculating object 3d positions running faster than 30it/min on MacBook.
+4. Get Jetson working and running the pipeline faster than 20it/min and communicating with Arduino.
+5. Be able to visualize robot movements using PyQt6 to better debug movement/image recognition issues.
+6. Autoupload videos to SupaBase for labelling.
 7. Autoupload information (Weight, CO2, classification) to SupaBase at least every 6 hours and show it on the EasyView Dashboard for DTU as a test user.
 
 
 ## Who is working on what?
-- Lucas: 1, 3, 4
-- Erik: 2, 5, 6
+- Lucas: 2, 3, 6
+- Erik: 1, 4, 5
 
 
 ## Links:
