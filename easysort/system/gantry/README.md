@@ -8,3 +8,12 @@ This connector outputs 3d positions for the robot to follow. The following posit
 
 These position are specified in the config and used by the classifier.
 The robot should then send a status update (see `easysort/common/datasaver.py`). When the status update has been recieved, the flow repeats.
+
+## Setup Arduino in VSCode
+
+1. Download PlatformIO extension
+2. Open the folder with the platformio.ini file
+3. Left bottom corner is checkmark, which is the build button.
+4. Left bottom corner is right arrow, which is the upload button.
+
+Or watch [this video](https://www.youtube.com/watch?v=gQ2lsSuXvVU&ab_channel=Abstractprogrammer)

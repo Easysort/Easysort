@@ -13,8 +13,9 @@ const float CONVEYOR_SPEED = 8.727;  // cm/s
 // const int SUCTION_CUP_READ_PIN = 13;
 // const int LIMIT_SWITCH_READ_PIN = 11;
 
-const long MaxSpeed = 4000; // 2000
-const long Acceleration = 4000; //
+const long MaxSpeed = 4000; // Can go to 8000 at least
+const long Acceleration = 4000; // Can go to 8000 at least
+const int SUCTION_CUP_WRITE_PIN = 5;
 
 const long XMaxSpeed = MaxSpeed;
 const long XAcceleration = Acceleration;
@@ -33,53 +34,6 @@ AccelStepper stepperX(AccelStepper::DRIVER, 2, 3);
 AccelStepper stepperY(AccelStepper::DRIVER, 6, 7);
 // AccelStepper stepperZ(AccelStepper::DRIVER, 9, 8);
 // ezButton limitSwitch(LIMIT_SWITCH_READ_PIN); // when z is touching, limitSwitch is LOW
-
-void setup() {
-  // Set max speed and acceleration for each stepper
-  Serial.begin(9600);
-  Serial.println("Starting...");
-  delay(4000);  // Avoid starting failure of running first moveCoordinated before arduino setup
-  stepperX.setMaxSpeed(XMaxSpeed);
-  stepperX.setAcceleration(XAcceleration);
-  stepperY.setMaxSpeed(YMaxSpeed);
-  stepperY.setAcceleration(YAcceleration);
-  // stepperZ.setMaxSpeed(ZMaxSpeed);
-  // stepperZ.setAcceleration(ZAcceleration);
-
-  // Starting point is (0, 0)
-  Serial.println("0/3...");
-  moveCoordinated(5, 0);
-  moveCoordinated(0, 0);
-  Serial.println("1/3...");
-  moveCoordinated(0, 5);
-  moveCoordinated(0, 0);
-  Serial.println("2/3...");
-  moveCoordinated(5, 5);
-  moveCoordinated(5, -5);
-  moveCoordinated(-5, -5);
-  moveCoordinated(-5, 5);
-  moveCoordinated(0, 0);
-  Serial.println("3/3...");
-  Serial.println("Done!");
-}
-
-void loop() {
-  if (Serial.available() > 0) {
-    String data = Serial.readStringUntil('\n'); // input is x,y\n
-    int comma = data.indexOf(',');
-    if (comma != -1) {
-      int num1 = data.substring(0, comma).toInt();
-      int num2 = data.substring(comma + 1).toInt();
-
-      moveCoordinated(num1, num2);
-      // add error handling
-      Serial.println("success"); // or "fail" if error
-      // error could be:
-      // - Cannot lift item
-      // - Dropped item on the way
-    }
-  }
-}
 
 Coordinates reverseKinematics(int input_x, int input_y) {  // Position -> robot movements
   // Converts normal x, y coordinates into what the motors have to do.
@@ -138,7 +92,6 @@ void moveCoordinated(float future_x, float future_y) {
     
     while (stepperX.distanceToGo() != 0 || stepperY.distanceToGo() != 0) {
       unsigned long now = micros();
-      unsigned long now_millis = millis();
       
       // Only step if we haven't reached the target yet
       if (stepperX.distanceToGo() != 0 && (now - last_x_step) >= x_interval) {
@@ -164,4 +117,74 @@ void moveCoordinated(float future_x, float future_y) {
   Serial.print("Movement took ");
   Serial.print(time_taken);
   Serial.println(" ms");
+}
+
+void setup() {
+  // Set max speed and acceleration for each stepper
+  pinMode(SUCTION_CUP_WRITE_PIN, OUTPUT);
+  Serial.begin(9600);
+  Serial.println("Starting...");
+  delay(4000);  // Avoid starting failure of running first moveCoordinated before arduino setup
+  stepperX.setMaxSpeed(XMaxSpeed);
+  stepperX.setAcceleration(XAcceleration);
+  stepperY.setMaxSpeed(YMaxSpeed);
+  stepperY.setAcceleration(YAcceleration);
+
+  Serial.println("Testing suction cup");
+  Serial.println("Suction cup should be on for 3 seconds");
+  digitalWrite(SUCTION_CUP_WRITE_PIN, HIGH);
+  delay(3000);
+  Serial.println("Suction cup should be off for 3 seconds");
+  digitalWrite(SUCTION_CUP_WRITE_PIN, LOW);
+  delay(3000);
+
+  // stepperZ.setMaxSpeed(ZMaxSpeed);
+  // stepperZ.setAcceleration(ZAcceleration);
+
+  // Starting point is (0, 0)
+  // Serial.println("0/3...");
+  // moveCoordinated(5, 0);
+  // moveCoordinated(0, 0);
+  // Serial.println("1/3...");
+  // moveCoordinated(0, 5);
+  // moveCoordinated(0, 0);
+  // Serial.println("2/3...");
+  // moveCoordinated(5, 5);
+  // moveCoordinated(5, -5);
+  // moveCoordinated(-5, -5);
+  // moveCoordinated(-5, 5);
+  // moveCoordinated(0, 0);
+  // Serial.println("3/3...");
+  Serial.println("Done!");
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    Serial.println("Received data:");
+    String data = Serial.readStringUntil('\n'); // input is x,y,suction\n
+    int firstComma = data.indexOf(',');
+    int secondComma = data.indexOf(',', firstComma + 1);
+    
+    if (firstComma != -1 && secondComma != -1) {
+      int num1 = data.substring(0, firstComma).toInt();
+      int num2 = data.substring(firstComma + 1, secondComma).toInt();
+      int suctionState = data.substring(secondComma + 1).toInt();
+      Serial.println("Received data:");
+      Serial.println(num1);
+      Serial.println(num2);
+      Serial.println(suctionState);
+      if (suctionState == 1) {
+        digitalWrite(SUCTION_CUP_WRITE_PIN, HIGH); // on
+      } else {
+        digitalWrite(SUCTION_CUP_WRITE_PIN, LOW); // off
+      }
+      moveCoordinated(num1, num2);
+
+      // add error handling
+      Serial.println("success"); // or "fail" if error
+      // error could be:
+      // - Cannot lift item
+      // - Dropped item on the way
+    }
+  }
 }

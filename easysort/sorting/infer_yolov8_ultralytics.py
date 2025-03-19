@@ -3,14 +3,15 @@ import supervision as sv
 
 from easysort.common.logger import EasySortLogger
 from easysort.common.timer import TimeIt
-from easysort.utils.detections import Detection
+from easysort.utils.detections import Detections, Detection
 from ultralytics import YOLO
 import time
 import torch
 from typing import List
 import numpy as np
+
 LOGGER = EasySortLogger()
-RANDOM_IMAGE_TENSOR = torch.rand((980, 1280, 3))
+RANDOM_IMAGE_TENSOR = torch.rand((980, 1280, 3)).numpy()
 
 class Classifier:
     def __init__(self):
@@ -18,10 +19,10 @@ class Classifier:
         LOGGER.info("Classifier initialized")
 
     @TimeIt("Bbox classification")
-    def __call__(self, image) -> List[Detection]:
+    def __call__(self, image: np.ndarray) -> List[Detection]:
         results = self.model(image, stream=True)
         results_unlisted = list(results)[0] # You can pass multiple images, we have one, so we take the first results object.
-        return Detection.from_ultralytics(results_unlisted)
+        return Detections.from_ultralytics(results_unlisted)
 
     def test_speed(self) -> None:
         time0 = time.time()
