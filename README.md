@@ -16,10 +16,16 @@ EasySort makes you go from a sorting problem to a solution in just a couple of h
 Our annotation tool we use at EasySort is also open-source and called [EasyLabeler](https://github.com/EasySort/easylabeler).
 
 # How to setup EasySort
-...
 
-```
-pip install -r requirements.txt
+The recommended way to setup EasySort is to install it in a virtual environment. The easiest way to do that is using [uv](https://github.com/astral-sh/uv?tab=readme-ov-file#installation):
+
+```bash
+# This will install all the dependencies and setup the virtual environment
+uv sync
+# Run the tests to make sure everything is working
+uv run pytest
+# Activate the virtual environment (or just prefix your commands with uv run)
+source .venv/bin/activate
 ```
 
 # Why open-source?
