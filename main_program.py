@@ -1,17 +1,22 @@
 import sys
+import threading
+
 from PyQt6 import QtCore, QtWidgets, QtGui, uic
 from PyQt6.QtCore import QThreadPool, QRunnable, QTimer, QDateTime, QSettings, Qt, QUrl, QRect, pyqtSignal
 from PyQt6.QtGui import (QPixmap, QImage, QTransform)
-from easysort.system.camera import CameraClass
+from easysort.common.environment import Environment
 import configparser
+import numpy as np
 
+from easysort.system.camera.CameraClass import CameraClass
+from easysort.system.gantry.connector import GantryConnector
 # read config file
 config = configparser.ConfigParser()
 config.read('config.ini')
 
 # startup camera
-camera = CameraClass.Camera(config)
-
+camera = CameraClass(config=config)
+robot = GantryConnector(Environment.GANTRY_PORT)
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -21,37 +26,76 @@ class MainWindow(QtWidgets.QMainWindow):
         uic.loadUi("easysort_gui.ui", self)
 
         # Set the logo
-        self.set_logo("assets/logo.png")
+        self.set_logo("docs/Easysort_logo.png")
 
         # Connect button signals if needed
-        self.pushButton1.clicked.connect(self.on_button1_clicked)
-        self.pushButton2.clicked.connect(self.on_button2_clicked)
-        self.pushButton3.clicked.connect(self.on_button3_clicked)
+        self.pushButtonXplus.clicked.connect(self.robotXplus)
+        self.pushButtonXminus.clicked.connect(self.robotXminus)
+        self.pushButtonYplus.clicked.connect(self.robotYplus)
+        self.pushButtonYminus.clicked.connect(self.robotYminus)
+        self.pushButtonZplus.clicked.connect(self.robotZplus)
+        self.pushButtonZminus.clicked.connect(self.robotZminus)
+        self.suctionOnButton.clicked.connect(self.suctionOn)
+        self.suctionOffButton.clicked.connect(self.suctionOff)
 
-        self.camera.emitImages.connect(lambda p: self.setImage(p))
-        self.camera.start()
+        camera.emitImages.connect(lambda p: self.setImage(p))
+        camera.robot_pose.connect(self.setRobotPose)
+
+        camera.start()
         self.camImage1 = self.findChild(QtWidgets.QLabel, 'labelCamera')
 
         # Update status label, etc.
         self.label1.setText("Status: Ready")
         self.labelStatus.setText(config.get('Robot', 'Status'))
 
-    def on_button1_clicked(self):
-        self.label1.setText("Button 1 clicked")
+    def robotXplus(self):
+        self.label1.setText("Robot X+")
+        t = threading.Thread(target=robot.go_to(robot.position[0] +3 ,0))
+        t.start()
 
-    def on_button2_clicked(self):
-        self.label1.setText("Button 2 clicked")
+    def robotXminus(self):
+        self.label1.setText("Robot X-")
+        t = threading.Thread(target=robot.go_to(robot.position[0] - 3 ,0))
+        t.start()
 
-    def on_button3_clicked(self):
-        self.label1.setText("Button 3 clicked")
+    def robotYplus(self):
+        self.label1.setText("Robot Y+")
+        t = threading.Thread(target=robot.go_to(0 ,robot.position[1] + 3))
+        t.start()
+
+    def robotYminus(self):
+        self.label1.setText("Robot Y-")
+        t = threading.Thread(target=robot.go_to(0 ,robot.position[1] - 3))
+        t.start()
+
+    def robotZplus(self):
+        self.label1.setText("Robot Z+")
+        t = threading.Thread(target=robot.go_to(0 ,robot.position[1] + 3))
+        t.start()
+
+    def robotZminus(self):
+        self.label1.setText("Robot Z-")
+        t = threading.Thread(target=robot.go_to(0 ,robot.position[1] - 3))
+        t.start()
+
+    def suctionOn(self):
+        t = threading.Thread(target=robot.suction_on)
+        t.start()
+
+    def suctionOff(self):
+        t = threading.Thread(target=robot.suction_off)
+        t.start()
+
+    def setRobotPose(self, pose):
+        self.labelStatus.setText(f"{pose[0]:.2f}, {pose[1]:.2f}, {pose[2]:.2f}")
 
 
     def setImage(self, p):
         p = QPixmap.fromImage(p)
-        p = p.scaled(int(config.get('Camera', 'rgb_resolution_x')),
-                     int(config.get('Camera', 'rgb_resolution_y')),
-                     Qt.KeepAspectRatio)
-        self.camImage1.setImage(p)
+        p = p.scaled(int(config.get('Camera', 'rgb_res_x')),
+                     int(config.get('Camera', 'rgb_res_y')),
+                     Qt.AspectRatioMode.KeepAspectRatio)
+        self.camImage1.setPixmap(p)
 
 
     def set_logo(self, filepath):
@@ -79,6 +123,19 @@ class MainWindow(QtWidgets.QMainWindow):
             )
         else:
             self.labelCamera.setText("Camera feed not available")
+
+
+    def move_robot_camera(self):
+        P_camera_start = np.array([camera.robot_y, camera.robot_y, camera.robot_z])
+        T = robot.calibrate(P_camera_start)
+        #print("Calibration complete! Translation offset:", T)
+
+        robot_movement = np.array([5, 0, 0])
+        camera_movement = robot.robot_to_camera(robot_movement, T)
+
+        robot(camera_movement[0], camera_movement[1])
+
+        #print("Robot movement in camera frame:", camera_movement)
 
 
 if __name__ == "__main__":

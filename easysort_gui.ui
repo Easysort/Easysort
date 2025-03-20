@@ -2,11 +2,10 @@
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
-  <!-- Window Properties -->
   <property name="geometry">
    <rect>
-    <x>100</x>
-    <y>100</y>
+    <x>0</x>
+    <y>0</y>
     <width>1000</width>
     <height>600</height>
    </rect>
@@ -14,25 +13,14 @@
   <property name="windowTitle">
    <string>PyQt6 Layout Example</string>
   </property>
-
   <widget class="QWidget" name="centralwidget">
-   <!-- Main horizontal layout -->
    <layout class="QHBoxLayout" name="horizontalLayout_main">
-
-    <!-- Left Panel (Logo + Buttons) -->
     <item>
      <layout class="QVBoxLayout" name="verticalLayout_left">
-      <!-- Logo Label -->
       <item>
        <widget class="QLabel" name="labelLogo">
-        <property name="text">
-         <string>LOGO</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignCenter</set>
-        </property>
-        <property name="frameShape">
-         <enum>QFrame::Box</enum>
+        <property name="enabled">
+         <bool>true</bool>
         </property>
         <property name="minimumSize">
          <size>
@@ -40,111 +28,148 @@
           <height>80</height>
          </size>
         </property>
-       </widget>
-      </item>
-
-      <!-- Button 1 -->
-      <item>
-       <widget class="QPushButton" name="pushButton1">
+        <property name="frameShape">
+         <enum>QFrame::Box</enum>
+        </property>
         <property name="text">
-         <string>BUTTON 1</string>
+         <string>LOGO</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
         </property>
        </widget>
       </item>
-      <!-- Button 2 -->
       <item>
-       <widget class="QPushButton" name="pushButton2">
+       <widget class="QPushButton" name="pushButtonXplus">
         <property name="text">
-         <string>BUTTON 2</string>
+         <string>X+</string>
         </property>
        </widget>
       </item>
-      <!-- Button 3 -->
       <item>
-       <widget class="QPushButton" name="pushButton3">
+       <widget class="QPushButton" name="pushButtonXminus">
         <property name="text">
-         <string>BUTTON 3</string>
+         <string>X-</string>
         </property>
        </widget>
       </item>
-
+      <item>
+       <widget class="QPushButton" name="pushButtonYplus">
+        <property name="text">
+         <string>Y+</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonYminus">
+        <property name="text">
+         <string>Y-</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonZplus">
+        <property name="text">
+         <string>Z+</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonZminus">
+        <property name="text">
+         <string>Z-</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </item>
-
-    <!-- Camera Window in the center -->
     <item>
      <widget class="QLabel" name="labelCamera">
-      <property name="text">
-       <string>CAMERA WINDOW</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-      <property name="frameShape">
-       <enum>QFrame::Box</enum>
-      </property>
       <property name="minimumSize">
        <size>
         <width>600</width>
         <height>400</height>
        </size>
       </property>
+      <property name="frameShape">
+       <enum>QFrame::Box</enum>
+      </property>
+      <property name="text">
+       <string>CAMERA WINDOW</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
      </widget>
     </item>
-
-    <!-- Right Panel (Status Label at top, Label 1 in middle) -->
     <item>
      <layout class="QVBoxLayout" name="verticalLayout_right">
-      <!-- Status Label at top -->
       <item>
        <widget class="QLabel" name="labelStatus">
-        <property name="text">
-         <string>STATUS LABEL</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignCenter</set>
-        </property>
-        <property name="frameShape">
-         <enum>QFrame::Box</enum>
-        </property>
         <property name="minimumSize">
          <size>
           <width>120</width>
           <height>40</height>
          </size>
         </property>
+        <property name="frameShape">
+         <enum>QFrame::Box</enum>
+        </property>
+        <property name="text">
+         <string>STATUS LABEL</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
        </widget>
       </item>
-
-
-      <!-- Label 1 (middle) -->
       <item>
        <widget class="QLabel" name="label1">
+        <property name="minimumSize">
+         <size>
+          <width>100</width>
+          <height>40</height>
+         </size>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Box</enum>
+        </property>
         <property name="text">
          <string>LABEL 1</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>
         </property>
-        <property name="frameShape">
-         <enum>QFrame::Box</enum>
-        </property>
-        <property name="minimumSize">
-         <size>
-          <width>100</width>
-          <height>40</height>
-         </size>
-        </property>a
        </widget>
       </item>
-
-
+      <item>
+       <widget class="QPushButton" name="suctionOnButton">
+        <property name="text">
+         <string>Suction on</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="suctionOffButton">
+        <property name="text">
+         <string>Suction off</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </item>
    </layout>
   </widget>
-
-  <widget class="QMenuBar" name="menubar"/>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1000</width>
+     <height>22</height>
+    </rect>
+   </property>
+  </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources/>
