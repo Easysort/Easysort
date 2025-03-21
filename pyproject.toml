@@ -26,7 +26,9 @@ dependencies = [
     "pylint>=2.14.2",
     "pre-commit>=4.2.0",
     "openai-clip==1.0.1",
-
+    "eclipse-zenoh>=1.2.1",
+    "msgpack>=1.1.0",
+    "msgspec>=0.19.0",
 ]
 
 [tool.hatch.build.targets.wheel]
