@@ -24,6 +24,8 @@ The recommended way to setup EasySort is to install it in a virtual environment.
 uv sync
 # Run the tests to make sure everything is working
 uv run pytest
+# Install git hooks
+uv run pre-commit install
 # Activate the virtual environment (or just prefix your commands with uv run)
 source .venv/bin/activate
 ```
