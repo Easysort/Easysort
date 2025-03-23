@@ -32,7 +32,7 @@ class Detection: # TODO: Add frame?
         self._center_point = center_point
         return center_point # (x, y, z)
 
-    def current_position(self, speed: float) -> Tuple[float, float, float]:
+    def current_center_point(self, speed: float) -> Tuple[float, float, float]:
         if self.timestamp is None:
             raise NotImplementedError("Timestamp is not set")
         return (self.center_point[0] + speed * self.timestamp, self.center_point[1], self.center_point[2])

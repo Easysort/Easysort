@@ -1,4 +1,4 @@
-
+from typing import Optional
 import time
 
 import serial
@@ -21,20 +21,22 @@ class GantryConnector:
         self.port = port
         self.name = name
         self.ser = self.establish_connection()
-        self.position = (0, 0)
+        self.position = (0, 0, 0)
         self.suction_state = 0
 
-    def go_to(self, x: int, y: int) -> None:
-        self.position = (x, y)
-        self.send_information((x, y, self.suction_state))
+    def go_to(self, x: int, y: int, z: int) -> None:
+        self.position = (x, y, z)
+        self.send_information((x, y, z, self.suction_state))
 
-    def suction_on(self) -> None:
+    def suction_on(self, x: Optional[int] = None, y: Optional[int] = None, z: Optional[int] = None) -> None:
+        self.position = (x or self.position[0], y or self.position[1], z or self.position[2])
         self.suction_state = 1
-        self.send_information((self.position[0], self.position[1], self.suction_state))
+        self.send_information((x, y, z, self.suction_state))
 
-    def suction_off(self) -> None:
+    def suction_off(self, x: Optional[int] = None, y: Optional[int] = None, z: Optional[int] = None) -> None:
+        self.position = (x or self.position[0], y or self.position[1], z or self.position[2])
         self.suction_state = 0
-        self.send_information((self.position[0], self.position[1], self.suction_state))
+        self.send_information((x, y, z, self.suction_state))
 
     def establish_connection(self) -> serial.Serial:
         try:
@@ -48,7 +50,7 @@ class GantryConnector:
 
     def send_information(self, msg: str | bytes | tuple) -> None:
         if isinstance(msg, str): msg = msg.encode()
-        elif isinstance(msg, tuple): msg = f"{msg[0]},{msg[1]},{msg[2]}\n".encode()
+        elif isinstance(msg, tuple): msg = f"{msg[0]},{msg[1]},{msg[2]},{msg[3]}\n".encode()
         try: self.ser.write(msg)
         except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
 
@@ -71,8 +73,8 @@ if __name__ == "__main__":
     while True:
         press_enter = input("Press enter to continue")
         if press_enter == "":
-            if connector.suction_state: connector.suction_off()
-            else: connector.suction_on()
+            if connector.suction_state: connector.suction_off(10, 20, 2)
+            else: connector.suction_on(0, 0, 0)
             # x = float(input("Enter x: "))
             # y = float(input("Enter y: "))
             # connector(x, y)
