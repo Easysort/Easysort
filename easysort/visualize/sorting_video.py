@@ -7,7 +7,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 from easysort.sorting.pipeline import SortingPipeline
-
+from easysort.visualize.sorting_image import visualize_sorting_pipeline_image
 
 def visualize_video(uuid: str, low: int = 0, high: int = 1000, save_images: bool = False):
     pipeline = SortingPipeline()
@@ -26,7 +26,7 @@ def visualize_video(uuid: str, low: int = 0, high: int = 1000, save_images: bool
     for image_path in tqdm(image_paths):
         image = cv2.imread(image_path)
         detections = pipeline(image)
-        main_view = pipeline.visualize(image, detections, show_plot=False)
+        main_view = visualize_sorting_pipeline_image(image, detections, show_plot=False)
         rendered_images.append(main_view)
 
     if save_images:
