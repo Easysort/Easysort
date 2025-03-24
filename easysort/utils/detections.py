@@ -22,10 +22,8 @@ class Detection: # TODO: Add frame?
 
     @property
     def center_point(self) -> Tuple[float, float, float]:
-        if self._center_point is not None:
-            return self._center_point
-        if self.mask is None:
-            center_point = ((self.xyxy[0] + self.xyxy[2]) / 2, (self.xyxy[1] + self.xyxy[3]) / 2, 0)
+        if self._center_point is not None: return self._center_point
+        if self.mask is None: center_point = ((self.xyxy[0] + self.xyxy[2]) / 2, (self.xyxy[1] + self.xyxy[3]) / 2, 0)
         else:
             center_point = np.mean(np.argwhere(self.mask), axis=0)
             center_point = (center_point[1], center_point[0], 0) # for some reason this is reversed
@@ -33,8 +31,7 @@ class Detection: # TODO: Add frame?
         return center_point # (x, y, z)
 
     def current_center_point(self, speed: float) -> Tuple[float, float, float]:
-        if self.timestamp is None:
-            raise NotImplementedError("Timestamp is not set")
+        if self.timestamp is None: raise NotImplementedError("Timestamp is not set")
         return (self.center_point[0] + speed * self.timestamp, self.center_point[1], self.center_point[2])
 
     def to_json(self):
@@ -55,6 +52,9 @@ class Detection: # TODO: Add frame?
             conf=json_data["conf"],
             names=json_data["names"],
         )
+
+    def __repr__(self):
+        return f"Detection(box={self.box}, mask={self.mask}, class_name={self.class_name}, conf={self.confidence})"
 
 class Mask(np.ndarray):
     def __new__(cls, mask: np.ndarray):
