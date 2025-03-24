@@ -5,8 +5,8 @@ import cv2
 class TestDetections(unittest.TestCase):
     def test_detections(self):
         from easysort.utils.detections import Detections, Detection
-        model = YOLO("/Users/lucasvilsen/Documents/Documents/EasySort/__old__/_old/runs/train4/weights/best.pt")
-        image = cv2.imread("/Users/lucasvilsen/Documents/Documents/EasySort/__old__/_old/test.jpg")
+        model = YOLO("__old__/_old/best.pt")
+        image = cv2.imread("__old__/_old/test.jpg")
         detections = Detections.from_ultralytics(list(model(image))[0])
         assert isinstance(detections, list)
         assert isinstance(detections[0], Detection)
