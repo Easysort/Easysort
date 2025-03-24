@@ -3,7 +3,7 @@ from PIL import Image
 from easysort.utils.detections import Detection
 import io
 import json
-from typing import Dict, Any, Union, List, Optional
+from typing import Dict, Any, Union, List
 from dataclasses import field
 from uuid import uuid4
 
@@ -11,7 +11,7 @@ from uuid import uuid4
 class VideoMetadata:
     date: str
     robot_id: str
-    uuid: Optional[str] = field(default_factory=lambda: str(uuid4()))
+    uuid: str = field(default_factory=lambda: str(uuid4()))
 
 @dataclass
 class ImageMetadata:
@@ -66,4 +66,4 @@ class VideoSample:
         return cls(samples=samples, metadata=VideoMetadata(**data["metadata"]))
 
     def __repr__(self) -> str:
-        return f"VideoSample(samples={len(self.samples)}, detections={[len(s.detections) for s in self.samples]}, metadata={self.metadata})"
+        return f"VideoSample(samples={len(self.samples)}, detections={[len(s.detections) for s in self.samples.values()]}, metadata={self.metadata})"

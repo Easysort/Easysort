@@ -1,5 +1,5 @@
 import supabase
-import os 
+import os
 from PIL import Image
 from typing import List, Optional
 import json
