@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from easysort.utils.detections import Detection
 
 def visualize_sorting_pipeline_image(image: np.ndarray, detections: List[Detection], show_plot: bool = True) -> np.ndarray:
+    assert isinstance(image, np.ndarray), "Image must be a numpy array, got {}".format(type(image))
     def get_color_for_class(class_name: str) -> tuple:
         # Generate a unique color based on the class name using HSV color space
         # Hash the string to get a consistent numeric value
