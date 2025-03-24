@@ -16,18 +16,21 @@ from easysort.common.environment import Environment
 class ImageRegistry:
     def __init__(self) -> None:
         self.supabase_helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
+        self.video_metadata: Optional[VideoMetadata] = None
 
     def set_video_metadata(self, metadata: VideoMetadata) -> None:
         self.video_metadata = metadata
         self.frame_idx = 0
 
     def save_video_metadata(self) -> None:
+        assert self.video_metadata is not None, "Video metadata not set, please call set_video_metadata first"
         path = Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, self.video_metadata.uuid, "metadata.json"))
         if path.exists(): return
         os.makedirs(path.parent, exist_ok=True)
         with open(path, "w") as f: json.dump(asdict(self.video_metadata), f)
 
     def add(self, image: Image.Image | np.ndarray, timestamp: float, detections: Optional[List[Detection]] = None) -> None: # Saves locally
+        assert self.video_metadata is not None, "Video metadata not set, please call set_video_metadata first"
         if isinstance(image, np.ndarray): image = Image.fromarray(image)
         if detections is None: detections = []
         sample = ImageSample(image, detections, ImageMetadata(self.frame_idx, timestamp, self.video_metadata.uuid))
