@@ -6,12 +6,6 @@ const float STEPS_PER_CM_X = 800 / CM_PER_REVOLUTION;
 const float STEPS_PER_CM_Y = 800 / CM_PER_REVOLUTION;
 const float STEPS_PER_CM_Z = 800 / CM_PER_REVOLUTION;
 const float CONVEYOR_SPEED = 8.727;  // cm/s
-// const int LOWEST_Z = 10;
-// const int HIGHEST_Z = 50;
-
-// const int SUCTION_CUP_WRITE_PIN = 12;
-// const int SUCTION_CUP_READ_PIN = 13;
-// const int LIMIT_SWITCH_READ_PIN = 11;
 
 const long MaxSpeed = 4000; // Can go to 8000 at least
 const long Acceleration = 4000; // Can go to 8000 at least
@@ -27,70 +21,90 @@ const long ZAcceleration = Acceleration;
 struct Coordinates {
   long x;
   long y;
+  long z;
 };
 
 // Define stepper motors. Adjust pin numbers as needed.
 AccelStepper stepperX(AccelStepper::DRIVER, 2, 3);
 AccelStepper stepperY(AccelStepper::DRIVER, 6, 7);
-// AccelStepper stepperZ(AccelStepper::DRIVER, 9, 8);
+AccelStepper stepperZ(AccelStepper::DRIVER, 8, 9);
 // ezButton limitSwitch(LIMIT_SWITCH_READ_PIN); // when z is touching, limitSwitch is LOW
 
-Coordinates reverseKinematics(int input_x, int input_y) {  // Position -> robot movements
+Coordinates reverseKinematics(int input_x, int input_y, int input_z) {  // Position -> robot movements
   // Converts normal x, y coordinates into what the motors have to do.
   return {
     input_x + input_y, // x
-    input_x - input_y  // y
+    input_x - input_y,  // y
+    input_x + input_z, // z
+
   };
-  // z = x + z_is_up * HIGHEST_Z;
 }
 
-void moveCoordinated(float future_x, float future_y) {
+void moveCoordinated(float future_x, float future_y, float future_z) {
   unsigned long start_time = millis();
   
   long target_x = future_x * STEPS_PER_CM_X;
   long target_y = future_y * STEPS_PER_CM_Y;
-  
-  Coordinates coords = reverseKinematics(target_x, target_y);
+  long target_z = future_z * STEPS_PER_CM_Z;
+  Coordinates coords = reverseKinematics(target_x, target_y, target_z);
   
   long x = coords.x - stepperX.currentPosition();
   long y = coords.y - stepperY.currentPosition();
+  long z = target_z - stepperZ.currentPosition();
+
+  Serial.print("x: ");
+  Serial.println(x);
+  Serial.print("y: ");
+  Serial.println(y);
+  Serial.print("z: ");
+  Serial.println(z);
   
   float abs_x = abs(x);
   float abs_y = abs(y);
-  float max_distance = max(abs_x, abs_y);
+  float abs_z = abs(z);
+  float max_distance = max(abs_x, max(abs_y, abs_z));
   
   if (max_distance > 0) {
-    float total_distance = sqrt(abs_x * abs_x + abs_y * abs_y);
+    float total_distance = sqrt(abs_x * abs_x + abs_y * abs_y + abs_z * abs_z);
     float x_ratio = abs_x / total_distance;
     float y_ratio = abs_y / total_distance;
+    float z_ratio = abs_z / total_distance;
     
     float x_speed = x_ratio * MaxSpeed * (x >= 0 ? 1 : -1);
     float y_speed = y_ratio * MaxSpeed * (y >= 0 ? 1 : -1);
+    float z_speed = z_ratio * MaxSpeed * (z >= 0 ? 1 : -1);
     
     Serial.print("Setting motor speeds - X: ");
     Serial.print(x_speed);
     Serial.print(" Y: ");
-    Serial.println(y_speed);
+    Serial.print(y_speed);
+    Serial.print(" Z: ");
+    Serial.println(z_speed);
     
     stepperX.moveTo(coords.x);
     stepperY.moveTo(coords.y);
-    
+    stepperZ.moveTo(coords.z);
     stepperX.setSpeed(x_speed);
     stepperY.setSpeed(y_speed);
+    stepperZ.setSpeed(z_speed);
     
     // Calculate step intervals in microseconds
     unsigned long x_interval = abs(1000000.0 / x_speed);  // microseconds between steps
     unsigned long y_interval = abs(1000000.0 / y_speed);  // microseconds between steps
+    unsigned long z_interval = abs(1000000.0 / z_speed);  // microseconds between steps
     
     unsigned long last_x_step = micros();
     unsigned long last_y_step = micros();
+    unsigned long last_z_step = micros();
     
     int x_dir = x >= 0 ? 1 : -1;
     int y_dir = y >= 0 ? 1 : -1;
+    int z_dir = z >= 0 ? 1 : -1;
     long x_target = coords.x;
     long y_target = coords.y;
+    long z_target = coords.z;
     
-    while (stepperX.distanceToGo() != 0 || stepperY.distanceToGo() != 0) {
+    while (stepperX.distanceToGo() != 0 || stepperY.distanceToGo() != 0 || stepperZ.distanceToGo() != 0) {
       unsigned long now = micros();
       
       // Only step if we haven't reached the target yet
@@ -108,6 +122,14 @@ void moveCoordinated(float future_x, float future_y) {
           stepperY.runSpeed();
         }
         last_y_step = now;
+      }
+
+      if (stepperZ.distanceToGo() != 0 && (now - last_z_step) >= z_interval) {
+        if ((z_dir > 0 && stepperZ.currentPosition() < z_target) ||
+            (z_dir < 0 && stepperZ.currentPosition() > z_target)) {
+          stepperZ.runSpeed();
+        }
+        last_z_step = now;
       }
       
     }
@@ -134,9 +156,9 @@ void setup() {
   Serial.println("Suction cup should be on for 3 seconds");
   digitalWrite(SUCTION_CUP_WRITE_PIN, HIGH);
   delay(3000);
-  Serial.println("Suction cup should be off for 3 seconds");
+  Serial.println("Suction cup should be off now");
   digitalWrite(SUCTION_CUP_WRITE_PIN, LOW);
-  delay(3000);
+  // delay(3000);
 
   // stepperZ.setMaxSpeed(ZMaxSpeed);
   // stepperZ.setAcceleration(ZAcceleration);
@@ -161,24 +183,27 @@ void setup() {
 void loop() {
   if (Serial.available() > 0) {
     Serial.println("Received data:");
-    String data = Serial.readStringUntil('\n'); // input is x,y,suction\n
+    String data = Serial.readStringUntil('\n'); // input is x,y,z,suction\n
     int firstComma = data.indexOf(',');
     int secondComma = data.indexOf(',', firstComma + 1);
+    int thirdComma = data.indexOf(',', secondComma + 1);
     
     if (firstComma != -1 && secondComma != -1) {
       int num1 = data.substring(0, firstComma).toInt();
       int num2 = data.substring(firstComma + 1, secondComma).toInt();
-      int suctionState = data.substring(secondComma + 1).toInt();
+      int num3 = data.substring(secondComma + 1, thirdComma).toInt();
+      int suctionState = data.substring(thirdComma + 1).toInt();
       Serial.println("Received data:");
       Serial.println(num1);
       Serial.println(num2);
+      Serial.println(num3);
       Serial.println(suctionState);
       if (suctionState == 1) {
         digitalWrite(SUCTION_CUP_WRITE_PIN, HIGH); // on
       } else {
         digitalWrite(SUCTION_CUP_WRITE_PIN, LOW); // off
       }
-      moveCoordinated(num1, num2);
+      moveCoordinated(num1, num2, num3);
 
       // add error handling
       Serial.println("success"); // or "fail" if error
