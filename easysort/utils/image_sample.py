@@ -27,7 +27,7 @@ class ImageSample:
 
     def to_json(self) -> str:
         img_byte_arr = io.BytesIO()
-        self.image.save(img_byte_arr, format=self.image.format or 'PNG')
+        self.image.save(img_byte_arr, format='JPEG', optimize=True)
         img_byte_arr.seek(0)
         image_data = img_byte_arr.getvalue().hex()
         return json.dumps({
