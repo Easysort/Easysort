@@ -26,18 +26,13 @@ class GantryConnector:
         self._is_ready = False
 
     def go_to(self, x: int, y: int, z: int) -> None:
-        self.position = (x, y, z)
-        self.send_information((x, y, z, self.suction_state))
+        self.send_information((x, y, z), self.suction_state)
 
     def suction_on(self, x: Optional[int] = None, y: Optional[int] = None, z: Optional[int] = None) -> None:
-        self.position = (x or self.position[0], y or self.position[1], z or self.position[2])
-        self.suction_state = 1
-        self.send_information((x, y, z, self.suction_state))
+        self.send_information((x or self.position[0], y or self.position[1], z or self.position[2]), 1)
 
     def suction_off(self, x: Optional[int] = None, y: Optional[int] = None, z: Optional[int] = None) -> None:
-        self.position = (x or self.position[0], y or self.position[1], z or self.position[2])
-        self.suction_state = 0
-        self.send_information((x, y, z, self.suction_state))
+        self.send_information((x or self.position[0], y or self.position[1], z or self.position[2]), 0)
 
     def establish_connection(self) -> serial.Serial:
         try:
@@ -49,10 +44,13 @@ class GantryConnector:
             open_ports = [port.device for port in serial.tools.list_ports.comports()]
             raise serial.SerialException(f"No open port at {self.port}, instead use one of: {open_ports}") from err
 
-    def send_information(self, msg: str | bytes | tuple) -> None:
+    def send_information(self, position: tuple, suction_state: int) -> None:
         if not self.is_ready: return
-        if isinstance(msg, str): msg = msg.encode()
-        elif isinstance(msg, tuple): msg = f"{','.join(map(str, msg))}\n".encode()
+        if self.position == position and self.suction_state == suction_state: return
+        self.position = position
+        self.suction_state = suction_state
+        msg = f"{','.join(map(str, position))},{suction_state}\n".encode()
+        print(msg)
         try: self.ser.write(msg)
         except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
 
