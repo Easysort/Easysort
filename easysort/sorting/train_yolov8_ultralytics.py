@@ -2,9 +2,8 @@ from ultralytics import YOLO
 
 model = YOLO("easysort/sorting/yolov8n.pt")  # load a pretrained model (recommended for training)
 
-# base_path = "/Users/lucasvilsen/Documents/Documents/EasySort"
-data_yaml = "/Users/lucasvilsen/Documents/Documents/EasySort/easysort/sorting/27-06-2024.v1i.yolov8/data.yaml"
-save_dir = "/Users/lucasvilsen/Documents/Documents/EasySort/easysort/sorting"
+data_yaml = "easysort/sorting/27-06-2024.v1i.yolov8/data.yaml"
+save_dir = "easysort/sorting"
 
 model.train(
     data=data_yaml,

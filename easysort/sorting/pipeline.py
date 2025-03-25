@@ -53,7 +53,7 @@ if __name__ == "__main__":
         print("--------------------------------")
 
     # To run image:
-    # SOURCE_IMAGE_PATH = "/Users/lucasvilsen/Documents/Documents/EasySort/__old__/_old/test.jpg"
+    # SOURCE_IMAGE_PATH = "__old__/_old/test.jpg"
     # image = cv2.imread(SOURCE_IMAGE_PATH)
     # detections = pipeline(image)
     # pipeline.visualize(image, detections)
