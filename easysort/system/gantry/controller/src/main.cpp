@@ -68,9 +68,10 @@ void moveCoordinated(float future_x, float future_y, float future_z) {
   unsigned long last_z_step = micros();
   
   if (max_distance > 0) {
-    float x_ratio = abs_x / max_distance;
-    float y_ratio = abs_y / max_distance;
-    float z_ratio = abs_z / max_distance;
+    float length = sqrt(abs_x * abs_x + abs_y * abs_y + abs_z * abs_z);
+    float x_ratio = abs_x / length;
+    float y_ratio = abs_y / length;
+    float z_ratio = abs_z / length;
     
     float x_speed = SpeedCoefficientHorizontal * x_ratio * MaxSpeed * (x >= 0 ? 1 : -1);
     float y_speed = SpeedCoefficientHorizontal * y_ratio * MaxSpeed * (y >= 0 ? 1 : -1);
