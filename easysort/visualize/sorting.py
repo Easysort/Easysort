@@ -26,7 +26,7 @@ def visualize_video(uuid: str, save_images: bool = False, rerun_pipeline: bool =
         main_view = visualize_sorting_pipeline_image(image, detections, show_plot=False)
         rendered_images.append(main_view)
 
-    rendered_images_path = Path(f"/Users/lucasvilsen/Documents/Documents/EasySort/rendered_videos/{uuid}")
+    rendered_images_path = Path(f"rendered_videos/{uuid}")
     rendered_images_path.mkdir(parents=True, exist_ok=True)
     if save_images:
         for i, image in enumerate(rendered_images):

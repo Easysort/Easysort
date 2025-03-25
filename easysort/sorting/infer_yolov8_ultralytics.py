@@ -15,7 +15,7 @@ RANDOM_IMAGE_TENSOR = torch.rand((980, 1280, 3)).numpy()
 
 class Classifier:
     def __init__(self):
-        self.model = YOLO("/Users/lucasvilsen/Documents/Documents/EasySort/__old__/_old/runs/train4/weights/best.pt")
+        self.model = YOLO("__old__/_old/best.pt")
         LOGGER.info("Classifier initialized")
 
     @TimeIt("Bbox classification")

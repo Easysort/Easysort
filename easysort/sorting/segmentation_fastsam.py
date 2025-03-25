@@ -6,7 +6,7 @@ from typing import List
 
 class Segmentation:
     def __init__(self):
-        self.fast_sam = FastSAM("/Users/lucasvilsen/Documents/Documents/EasySort/easysort/models/fastsam/FastSAM-s.pt")
+        self.fast_sam = FastSAM("easysort/models/fastsam/FastSAM-s.pt")
         self.colors = [(0,255,0), (255,0,0), (0,0,255), (255,255,0), (255,0,255), (0,255,255)]
 
     def match_mask_to_detection(self, detections: List[Detection], masks: List[np.ndarray]) -> List[Detection]:
