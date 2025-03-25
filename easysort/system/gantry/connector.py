@@ -23,6 +23,7 @@ class GantryConnector:
         self.ser = self.establish_connection()
         self.position = (0, 0, 0)
         self.suction_state = 0
+        self._is_ready = False
 
     def go_to(self, x: int, y: int, z: int) -> None:
         self.position = (x, y, z)
@@ -49,8 +50,9 @@ class GantryConnector:
             raise serial.SerialException(f"No open port at {self.port}, instead use one of: {open_ports}") from err
 
     def send_information(self, msg: str | bytes | tuple) -> None:
+        if not self.is_ready: return
         if isinstance(msg, str): msg = msg.encode()
-        elif isinstance(msg, tuple): msg = f"{msg[0]},{msg[1]},{msg[2]},{msg[3]}\n".encode()
+        elif isinstance(msg, tuple): msg = f"{','.join(map(str, msg))}\n".encode()
         try: self.ser.write(msg)
         except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
 
@@ -64,7 +66,15 @@ class GantryConnector:
         _LOGGER.warning(f"Timeout occurred while waiting for response from {self.port}")
         return '' # TODO: How to handle this?
 
-    def is_ready(self) -> bool: return True # TODO: Implement this
+    @property
+    def is_ready(self) -> bool:
+        lines = self.ser.readlines()
+        not_ready_lines = max([i for i, line in enumerate(lines) if line.decode().strip() == "-NOT-READY-"] or [-1])
+        ready_lines = max([i for i, line in enumerate(lines) if line.decode().strip() == "-READY-"] or [-1])
+        if not_ready_lines == -1 and ready_lines == -1: return self._is_ready
+        self._is_ready = not_ready_lines <= ready_lines
+        return self._is_ready
+
     def clear_buffer(self) -> None: self.ser.reset_input_buffer()
     def quit(self) -> None: self.ser.close()
 
@@ -73,9 +83,8 @@ if __name__ == "__main__":
     while True:
         press_enter = input("Press enter to continue")
         if press_enter == "":
-            if connector.suction_state: connector.suction_off(10, 20, 2)
+            if connector.suction_state: connector.suction_off(2, 2, 0)
             else: connector.suction_on(0, 0, 0)
-            # x = float(input("Enter x: "))
-            # y = float(input("Enter y: "))
-            # connector(x, y)
-            # time.sleep(1)
+        elif press_enter == "q":
+            connector.quit()
+            break
