@@ -35,7 +35,7 @@ Coordinates reverseKinematics(int input_x, int input_y, int input_z) {  // Posit
   return {
     input_x + input_y, // x
     input_x - input_y, // y
-    input_x + input_z, // z
+    (input_x - input_y) + input_z, // z
 
   };
 }
