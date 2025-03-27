@@ -1,4 +1,4 @@
-
+from typing import Optional
 import time
 
 import serial
@@ -21,20 +21,18 @@ class GantryConnector:
         self.port = port
         self.name = name
         self.ser = self.establish_connection()
-        self.position = (0, 0)
+        self.position = (0, 0, 0)
         self.suction_state = 0
+        self._is_ready = False
 
-    def go_to(self, x: int, y: int) -> None:
-        self.position = (x, y)
-        self.send_information((x, y, self.suction_state))
+    def go_to(self, x: int, y: int, z: int) -> None:
+        self.send_information((x, y, z), self.suction_state)
 
-    def suction_on(self) -> None:
-        self.suction_state = 1
-        self.send_information((self.position[0], self.position[1], self.suction_state))
+    def suction_on(self, x: Optional[int] = None, y: Optional[int] = None, z: Optional[int] = None) -> None:
+        self.send_information((x or self.position[0], y or self.position[1], z or self.position[2]), 1)
 
-    def suction_off(self) -> None:
-        self.suction_state = 0
-        self.send_information((self.position[0], self.position[1], self.suction_state))
+    def suction_off(self, x: Optional[int] = None, y: Optional[int] = None, z: Optional[int] = None) -> None:
+        self.send_information((x or self.position[0], y or self.position[1], z or self.position[2]), 0)
 
     def establish_connection(self) -> serial.Serial:
         try:
@@ -46,9 +44,13 @@ class GantryConnector:
             open_ports = [port.device for port in serial.tools.list_ports.comports()]
             raise serial.SerialException(f"No open port at {self.port}, instead use one of: {open_ports}") from err
 
-    def send_information(self, msg: str | bytes | tuple) -> None:
-        if isinstance(msg, str): msg = msg.encode()
-        elif isinstance(msg, tuple): msg = f"{msg[0]},{msg[1]},{msg[2]}\n".encode()
+    def send_information(self, position: tuple, suction_state: int) -> None:
+        if not self.is_ready: return
+        if self.position == position and self.suction_state == suction_state: return
+        self.position = position
+        self.suction_state = suction_state
+        msg = f"{','.join(map(str, position))},{suction_state}\n".encode()
+        print(msg)
         try: self.ser.write(msg)
         except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
 
@@ -62,7 +64,15 @@ class GantryConnector:
         _LOGGER.warning(f"Timeout occurred while waiting for response from {self.port}")
         return '' # TODO: How to handle this?
 
-    def is_ready(self) -> bool: return True # TODO: Implement this
+    @property
+    def is_ready(self) -> bool:
+        lines = self.ser.readlines()
+        not_ready_lines = max([i for i, line in enumerate(lines) if line.decode().strip() == "-NOT-READY-"] or [-1])
+        ready_lines = max([i for i, line in enumerate(lines) if line.decode().strip() == "-READY-"] or [-1])
+        if not_ready_lines == -1 and ready_lines == -1: return self._is_ready
+        self._is_ready = not_ready_lines <= ready_lines
+        return self._is_ready
+
     def clear_buffer(self) -> None: self.ser.reset_input_buffer()
     def quit(self) -> None: self.ser.close()
 
@@ -71,9 +81,8 @@ if __name__ == "__main__":
     while True:
         press_enter = input("Press enter to continue")
         if press_enter == "":
-            if connector.suction_state: connector.suction_off()
-            else: connector.suction_on()
-            # x = float(input("Enter x: "))
-            # y = float(input("Enter y: "))
-            # connector(x, y)
-            # time.sleep(1)
+            if connector.suction_state: connector.suction_off(2, 2, 0)
+            else: connector.suction_on(0, 0, 0)
+        elif press_enter == "q":
+            connector.quit()
+            break

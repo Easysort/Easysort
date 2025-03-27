@@ -28,7 +28,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ruff mypy pylint pytest
-          pip install pillow numpy  # Adding required packages for tests
+          pip install pillow numpy ultralytics # Adding required packages for tests
 
       - name: Run Ruff
         run: python -m ruff check easysort/ tests/ --fix
