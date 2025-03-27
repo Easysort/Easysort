@@ -17,6 +17,8 @@ const long YMaxSpeed = MaxSpeed;
 const long YAcceleration = Acceleration;
 const long ZMaxSpeed = MaxSpeed;
 const long ZAcceleration = Acceleration;
+constexpr double SpeedCoefficientHorizontal = 1.2; // Allowed larger than 1.0 when the horizontal space is small.
+constexpr double SpeedCoefficientVertical = 1.2; // Allowed larger than 1.0 when the height is small.
 
 struct Coordinates {
   long x;
@@ -66,13 +68,14 @@ void moveCoordinated(float future_x, float future_y, float future_z) {
   unsigned long last_z_step = micros();
   
   if (max_distance > 0) {
-    float x_ratio = abs_x / max_distance;
-    float y_ratio = abs_y / max_distance;
-    float z_ratio = abs_z / max_distance;
+    float length = sqrt(abs_x * abs_x + abs_y * abs_y + abs_z * abs_z);
+    float x_ratio = abs_x / length;
+    float y_ratio = abs_y / length;
+    float z_ratio = abs_z / length;
     
-    float x_speed = x_ratio * MaxSpeed * (x >= 0 ? 1 : -1);
-    float y_speed = y_ratio * MaxSpeed * (y >= 0 ? 1 : -1);
-    float z_speed = z_ratio * MaxSpeed * (z >= 0 ? 1 : -1);
+    float x_speed = SpeedCoefficientHorizontal * x_ratio * MaxSpeed * (x >= 0 ? 1 : -1);
+    float y_speed = SpeedCoefficientHorizontal * y_ratio * MaxSpeed * (y >= 0 ? 1 : -1);
+    float z_speed = SpeedCoefficientVertical * z_ratio * MaxSpeed * (z >= 0 ? 1 : -1);
     
     // Serial.print("Setting motor speeds - X: ");
     // Serial.print(x_speed);
