@@ -1,9 +1,11 @@
 
 from easysort.sorting.infer_yolov8_ultralytics import Classifier
+from easysort.sorting.infer_yoloWorld import ClassifierYoloWorld, test_yoloworld_classes
 from easysort.sorting.segmentation_fastsam import Segmentation
 from easysort.utils.detections import Detection
 from easysort.common.environment import Environment
 from easysort.system.camera.realsense_connector import RealSenseConnector
+from easysort.system.camera.camera_connector import CameraConnector
 from easysort.visualize.helpers import visualize_sorting_pipeline_image
 from easysort.common.image_registry import ImageRegistry
 from easysort.utils.image_sample import VideoMetadata
@@ -15,9 +17,9 @@ import time
 from datetime import datetime
 
 class SortingPipeline:
-    def __init__(self):
-        self.camera = RealSenseConnector()
-        self.classifier = Classifier()
+    def __init__(self, use_yolo_world: bool = False):
+        self.camera = RealSenseConnector() if not Environment.DEBUG else CameraConnector()
+        self.classifier = ClassifierYoloWorld(test_yoloworld_classes) if use_yolo_world else Classifier()
         self.segmentation = Segmentation()
         self.image_registry = ImageRegistry()
 
@@ -46,14 +48,8 @@ class SortingPipeline:
                     break
 
 if __name__ == "__main__":
-    # Has to be run with sudo
+    # Has to be run with sudo if DEBUG is False
     pipeline = SortingPipeline()
     for detections in pipeline.stream():
         print(detections)
         print("--------------------------------")
-
-    # To run image:
-    # SOURCE_IMAGE_PATH = "__old__/_old/test.jpg"
-    # image = cv2.imread(SOURCE_IMAGE_PATH)
-    # detections = pipeline(image)
-    # pipeline.visualize(image, detections)
