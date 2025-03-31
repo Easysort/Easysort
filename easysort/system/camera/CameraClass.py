@@ -12,6 +12,10 @@ import cv2
 # Dictionary that was used to generate the ArUco marker
 aruco_dictionary_name = "DICT_ARUCO_ORIGINAL"
 
+t_R_M = np.array([[0.0], [0.01], [0.49]])  # Example: Marker to Suction cup offset
+R_R_M = np.eye(3)  # no rotation
+T_R_M = np.vstack((np.hstack((R_R_M, t_R_M)), [0, 0, 0, 1]))
+
 # The different ArUco dictionaries built into the OpenCV library.
 ARUCO_DICT = {
     "DICT_4X4_50": cv2.aruco.DICT_4X4_50,
@@ -73,6 +77,7 @@ class CameraClass(QThread):
         self.robot_x = 0
         self.robot_y = 0
         self.robot_z = 0
+        self.T_C_M = None
 
         self.rs_config.enable_stream(rs.stream.color, int(config.get('Camera', 'rgb_res_x')),
                                                          int(config.get('Camera', 'rgb_res_y')),
@@ -141,14 +146,23 @@ class CameraClass(QThread):
 
                 for i, marker_id in enumerate(marker_ids):
                     # Store the translation (i.e. position) information
-                    transform_translation_x = tvecs[i][0][0]
-                    transform_translation_y = tvecs[i][0][1]
-                    transform_translation_z = tvecs[i][0][2]
 
+                    R_m, _ = cv2.Rodrigues(rvecs[i])
+                    t_m = tvecs[i].reshape((3, 1))
 
-                    self.robot_x = tvecs[i][0][0]
-                    self.robot_y = tvecs[i][0][1]
-                    self.robot_z = tvecs[i][0][2]
+                    # Construct Transformation Matrix from Camera to Marker
+                    T_C_M = np.vstack((np.hstack((R_m, t_m)), [0, 0, 0, 1]))
+
+                    # Compute Transformation from Camera to Robot
+                    T_C_R = np.dot(T_C_M, np.linalg.inv(T_R_M))
+
+                    robot_position_in_camera = T_C_R[:3, 3]
+
+                    # Extract Robot Position in Camera Frame
+                    #print(f"Robot Position in Camera Frame: {robot_position_in_camera.flatten()}")
+                    self.robot_x = robot_position_in_camera[0]
+                    self.robot_y = robot_position_in_camera[1]
+                    self.robot_z = robot_position_in_camera[2]
 
                     # Store the rotation information
                     rotation_matrix = np.eye(4)
@@ -157,20 +171,20 @@ class CameraClass(QThread):
                     quat = r.as_quat()
 
                     # Quaternion format
-                    #transform_rotation_x = quat[0]
-                    #transform_rotation_y = quat[1]
-                    #transform_rotation_z = quat[2]
-                    #transform_rotation_w = quat[3]
+                    transform_rotation_x = quat[0]
+                    transform_rotation_y = quat[1]
+                    transform_rotation_z = quat[2]
+                    transform_rotation_w = quat[3]
 
                     # Euler angle format in radians
-                    #roll_x, pitch_y, yaw_z = euler_from_quaternion(transform_rotation_x,
-                    #                                               transform_rotation_y,
-                    #                                               transform_rotation_z,
-                    #                                               transform_rotation_w)
+                    roll_x, pitch_y, yaw_z = euler_from_quaternion(transform_rotation_x,
+                                                                   transform_rotation_y,
+                                                                   transform_rotation_z,
+                                                                   transform_rotation_w)
 
-                    #roll_x = math.degrees(roll_x)
-                    #pitch_y = math.degrees(pitch_y)
-                    #yaw_z = math.degrees(yaw_z)
+                    roll_x = math.degrees(roll_x)
+                    pitch_y = math.degrees(pitch_y)
+                    yaw_z = math.degrees(yaw_z)
 
                     # Draw the axes on the marker
                     cv2.drawFrameAxes(color_image, self.mtx, self.dst, rvecs[i], tvecs[i], 0.05)
@@ -187,9 +201,9 @@ class CameraClass(QThread):
             convertToQtFormat = QImage(color_image.data, w, h, bytesPerLine, QImage.Format.Format_RGB888)
             p = convertToQtFormat.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatio)
             self.emitImages.emit(p)
-            self.robot_pose.emit([transform_translation_x,
-                                  transform_translation_y,
-                                  transform_translation_z])
+            self.robot_pose.emit([self.robot_x,
+                                  self.robot_y,
+                                  self.robot_z])
 
     def get_image(self):
         if self.cam.isOpened():

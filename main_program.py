@@ -50,32 +50,33 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def robotXplus(self):
         self.label1.setText("Robot X+")
-        t = threading.Thread(target=robot.go_to(robot.position[0] +3 ,0))
+        t = threading.Thread(target=robot.go_to, args=(robot.position[0] + 1,robot.position[1], robot.position[2]))
         t.start()
+        #self.move_robot_camera()
 
     def robotXminus(self):
         self.label1.setText("Robot X-")
-        t = threading.Thread(target=robot.go_to(robot.position[0] - 3 ,0))
+        t = threading.Thread(target=robot.go_to, args=(robot.position[0] - 1 ,robot.position[1], robot.position[2]))
         t.start()
 
     def robotYplus(self):
         self.label1.setText("Robot Y+")
-        t = threading.Thread(target=robot.go_to(0 ,robot.position[1] + 3))
+        t = threading.Thread(target=robot.go_to, args=(robot.position[0] ,robot.position[1] + 1, robot.position[2]))
         t.start()
 
     def robotYminus(self):
         self.label1.setText("Robot Y-")
-        t = threading.Thread(target=robot.go_to(0 ,robot.position[1] - 3))
+        t = threading.Thread(target=robot.go_to, args=(robot.position[0] ,robot.position[1] - 1, robot.position[2]))
         t.start()
 
     def robotZplus(self):
         self.label1.setText("Robot Z+")
-        t = threading.Thread(target=robot.go_to(0 ,robot.position[1] + 3))
+        t = threading.Thread(target=robot.go_to, args=(robot.position[0] ,robot.position[1], robot.position[2] + 10))
         t.start()
 
     def robotZminus(self):
         self.label1.setText("Robot Z-")
-        t = threading.Thread(target=robot.go_to(0 ,robot.position[1] - 3))
+        t = threading.Thread(target=robot.go_to, args=(robot.position[0] , robot.position[1], robot.position[2] - 10))
         t.start()
 
     def suctionOn(self):
@@ -88,7 +89,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def setRobotPose(self, pose):
         self.labelStatus.setText(f"{pose[0]:.2f}, {pose[1]:.2f}, {pose[2]:.2f}")
-
 
     def setImage(self, p):
         p = QPixmap.fromImage(p)
@@ -125,17 +125,27 @@ class MainWindow(QtWidgets.QMainWindow):
             self.labelCamera.setText("Camera feed not available")
 
 
+
+    def calibrate(self, camera_position):
+        return np.array(camera_position)
+
+    def robot_to_camera(self, robot_movement, T):
+        return robot_movement + T
+
+
     def move_robot_camera(self):
         P_camera_start = np.array([camera.robot_y, camera.robot_y, camera.robot_z])
+
+
         T = robot.calibrate(P_camera_start)
         #print("Calibration complete! Translation offset:", T)
 
         robot_movement = np.array([5, 0, 0])
         camera_movement = robot.robot_to_camera(robot_movement, T)
 
-        robot(camera_movement[0], camera_movement[1])
+        #robot(camera_movement[0], camera_movement[1])
 
-        #print("Robot movement in camera frame:", camera_movement)
+        print("Robot movement in camera frame:", camera_movement)
 
 
 if __name__ == "__main__":
