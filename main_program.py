@@ -37,9 +37,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pushButtonZminus.clicked.connect(self.robotZminus)
         self.suctionOnButton.clicked.connect(self.suctionOn)
         self.suctionOffButton.clicked.connect(self.suctionOff)
+        self.pickUpButton.clicked.connect(self.pickUp)
 
         camera.emitImages.connect(lambda p: self.setImage(p))
         camera.robot_pose.connect(self.setRobotPose)
+        camera.markers_in_view.connect(self.markersPositions)
 
         camera.start()
         self.camImage1 = self.findChild(QtWidgets.QLabel, 'labelCamera')
@@ -90,6 +92,35 @@ class MainWindow(QtWidgets.QMainWindow):
     def setRobotPose(self, pose):
         self.labelStatus.setText(f"{pose[0]:.2f}, {pose[1]:.2f}, {pose[2]:.2f}")
 
+    def markersPositions(self, marker_positions):
+        for marker_id, position in marker_positions.items():
+            self.markersLabel.setText(f"Marker {marker_id}:"
+                                      f" X={position[0]:.2f},"
+                                      f" Y={position[1]:.2f},"
+                                      f" Z={position[2]:.2f}")
+
+    def pickUp(self):
+        self.label1.setText("Move robot to the marker")
+
+        T_R_C = np.linalg.inv(camera.T_C_R)
+        print("T_C_R (Robot in Camera Frame):\n", camera.T_C_R)
+
+        print(T_R_C)
+
+        for marker_id, marker_pose in camera.marker_positions.items():
+            print(marker_id)
+            T_R_C = np.linalg.inv(camera.T_C_R)
+
+            marker_cam = np.array([[marker_pose[0]], [marker_pose[1]], [marker_pose[2]], [1]])
+
+            # Transform marker position from Camera Frame to Robot Frame
+            marker_robot = np.dot(T_R_C, marker_cam)[:3]  # Extract only XYZ
+
+            print("move robot to {}".format([float(marker_robot[1]), float(-marker_robot[0]), float(marker_robot[2])]))
+
+            #t = threading.Thread(target=robot.go_to, args=(robot.position[0] ,robot.position[1] - 1, robot.position[2]))
+            #t.start()
+
     def setImage(self, p):
         p = QPixmap.fromImage(p)
         p = p.scaled(int(config.get('Camera', 'rgb_res_x')),
@@ -124,28 +155,6 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.labelCamera.setText("Camera feed not available")
 
-
-
-    def calibrate(self, camera_position):
-        return np.array(camera_position)
-
-    def robot_to_camera(self, robot_movement, T):
-        return robot_movement + T
-
-
-    def move_robot_camera(self):
-        P_camera_start = np.array([camera.robot_y, camera.robot_y, camera.robot_z])
-
-
-        T = robot.calibrate(P_camera_start)
-        #print("Calibration complete! Translation offset:", T)
-
-        robot_movement = np.array([5, 0, 0])
-        camera_movement = robot.robot_to_camera(robot_movement, T)
-
-        #robot(camera_movement[0], camera_movement[1])
-
-        print("Robot movement in camera frame:", camera_movement)
 
 
 if __name__ == "__main__":

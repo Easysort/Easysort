@@ -41,12 +41,6 @@ ARUCO_DICT = {
 aruco_marker_side_length = 0.03
 
 def euler_from_quaternion(x, y, z, w):
-    """
-    Convert a quaternion into euler angles (roll, pitch, yaw)
-    roll is rotation around x in radians (counterclockwise)
-    pitch is rotation around y in radians (counterclockwise)
-    yaw is rotation around z in radians (counterclockwise)
-    """
     t0 = +2.0 * (w * x + y * z)
     t1 = +1.0 - 2.0 * (x * x + y * y)
     roll_x = math.atan2(t0, t1)
@@ -66,6 +60,7 @@ def euler_from_quaternion(x, y, z, w):
 class CameraClass(QThread):
     emitImages = pyqtSignal(QImage)
     robot_pose = pyqtSignal(list)
+    markers_in_view = pyqtSignal(dict)
 
     def __init__(self, config, parent=None):
         super().__init__(parent)  # Correct way to initialize QThread
@@ -78,6 +73,8 @@ class CameraClass(QThread):
         self.robot_y = 0
         self.robot_z = 0
         self.T_C_M = None
+        self.T_C_R = None
+        self.marker_positions = {}
 
         self.rs_config.enable_stream(rs.stream.color, int(config.get('Camera', 'rgb_res_x')),
                                                          int(config.get('Camera', 'rgb_res_y')),
@@ -96,6 +93,7 @@ class CameraClass(QThread):
         pipe_profile = self.pipeline.start(self.rs_config)
         depth_sensor = pipe_profile.get_device().first_depth_sensor()
         depth_sensor.set_option(rs.option.visual_preset, 3)
+
 
         self.mtx =  np.array([
                                 [config.get('Camera', 'f_x'), 0., config.get('Camera', 'c_x')],
@@ -145,7 +143,6 @@ class CameraClass(QThread):
                 )
 
                 for i, marker_id in enumerate(marker_ids):
-                    # Store the translation (i.e. position) information
 
                     R_m, _ = cv2.Rodrigues(rvecs[i])
                     t_m = tvecs[i].reshape((3, 1))
@@ -153,41 +150,68 @@ class CameraClass(QThread):
                     # Construct Transformation Matrix from Camera to Marker
                     T_C_M = np.vstack((np.hstack((R_m, t_m)), [0, 0, 0, 1]))
 
-                    # Compute Transformation from Camera to Robot
-                    T_C_R = np.dot(T_C_M, np.linalg.inv(T_R_M))
+                    # 623 is markerID which is mounted on the robot
+                    marker_id = int(marker_ids[i][0])
 
-                    robot_position_in_camera = T_C_R[:3, 3]
-
-                    # Extract Robot Position in Camera Frame
-                    #print(f"Robot Position in Camera Frame: {robot_position_in_camera.flatten()}")
-                    self.robot_x = robot_position_in_camera[0]
-                    self.robot_y = robot_position_in_camera[1]
-                    self.robot_z = robot_position_in_camera[2]
-
+                    if marker_id == 623:
+                        T_C_R = np.dot(T_C_M, np.linalg.inv(T_R_M))
+                        self.T_C_R = T_C_R
+                        robot_position_in_camera = T_C_R[:3, 3]
+                        self.robot_x = robot_position_in_camera[0]
+                        self.robot_y = robot_position_in_camera[1]
+                        self.robot_z = robot_position_in_camera[2]
+                    elif marker_id == 163:
+                        self.marker_positions[marker_id] = [
+                            round(float(t_m[0]), 5),  # X position
+                            round(float(t_m[1]), 5),  # Y position
+                            round(float(t_m[2]), 5)  # Z position
+                        ]
                     # Store the rotation information
-                    rotation_matrix = np.eye(4)
-                    rotation_matrix[0:3, 0:3] = cv2.Rodrigues(np.array(rvecs[i][0]))[0]
-                    r = R.from_matrix(rotation_matrix[0:3, 0:3])
-                    quat = r.as_quat()
+                    #rotation_matrix = np.eye(4)
+                    #rotation_matrix[0:3, 0:3] = cv2.Rodrigues(np.array(rvecs[i][0]))[0]
+                    #r = R.from_matrix(rotation_matrix[0:3, 0:3])
+                    #quat = r.as_quat()
 
                     # Quaternion format
-                    transform_rotation_x = quat[0]
-                    transform_rotation_y = quat[1]
-                    transform_rotation_z = quat[2]
-                    transform_rotation_w = quat[3]
+                    #transform_rotation_x = quat[0]
+                    #transform_rotation_y = quat[1]
+                    #transform_rotation_z = quat[2]
+                    #transform_rotation_w = quat[3]
 
                     # Euler angle format in radians
-                    roll_x, pitch_y, yaw_z = euler_from_quaternion(transform_rotation_x,
-                                                                   transform_rotation_y,
-                                                                   transform_rotation_z,
-                                                                   transform_rotation_w)
+                    #roll_x, pitch_y, yaw_z = euler_from_quaternion(transform_rotation_x,
+                    #                                               transform_rotation_y,
+                    #                                               transform_rotation_z,
+                    #                                               transform_rotation_w)
 
-                    roll_x = math.degrees(roll_x)
-                    pitch_y = math.degrees(pitch_y)
-                    yaw_z = math.degrees(yaw_z)
+                    #roll_x = math.degrees(roll_x)
+                    #pitch_y = math.degrees(pitch_y)
+                    #yaw_z = math.degrees(yaw_z)
 
                     # Draw the axes on the marker
-                    cv2.drawFrameAxes(color_image, self.mtx, self.dst, rvecs[i], tvecs[i], 0.05)
+
+                    for i in range(len(rvecs)):
+                        # Convert original rotation vector to rotation matrix
+                        R_orig, _ = cv2.Rodrigues(rvecs[i])
+
+                        # Define a 90° rotation about the Z-axis
+                        theta = np.deg2rad(90)
+                        R_z = np.array([
+                            [np.cos(theta), -np.sin(theta), 0],
+                            [np.sin(theta), np.cos(theta), 0],
+                            [0, 0, 1]
+                        ])
+
+                        # Apply the additional rotation: new_R = R_z * R_orig
+                        R_new = np.dot(R_z, R_orig)
+
+                        # Convert the new rotation matrix back to a rotation vector
+                        rvec_new, _ = cv2.Rodrigues(R_new)
+
+                        # Draw the axes using the new rotation vector and original translation vector
+                        cv2.drawFrameAxes(color_image, self.mtx, self.dst, rvec_new, tvecs[i], 0.05)
+
+                    #cv2.drawFrameAxes(color_image, self.mtx, self.dst, rvecs[i], tvecs[i], 0.05)
 
             # percent of original size
             width = int(color_image.shape[1])
@@ -204,6 +228,7 @@ class CameraClass(QThread):
             self.robot_pose.emit([self.robot_x,
                                   self.robot_y,
                                   self.robot_z])
+            self.markers_in_view.emit(self.marker_positions)
 
     def get_image(self):
         if self.cam.isOpened():
