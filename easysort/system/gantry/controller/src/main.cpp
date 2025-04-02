@@ -1,4 +1,5 @@
 #include <AccelStepper.h>
+#include <TimeLib.h>
 
 const float CMS_FOR_10_REVOLUTIONS = 60;
 const float CM_PER_REVOLUTION = CMS_FOR_10_REVOLUTIONS / 10;
@@ -125,10 +126,18 @@ void moveCoordinated(float future_x, float future_y, float future_z) {
   // Serial.println(last_z_step);
 }
 
+// Replace the time sync variables with:
+unsigned long startupMillis = 0;  // Arduino's startup time in millis
+
+// Replace getCurrentTime() with:
+unsigned long getCurrentTime() {
+    return millis() - startupMillis;
+}
+
 void setup() {
   // Set max speed and acceleration for each stepper
   pinMode(SUCTION_CUP_WRITE_PIN, OUTPUT);
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println("Starting...");
   delay(4000);  // Avoid starting failure of running first moveCoordinated before arduino setup
   stepperX.setMaxSpeed(XMaxSpeed);
@@ -144,35 +153,92 @@ void setup() {
   delay(3000);
   Serial.println("Suction cup should be off now");
   digitalWrite(SUCTION_CUP_WRITE_PIN, LOW);
+  
+  startupMillis = millis();  // Record startup time
   Serial.println("-READY-");
 }
 
 void loop() {
   if (Serial.available() > 0) {
     Serial.println("-NOT-READY-");
-    // Serial.println("Received data:");
-    String data = Serial.readStringUntil('\n'); // input is x,y,z,suction\n
-    int firstComma = data.indexOf(',');
-    int secondComma = data.indexOf(',', firstComma + 1);
-    int thirdComma = data.indexOf(',', secondComma + 1);
+    String data = Serial.readStringUntil('\n');
     
-    if (firstComma != -1 && secondComma != -1) {
-      int num1 = data.substring(0, firstComma).toInt();
-      int num2 = data.substring(firstComma + 1, secondComma).toInt();
-      int num3 = data.substring(secondComma + 1, thirdComma).toInt();
-      int suctionState = data.substring(thirdComma + 1).toInt();
-      // Serial.println("Data is correctly formatted:");
-      // Serial.println(num1);
-      // Serial.println(num2);
-      // Serial.println(num3);
-      // Serial.println(suctionState);
-      if (suctionState == 1) {
-        digitalWrite(SUCTION_CUP_WRITE_PIN, HIGH); // on
-      } else {
-        digitalWrite(SUCTION_CUP_WRITE_PIN, LOW); // off
-      }
-      moveCoordinated(num1, num2, num3);
+    if (data.startsWith("SYNC?")) {
+      Serial.println(getCurrentTime());
+      Serial.println("-READY-");
+      return;
     }
+
+    // Log timestamp when receiving command
+    double currentTime = getCurrentTime();
+    Serial.print("T:");
+    Serial.print(currentTime, 6);
+    Serial.print(" CMD:");
+    Serial.println(data);
+
+    if (data.startsWith("pickup")) {
+      // Remove "pickup(" and ")" from the string
+      data = data.substring(7, data.length() - 1);
+      
+      // Split the string by ").(", which separates our coordinate groups
+      int firstSplit = data.indexOf(").(");
+      int secondSplit = data.indexOf(").(", firstSplit + 1);
+      int thirdSplit = data.indexOf(").(", secondSplit + 1);
+      
+      String dropPos = data.substring(0, firstSplit);
+      String transPos = data.substring(firstSplit + 3, secondSplit);
+      String restPos = data.substring(secondSplit + 3, thirdSplit);
+      
+      // Define a struct for positions
+      struct Position {
+        int x, y, z, s;
+      };
+      
+      // Function to process each position string
+      auto processPosition = [](String pos) -> Position {
+        int firstComma = pos.indexOf(',');
+        int secondComma = pos.indexOf(',', firstComma + 1);
+        int thirdComma = pos.indexOf(',', secondComma + 1);
+        
+        Position p;
+        p.x = pos.substring(0, firstComma).toInt();
+        p.y = pos.substring(firstComma + 1, secondComma).toInt();
+        p.z = pos.substring(secondComma + 1, thirdComma).toInt();
+        p.s = pos.substring(thirdComma + 1).toInt();
+        return p;
+      };
+      
+      // Process each position
+      Position drop = processPosition(dropPos);
+      Position trans = processPosition(transPos);
+      Position rest = processPosition(restPos);
+      
+      // Execute the movement sequence
+      digitalWrite(SUCTION_CUP_WRITE_PIN, drop.s);
+      moveCoordinated(drop.x, drop.y, drop.z);
+      
+      digitalWrite(SUCTION_CUP_WRITE_PIN, trans.s);
+      moveCoordinated(trans.x, trans.y, trans.z);
+      
+      digitalWrite(SUCTION_CUP_WRITE_PIN, rest.s);
+      moveCoordinated(rest.x, rest.y, rest.z);
+    } else {
+      // Handle simple position commands (legacy format)
+      int firstComma = data.indexOf(',');
+      int secondComma = data.indexOf(',', firstComma + 1);
+      int thirdComma = data.indexOf(',', secondComma + 1);
+      
+      if (firstComma != -1 && secondComma != -1 && thirdComma != -1) {
+        int x = data.substring(0, firstComma).toInt();
+        int y = data.substring(firstComma + 1, secondComma).toInt();
+        int z = data.substring(secondComma + 1, thirdComma).toInt();
+        int suctionState = data.substring(thirdComma + 1).toInt();
+        
+        digitalWrite(SUCTION_CUP_WRITE_PIN, suctionState);
+        moveCoordinated(x, y, z);
+      }
+    }
+    
     Serial.println("-READY-");
   }
 }
