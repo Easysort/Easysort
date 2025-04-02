@@ -63,22 +63,23 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def robotYplus(self):
         self.label1.setText("Robot Y+")
-        t = threading.Thread(target=robot.go_to, args=(robot.position[0] ,robot.position[1] + 1, robot.position[2]))
+        t = threading.Thread(target=robot.go_to, args=(robot.position[0] ,robot.position[1] + 5, robot.position[2]))
         t.start()
 
     def robotYminus(self):
         self.label1.setText("Robot Y-")
-        t = threading.Thread(target=robot.go_to, args=(robot.position[0] ,robot.position[1] - 1, robot.position[2]))
+        t = threading.Thread(target=robot.go_to, args=(robot.position[0] ,robot.position[1] - 5, robot.position[2]))
         t.start()
 
     def robotZplus(self):
         self.label1.setText("Robot Z+")
-        t = threading.Thread(target=robot.go_to, args=(robot.position[0] ,robot.position[1], robot.position[2] + 10))
+        print("Z+")
+        t = threading.Thread(target=robot.go_to, args=(robot.position[0] ,robot.position[1], robot.position[2] + 2))
         t.start()
 
     def robotZminus(self):
         self.label1.setText("Robot Z-")
-        t = threading.Thread(target=robot.go_to, args=(robot.position[0] , robot.position[1], robot.position[2] - 10))
+        t = threading.Thread(target=robot.go_to, args=(robot.position[0] , robot.position[1], robot.position[2] - 1))
         t.start()
 
     def suctionOn(self):
@@ -95,17 +96,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def markersPositions(self, marker_positions):
         for marker_id, position in marker_positions.items():
             self.markersLabel.setText(f"Marker {marker_id}:"
-                                      f" X={position[0]:.2f},"
-                                      f" Y={position[1]:.2f},"
-                                      f" Z={position[2]:.2f}")
+                                      f" X={position[0]:.3f},"
+                                      f" Y={position[1]:.3f},"
+                                      f" Z={position[2]:.3f}")
 
     def pickUp(self):
         self.label1.setText("Move robot to the marker")
-
-        T_R_C = np.linalg.inv(camera.T_C_R)
-        print("T_C_R (Robot in Camera Frame):\n", camera.T_C_R)
-
-        print(T_R_C)
 
         for marker_id, marker_pose in camera.marker_positions.items():
             print(marker_id)
@@ -116,10 +112,19 @@ class MainWindow(QtWidgets.QMainWindow):
             # Transform marker position from Camera Frame to Robot Frame
             marker_robot = np.dot(T_R_C, marker_cam)[:3]  # Extract only XYZ
 
-            print("move robot to {}".format([float(marker_robot[1]), float(-marker_robot[0]), float(marker_robot[2])]))
 
-            #t = threading.Thread(target=robot.go_to, args=(robot.position[0] ,robot.position[1] - 1, robot.position[2]))
-            #t.start()
+            print("move robot to {}".format([robot.position[0] + float(marker_robot[1]),
+                                             robot.position[1] + float(-marker_robot[0]),
+                                             robot.position[2] + float(marker_robot[2])]))
+
+            x = (robot.position[0] + float(-marker_robot[1])) * 100
+            y = (robot.position[1] + float(marker_robot[0])) * 100
+            z = (robot.position[2] + float(marker_robot[2])) * 100
+
+        print(x,y,z)
+        print("****")
+        t = threading.Thread(target=robot.go_to, args=(x,y,z))
+        t.start()
 
     def setImage(self, p):
         p = QPixmap.fromImage(p)

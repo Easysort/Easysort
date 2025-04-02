@@ -4,15 +4,16 @@ import pyrealsense2 as rs
 import numpy as np
 from PyQt6.QtCore import (QThread, Qt, pyqtSignal)
 from PyQt6.QtGui import (QPixmap, QImage)
+from numpy.ma.extras import average
 from scipy.spatial.transform import Rotation as R
 import math
 import cv2
-
+from collections import deque
 
 # Dictionary that was used to generate the ArUco marker
 aruco_dictionary_name = "DICT_ARUCO_ORIGINAL"
 
-t_R_M = np.array([[0.0], [0.01], [0.49]])  # Example: Marker to Suction cup offset
+t_R_M = np.array([[0.0], [0.01], [0.19]])  # Example: Marker to Suction cup offset
 R_R_M = np.eye(3)  # no rotation
 T_R_M = np.vstack((np.hstack((R_R_M, t_R_M)), [0, 0, 0, 1]))
 
@@ -75,6 +76,10 @@ class CameraClass(QThread):
         self.T_C_M = None
         self.T_C_R = None
         self.marker_positions = {}
+        self.pipe_profile = None
+        self.object_position = [0,0,0]
+        self.marker_history = []
+        self.robot_history = []
 
         self.rs_config.enable_stream(rs.stream.color, int(config.get('Camera', 'rgb_res_x')),
                                                          int(config.get('Camera', 'rgb_res_y')),
@@ -90,8 +95,8 @@ class CameraClass(QThread):
         self.depth_frame = None
         self.camera_run = True
 
-        pipe_profile = self.pipeline.start(self.rs_config)
-        depth_sensor = pipe_profile.get_device().first_depth_sensor()
+        self.pipe_profile = self.pipeline.start(self.rs_config)
+        depth_sensor = self.pipe_profile.get_device().first_depth_sensor()
         depth_sensor.set_option(rs.option.visual_preset, 3)
 
 
@@ -110,6 +115,8 @@ class CameraClass(QThread):
 
         #s = pipe_profile.query_sensors()[1]
         #s.set_option(rs.option.enable_auto_exposure, True)
+
+
 
     def run(self):
         while self.camera_run:
@@ -133,14 +140,21 @@ class CameraClass(QThread):
                 color_image, self.this_aruco_dictionary, parameters=self.this_aruco_parameters
             )
 
-            transform_translation_x = 0.0
-            transform_translation_y = 0.0
-            transform_translation_z = 0.0
 
             if marker_ids is not None:
                 rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
                     corners, .03, self.mtx, self.dst  # Now cameraMatrix and distCoeff are used
                 )
+
+                for i, marker_id in enumerate(marker_ids.flatten()):
+                    marker_corners = corners[i][0]  # Get the four corners of the marker
+
+                    # Get 3D position (X, Y, Z) in meters
+                    marker_position = self.get_3d_position(self.depth_frame, marker_corners)
+
+                    if marker_position is not None:
+                        if marker_id == 163:
+                            self.object_position = marker_position
 
                 for i, marker_id in enumerate(marker_ids):
 
@@ -150,68 +164,26 @@ class CameraClass(QThread):
                     # Construct Transformation Matrix from Camera to Marker
                     T_C_M = np.vstack((np.hstack((R_m, t_m)), [0, 0, 0, 1]))
 
-                    # 623 is markerID which is mounted on the robot
                     marker_id = int(marker_ids[i][0])
 
-                    if marker_id == 623:
+                    if marker_id == 216:
                         T_C_R = np.dot(T_C_M, np.linalg.inv(T_R_M))
                         self.T_C_R = T_C_R
                         robot_position_in_camera = T_C_R[:3, 3]
-                        self.robot_x = robot_position_in_camera[0]
-                        self.robot_y = robot_position_in_camera[1]
-                        self.robot_z = robot_position_in_camera[2]
+
+                        self.robot_x = robot_position_in_camera[0] * 100
+                        self.robot_y = robot_position_in_camera[1] * 100
+                        self.robot_z = robot_position_in_camera[2] * 100
+
+
                     elif marker_id == 163:
                         self.marker_positions[marker_id] = [
-                            round(float(t_m[0]), 5),  # X position
-                            round(float(t_m[1]), 5),  # Y position
-                            round(float(t_m[2]), 5)  # Z position
+                            round(float(self.object_position[0]), 5),  # X position
+                            round(float(self.object_position[1]), 5),  # Y position
+                            round(float(self.object_position[2]), 5)  # Z position
                         ]
-                    # Store the rotation information
-                    #rotation_matrix = np.eye(4)
-                    #rotation_matrix[0:3, 0:3] = cv2.Rodrigues(np.array(rvecs[i][0]))[0]
-                    #r = R.from_matrix(rotation_matrix[0:3, 0:3])
-                    #quat = r.as_quat()
 
-                    # Quaternion format
-                    #transform_rotation_x = quat[0]
-                    #transform_rotation_y = quat[1]
-                    #transform_rotation_z = quat[2]
-                    #transform_rotation_w = quat[3]
-
-                    # Euler angle format in radians
-                    #roll_x, pitch_y, yaw_z = euler_from_quaternion(transform_rotation_x,
-                    #                                               transform_rotation_y,
-                    #                                               transform_rotation_z,
-                    #                                               transform_rotation_w)
-
-                    #roll_x = math.degrees(roll_x)
-                    #pitch_y = math.degrees(pitch_y)
-                    #yaw_z = math.degrees(yaw_z)
-
-                    # Draw the axes on the marker
-
-                    for i in range(len(rvecs)):
-                        # Convert original rotation vector to rotation matrix
-                        R_orig, _ = cv2.Rodrigues(rvecs[i])
-
-                        # Define a 90° rotation about the Z-axis
-                        theta = np.deg2rad(90)
-                        R_z = np.array([
-                            [np.cos(theta), -np.sin(theta), 0],
-                            [np.sin(theta), np.cos(theta), 0],
-                            [0, 0, 1]
-                        ])
-
-                        # Apply the additional rotation: new_R = R_z * R_orig
-                        R_new = np.dot(R_z, R_orig)
-
-                        # Convert the new rotation matrix back to a rotation vector
-                        rvec_new, _ = cv2.Rodrigues(R_new)
-
-                        # Draw the axes using the new rotation vector and original translation vector
-                        cv2.drawFrameAxes(color_image, self.mtx, self.dst, rvec_new, tvecs[i], 0.05)
-
-                    #cv2.drawFrameAxes(color_image, self.mtx, self.dst, rvecs[i], tvecs[i], 0.05)
+                    cv2.drawFrameAxes(color_image, self.mtx, self.dst, rvecs[i], tvecs[i], 0.05)
 
             # percent of original size
             width = int(color_image.shape[1])
@@ -243,6 +215,33 @@ class CameraClass(QThread):
     def track_robot(self):
         pass
 
+    def is_valid_movement(self, previous, current):
+        threshold = 0.05
+        if previous is None:
+            return True  # No previous data, accept first measurement
+
+        # Compute Euclidean distance between old and new positions
+        distance = np.linalg.norm(np.array(previous) - np.array(current))
+
+        return distance < threshold  # Return True if movement is within limits
+
+    def get_3d_position(self, depth_frame, corners):
+        """ Get the average 3D position from the ArUco marker corners. """
+        depth_points = []
+        intrinsics = self.pipe_profile.get_stream(rs.stream.color).as_video_stream_profile().get_intrinsics()
+
+        for corner in corners:
+            x, y = int(corner[0]), int(corner[1])
+            depth = depth_frame.get_distance(x, y)  # Depth in meters
+
+            if depth > 0:  # Valid depth check
+                point_3d = rs.rs2_deproject_pixel_to_point(intrinsics, [x, y], depth)
+                depth_points.append(point_3d)
+
+        if len(depth_points) > 0:
+            return np.mean(depth_points, axis=0)  # Average position (X, Y, Z)
+
+        return None  # No valid depth
 
     def save_images(self, number):
         if self.cam.isOpened():
