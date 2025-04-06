@@ -142,6 +142,38 @@ class GantryConnector:
         # try: self.ser.write(instructions.encode())
         # except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
 
+    def _sync_time(self) -> None:
+        """
+        Get time offset between Arduino startup and connector startup
+        """
+        while not self.is_ready: pass
+        self.ser.reset_input_buffer()
+        self.ser.write(b"SYNC?\n")
+        while not self.ser.in_waiting: pass
+        not_ready_msg = self.ser.readline().decode().strip()
+        assert not_ready_msg == "-NOT-READY-"
+        while not self.ser.in_waiting: pass
+        message = self.ser.readline().decode().strip()
+        try:
+            arduino_ms = float(message) / 1000.0  # Convert Arduino milliseconds to seconds
+            self.arduino_time_offset = (time.time() - self.start_time) - arduino_ms
+            _LOGGER.info(f"Time sync established. Arduino offset: {self.arduino_time_offset}")
+        except (ValueError, serial.SerialException) as e:
+            _LOGGER.error(f"Time sync failed: {e}")
+
+    def pickup_detection(self, detection: Detection) -> None:
+        dx, dy, dz = detection.center_point
+        if detection.timestamp is None:
+            _LOGGER.error(f"Detection timestamp is None for detection: {detection}")
+            return
+        detection_time = self.start_time - detection.timestamp + self.arduino_time_offset
+        tx, ty, tz = (10, 0, 0)
+        rx, ry, rz = (0, 0, 0)
+        ds, ts, rs = (1, 0, 0)
+        instructions = f"pickup({dx},{dy},{dz},{ds}).({tx},{ty},{tz},{ts}).({rx},{ry},{rz},{rs}).({detection_time})"
+        try: self.ser.write(instructions.encode())
+        except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
+
     def send_information(self, position: tuple, suction_state: int) -> None:
         if not self.is_ready: return
         if self.position == position and self.suction_state == suction_state: return
@@ -189,4 +221,5 @@ if __name__ == "__main__":
     # connector.suction_off()
     # while not connector.is_ready: pass
     connector.quit()
+    print("Done")
     print("Done")
