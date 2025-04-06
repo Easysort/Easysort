@@ -7,6 +7,11 @@ import os
 import sys
 from collections import OrderedDict
 
+f_x = 635.47505771
+f_y = 636.69651825
+c_x = 323.90900467
+c_y = 244.25395186
+
 def get_pipeline():
     # On Mac the Intel Realsense library is extremely bad.
     # Connection only works 1 out of 10 times. This is a workaround to try and fix it.
@@ -15,8 +20,8 @@ def get_pipeline():
             # Test for "Failed to set power state" Error
             pipeline = rs.pipeline()
             config = rs.config()
-            config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 6)
-            config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 6)
+            config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 6)
+            config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 6)
             pipeline.start(config)
             # Test for RuntimeError: Frame didn't arrive within 5000
             frames = pipeline.wait_for_frames()
@@ -51,14 +56,18 @@ class RealSenseConnector:
         return np.asanyarray(color_frame), timestamp
 
     def get_depth_for_detection(self, detection: Detection) -> float:
+        return 10
         assert detection.timestamp is not None
         depth_array = self._depth_cache.get(detection.timestamp)
         if depth_array is None: return -1
-        y, x, _ = map(int, detection.center_point)
-        return depth_array[y, x]
+        x, y, _ = map(int, detection.center_point)
+        direct_distance = depth_array[y, x]
+        x_norm = (x - c_x) / f_x
+        y_norm = (y - c_y) / f_y
+        z = direct_distance / np.sqrt(1 + x_norm**2 + y_norm**2)
+        return z
 
 if __name__ == "__main__":
     connector = RealSenseConnector()
     while True:
         color_image, timestamp = connector.get_color_image()
-        print(color_image.shape, timestamp)
