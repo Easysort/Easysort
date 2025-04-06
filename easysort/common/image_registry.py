@@ -15,7 +15,6 @@ from easysort.common.environment import Environment
 
 class ImageRegistry:
     def __init__(self) -> None:
-        self.supabase_helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
         self.video_metadata: Optional[VideoMetadata] = None
 
     def set_video_metadata(self, metadata: VideoMetadata) -> None:
@@ -40,6 +39,15 @@ class ImageRegistry:
         self.save_video_metadata()
         self.frame_idx += 1
 
+    def exists(self, uuid: str) -> bool:
+        return Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid)).exists()
+    
+    def cleanup(self, min_len: int = 10) -> None:
+        for path in set([p.parent for p in Path(Environment.IMAGE_REGISTRY_PATH).glob("**/*.sample")]):
+            if len(list(path.glob("*.sample"))) < min_len:
+                for p in path.glob("*"): p.unlink()
+                os.rmdir(path)
+
     def compress_image_samples_to_video(self, uuid: str, delete: Optional[bool] = True) -> VideoSample:
         image_paths = list(Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid)).glob("*.sample"))
         image_paths.sort(key=lambda x: int(x.stem))
@@ -52,6 +60,7 @@ class ImageRegistry:
         return video_sample
 
     def upload(self) -> None: # Uploads images to Supabase and deletes them locally
+        self.supabase_helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
         uuids = set([p.parts[1] for p in Path(Environment.IMAGE_REGISTRY_PATH).glob("**/*.sample")])
         for uuid in uuids:
             video_sample = self.compress_image_samples_to_video(uuid)
@@ -90,4 +99,5 @@ class SupabaseHelper:
 
 if __name__ == "__main__":
     image_registry = ImageRegistry()
-    image_registry.upload()
+    # image_registry.upload()
+    image_registry.cleanup()

@@ -16,6 +16,7 @@ class Detection:
         self.area = (self.xyxy[2] - self.xyxy[0]) * (self.xyxy[3] - self.xyxy[1])
         self._center_point: Optional[Tuple[float, float, float]] = None
         self.timestamp = timestamp
+        self._robot_center_point: Optional[np.ndarray] = None
 
     def set_center_point(self, center_point: Optional[Tuple[float, float, float]] = None) -> None:
         self._center_point = center_point

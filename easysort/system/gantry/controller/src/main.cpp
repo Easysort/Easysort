@@ -149,6 +149,15 @@ void setup() {
 
   Serial.println("Testing suction cup");
   Serial.println("Suction cup should be on for 3 seconds");
+  
+  // Test pattern: blink 3 times then stay on for 3 seconds
+  for(int i = 0; i < 3; i++) {
+    digitalWrite(SUCTION_CUP_WRITE_PIN, HIGH);
+    delay(500);
+    digitalWrite(SUCTION_CUP_WRITE_PIN, LOW);
+    delay(500);
+  }
+  
   digitalWrite(SUCTION_CUP_WRITE_PIN, HIGH);
   delay(3000);
   Serial.println("Suction cup should be off now");

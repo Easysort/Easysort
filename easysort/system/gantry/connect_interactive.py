@@ -16,7 +16,7 @@ def get_key():
     return ch
 
 if __name__ == "__main__":
-    connector = GantryConnector(Environment.GANTRY_PORT)
+    connector = GantryConnector(Environment.GANTRY_PORT, None)
     x, y, z = 0, 0, 0
 
     while True:
@@ -52,7 +52,13 @@ if __name__ == "__main__":
                 connector.suction_on(x, y, z)
                 print(f"Suction on: ({x}, {y}, {z})")
         elif key.lower() == 'x':
-            connector.quit()
+            connector.quit(return_to_start=False)
             break
+        elif key.lower() == 't':
+            connector.go_to(
+                x - 37,
+                y,
+                z + 12
+            )
         connector.go_to(x, y, z)
         print(f"Position: ({x}, {y}, {z}), Suction: {'On' if connector.suction_state else 'Off'}")

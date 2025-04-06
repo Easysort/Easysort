@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 from tqdm import tqdm
 
-from easysort.common.image_registry import SupabaseHelper
+from easysort.common.image_registry import SupabaseHelper, ImageRegistry
 from easysort.common.environment import Environment
 from easysort.sorting.pipeline import SortingPipeline
 from easysort.visualize.helpers import visualize_sorting_pipeline_image
@@ -13,11 +13,18 @@ from easysort.visualize.helpers import visualize_sorting_pipeline_image
 
 def visualize_video(uuid: str, save_images: bool = False, rerun_pipeline: bool = True):
     pipeline = SortingPipeline()
-    supabase_helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
-    if not supabase_helper.exists(uuid):
-        print(f"Video {uuid} not found in Supabase")
+    # supabase_helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
+    image_registry = ImageRegistry()
+    if not image_registry.exists(uuid):
+        print(f"Video {uuid} not found in Image Registry")
         return
-    video_sample = supabase_helper.get(uuid)
+    # if supabase_helper.exists(uuid):
+    #     video_sample = supabase_helper.get(uuid)
+    if image_registry.exists(uuid):
+        video_sample = image_registry.compress_image_samples_to_video(uuid, delete=False)
+    else:
+        print(f"Video {uuid} not found in Supabase or Image Registry")
+        return
 
     rendered_images = []
     for image_sample in tqdm(video_sample.samples.values(), desc="Visualizing video"):
