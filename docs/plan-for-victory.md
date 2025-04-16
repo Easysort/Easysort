@@ -11,20 +11,23 @@ This plan is updated every Sunday by @Apros7 (Lucas Vilsen)
 
 ## Upcomings goals:
 1. Have a working product for sorting waste at Startup Day on Thursday, 15th of May.
-2. Sort >5 tons of waste May 26th, 27th & 28th.
+2. Sort >3 tons of waste May 26th, 27th & 28th.
 
 
 ## Plan (in ranked order of priority)
-1. Improve EasyLabeller to a usable state and label first 1000 images.
-2. Autoupload and perform selection in samples needed for manual labelling to improve AI sorting.
-3. Have a complete pipeline for recognizing and calculating object 3d positions running faster than >20it/min on Jetson.
-4. Develop first beta version of Customer Portal (and show information about CO2, weight, sorting accuracy).
-5. Autoupload information (Weight, CO2, classification) to SupaBase at least every 6 hours.
+1. Redo website
+2. Improve EasyLabeller to a usable state and label first 1000 images.
+3. Autoupload and perform selection in samples needed for manual labelling to improve AI sorting.
+4. Have a complete pipeline for recognizing and calculating object 3d positions running faster than >20it/min on Jetson.
+5. Redo EasyTrack
+
+## Secondary
+- Autoupload information (Weight, CO2, classification) to SupaBase at least every 6 hours.
 
 
 ## Who is responsible for what?
-- Lucas: 1, 2, 4, 5
-- Erik: 3
+- Lucas: 1, 2, 3, 5
+- Erik: 4
 
 
 ## Links:
