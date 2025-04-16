@@ -13,7 +13,7 @@ class Environment:
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
     SUPABASE_AI_IMAGES_BUCKET: str = "ai-images"
-    IMAGE_REGISTRY_PATH: str = "image_registry"
+    IMAGE_REGISTRY_PATH: str = "image_registry_dtu"
 
     # Gantry:
     GANTRY_PORT: str = os.getenv("GANTRY_PORT", "")

@@ -12,7 +12,10 @@ from easysort.visualize.helpers import visualize_sorting_pipeline_image
 
 
 def visualize_video(uuid: str, save_images: bool = False, rerun_pipeline: bool = True):
-    pipeline = SortingPipeline()
+    if rerun_pipeline:
+        pipeline = SortingPipeline()
+    else:
+        pipeline = None
     # supabase_helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
     image_registry = ImageRegistry()
     if not image_registry.exists(uuid):

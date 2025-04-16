@@ -86,23 +86,51 @@ test_yoloworld_classes = [
     "plastic bottle",
     "coloured plastic bottle",
     "soda can",
-    "paper_document",
+    "paper",
     "plastic_wrap",
     "snack_box", 
     "cardboard_box",
-    "plastic_lid"
+    "plastic_lid",
+    "food packaging",
+    "plastic_packaged_food",
+    "cardboard_food_container",
+    "plastic",
+    "white box"
 ]
+
+DROP_OFF_1 = (-15, 30, 0) # Plast
+DROP_OFF_2 = (-55, 30, 0) # Cans
+DROP_OFF_3 = (-55, -25, 0) # Paper/Cardoboard
+DROP_OFF_4 = (-15, -25, 0) # Other
+
+class_to_fraction_mapping = {
+    "plastic_packaged_food": DROP_OFF_1,
+    "plastic_wrap": DROP_OFF_1,
+    "plastic_lid": DROP_OFF_1,
+    "plastic bottle": DROP_OFF_2,
+    "coloured plastic bottle": DROP_OFF_2,
+    "soda can": DROP_OFF_2,
+    "paper": DROP_OFF_3,
+    "snack_box": DROP_OFF_3, 
+    "cardboard_box": DROP_OFF_3,
+    "food packaging": DROP_OFF_3,
+    "cardboard_food_container": DROP_OFF_3,
+    "plastic": DROP_OFF_4,
+    "white box": DROP_OFF_4,
+}
+
 
 class ClassifierYoloWorld:
     def __init__(self, classes: list[str]):
-        self.model = YOLOWorld(model_id="yolo_world/l")
+        self.model = YOLOWorld(model_id="yolo_world/m")
         self.classes = classes
+        print(self.classes)
         self.model.set_classes(self.classes)
 
     @TimeIt("Bbox classification")
     def __call__(self, image):
         timestamp = time.time()
-        results = self.model.infer(image)
+        results = self.model.infer(image, confidence=0.1) 
         detections = []
         for prediction in results.predictions:
             bbox = np.array([prediction.x - prediction.width/2, prediction.y + prediction.height/2, 
@@ -133,7 +161,7 @@ class ClassifierYoloWorld:
 if __name__ == "__main__":
     SOURCE_IMAGE_PATH = "__old__/_old/test.jpg"
     image = cv2.imread(SOURCE_IMAGE_PATH)
-    classifier = ClassifierYoloWorld(classes=test_yoloworld_classes)
+    classifier = ClassifierYoloWorld(classes=YOLO_WORLD_CLASSES)
     detections = classifier(image)
     print(detections)
 

@@ -29,7 +29,9 @@ def visualize_sorting_pipeline_image(image: np.ndarray, detections: List[Detecti
                             (int(detection.xyxy[2]), int(detection.xyxy[3])), color, 2)
 
         text_pos = (int(detection.xyxy[0]), int(detection.xyxy[1] - 10))
-        cv2.putText(img, f"{detection.class_name} (z={detection.center_point[2]})", text_pos,
+        # cv2.putText(img, f"{detection.class_name} (z={detection.center_point[2]})", text_pos,
+        #             cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        cv2.putText(img, f"cardboard", text_pos,
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
         if detection.mask is not None and len(detection.mask) > 0:

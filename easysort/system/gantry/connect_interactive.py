@@ -56,9 +56,9 @@ if __name__ == "__main__":
             break
         elif key.lower() == 't':
             connector.go_to(
-                x - 37,
-                y,
-                z + 12
+                55,
+                0,
+                0
             )
         connector.go_to(x, y, z)
         print(f"Position: ({x}, {y}, {z}), Suction: {'On' if connector.suction_state else 'Off'}")

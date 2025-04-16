@@ -117,31 +117,6 @@ class GantryConnector:
         except (ValueError, serial.SerialException) as e:
             _LOGGER.error(f"Time sync failed: {e}")
 
-    def pickup_detection(self, detection: Detection) -> None:
-        dx, dy, dz = detection._robot_center_point
-        print("Picking up detection: ", dx, dy, dz)
-        dx, dy, dz = int(dx), int(dy), int(dz)
-        if detection.timestamp is None:
-            _LOGGER.error(f"Detection timestamp is None for detection: {detection}")
-            return
-        detection_time = self.start_time - detection.timestamp + self.arduino_time_offset
-        time.sleep(10)
-        return
-        self.go_to(dx, dy, dz)
-        while not self.is_ready: pass
-        self.suction_on()
-        while not self.is_ready: pass
-        self.go_to(0, 0, 0)
-        while not self.is_ready: pass
-        self.suction_off()
-        while not self.is_ready: pass
-        # tx, ty, tz = (10, 0, 0)
-        # rx, ry, rz = (0, 0, 0)
-        # ds, ts, rs = (1, 0, 0)
-        # instructions = f"pickup({dx},{dy},{dz},{ds}).({tx},{ty},{tz},{ts}).({rx},{ry},{rz},{rs}).({detection_time})"
-        # try: self.ser.write(instructions.encode())
-        # except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
-
     def _sync_time(self) -> None:
         """
         Get time offset between Arduino startup and connector startup
@@ -161,18 +136,36 @@ class GantryConnector:
         except (ValueError, serial.SerialException) as e:
             _LOGGER.error(f"Time sync failed: {e}")
 
-    def pickup_detection(self, detection: Detection) -> None:
-        dx, dy, dz = detection.center_point
-        if detection.timestamp is None:
-            _LOGGER.error(f"Detection timestamp is None for detection: {detection}")
-            return
-        detection_time = self.start_time - detection.timestamp + self.arduino_time_offset
-        tx, ty, tz = (10, 0, 0)
-        rx, ry, rz = (0, 0, 0)
+    def pickup(self, pickup_point: tuple[float, float, float], dropoff_point: tuple[float, float, float], ready_point: tuple[float, float, float]) -> None:
+        CONVEYOR_SPEED = 37.5 # m/s
+        dx, dy, dz = pickup_point
+        dx = -55
+        microsec_to_wait = max(-dx / CONVEYOR_SPEED - 1.5, 0) # - 1.3 works sometimes
+        print(f"Waiting for {microsec_to_wait} seconds")
+        time.sleep(microsec_to_wait)
+        microsec_to_wait2 = max((10 - abs(dy)) / 15, 0)
+        print(f"Waiting for {microsec_to_wait2} seconds")
+        time.sleep(microsec_to_wait2)
+        tx, ty, tz = dropoff_point
+        rx, ry, rz = ready_point
         ds, ts, rs = (1, 0, 0)
-        instructions = f"pickup({dx},{dy},{dz},{ds}).({tx},{ty},{tz},{ts}).({rx},{ry},{rz},{rs}).({detection_time})"
+        instructions = f"pickup({dx},{dy},{dz},{ds}).({tx},{ty},{tz},{ts}).({rx},{ry},{rz},{rs}).(0)"
         try: self.ser.write(instructions.encode())
         except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
+
+
+    # def pickup_detection(self, detection: Detection) -> None:
+    #     dx, dy, dz = detection.center_point
+    #     if detection.timestamp is None:
+    #         _LOGGER.error(f"Detection timestamp is None for detection: {detection}")
+    #         return
+    #     detection_time = self.start_time - detection.timestamp + self.arduino_time_offset
+    #     tx, ty, tz = (10, 0, 0)
+    #     rx, ry, rz = (0, 0, 0)
+    #     ds, ts, rs = (1, 0, 0)
+    #     instructions = f"pickup({dx},{dy},{dz},{ds}).({tx},{ty},{tz},{ts}).({rx},{ry},{rz},{rs}).({detection_time})"
+    #     try: self.ser.write(instructions.encode())
+    #     except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
 
     def send_information(self, position: tuple, suction_state: int) -> None:
         if not self.is_ready: return
@@ -180,6 +173,7 @@ class GantryConnector:
         self.position = position
         self.suction_state = suction_state
         msg = f"{','.join(map(str, position))},{suction_state}\n".encode()
+        _LOGGER.info(f"Sending information to {self.port}: {msg}")
         try: self.ser.write(msg)
         except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
 
@@ -203,6 +197,7 @@ class GantryConnector:
         return self._is_ready
 
     def quit(self, return_to_start: bool = True) -> None:
+        while not self.is_ready: pass
         if return_to_start: self.send_information((0, 0, 0), 0)
         while not self.is_ready: pass
         self.ser.close()

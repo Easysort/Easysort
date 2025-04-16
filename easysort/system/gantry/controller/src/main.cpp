@@ -1,5 +1,4 @@
 #include <AccelStepper.h>
-#include <TimeLib.h>
 
 const float CMS_FOR_10_REVOLUTIONS = 60;
 const float CM_PER_REVOLUTION = CMS_FOR_10_REVOLUTIONS / 10;
@@ -8,8 +7,8 @@ const float STEPS_PER_CM_Y = 800 / CM_PER_REVOLUTION;
 const float STEPS_PER_CM_Z = 800 / CM_PER_REVOLUTION;
 const float CONVEYOR_SPEED = 8.727;  // cm/s
 
-const long MaxSpeed = 1000; // Can go to 8000 at least
-const long Acceleration = 1000; // Can go to 8000 at least
+const long MaxSpeed = 2200; // Can go to 8000 at least
+const long Acceleration = 2200; // Can go to 8000 at least
 const int SUCTION_CUP_WRITE_PIN = 5;
 
 const long XMaxSpeed = MaxSpeed;
@@ -57,9 +56,9 @@ void moveCoordinated(float future_x, float future_y, float future_z) {
   stepperY.moveTo(coords.y);
   stepperZ.moveTo(coords.z);
   
-  float abs_x = abs(coords.x - stepperX.currentPosition());
-  float abs_y = abs(coords.y - stepperY.currentPosition());
-  float abs_z = abs(coords.z - stepperZ.currentPosition());
+  float abs_x = abs(x);
+  float abs_y = abs(y);
+  float abs_z = abs(z);
   float max_distance = max(abs_x, max(abs_y, abs_z));
 
   unsigned long last_x_step = micros();
@@ -74,7 +73,7 @@ void moveCoordinated(float future_x, float future_y, float future_z) {
     float x_speed = x_ratio * MaxSpeed * (x >= 0 ? 1 : -1);
     float y_speed = y_ratio * MaxSpeed * (y >= 0 ? 1 : -1);
     float z_speed = z_ratio * MaxSpeed * (z >= 0 ? 1 : -1);
-    
+
     // Serial.print("Setting motor speeds - X: ");
     // Serial.print(x_speed);
     // Serial.print(" Y: ");
@@ -149,15 +148,6 @@ void setup() {
 
   Serial.println("Testing suction cup");
   Serial.println("Suction cup should be on for 3 seconds");
-  
-  // Test pattern: blink 3 times then stay on for 3 seconds
-  for(int i = 0; i < 3; i++) {
-    digitalWrite(SUCTION_CUP_WRITE_PIN, HIGH);
-    delay(500);
-    digitalWrite(SUCTION_CUP_WRITE_PIN, LOW);
-    delay(500);
-  }
-  
   digitalWrite(SUCTION_CUP_WRITE_PIN, HIGH);
   delay(3000);
   Serial.println("Suction cup should be off now");
@@ -170,7 +160,16 @@ void setup() {
 void loop() {
   if (Serial.available() > 0) {
     Serial.println("-NOT-READY-");
+    
+    // Set timeout to 100ms
+    Serial.setTimeout(50);
     String data = Serial.readStringUntil('\n');
+    
+    if (data.length() == 0) {
+      Serial.println("Error: Serial read timeout");
+      Serial.println("-READY-");
+      return;
+    }
     
     if (data.startsWith("SYNC?")) {
       Serial.println(getCurrentTime());
@@ -224,13 +223,15 @@ void loop() {
       
       // Execute the movement sequence
       digitalWrite(SUCTION_CUP_WRITE_PIN, drop.s);
+      moveCoordinated(drop.x, drop.y, 0);
       moveCoordinated(drop.x, drop.y, drop.z);
-      
-      digitalWrite(SUCTION_CUP_WRITE_PIN, trans.s);
+      delay(200);
+      moveCoordinated(drop.x, drop.y, 0);
       moveCoordinated(trans.x, trans.y, trans.z);
-      
-      digitalWrite(SUCTION_CUP_WRITE_PIN, rest.s);
+      digitalWrite(SUCTION_CUP_WRITE_PIN, trans.s);
+      delay(1000);
       moveCoordinated(rest.x, rest.y, rest.z);
+      digitalWrite(SUCTION_CUP_WRITE_PIN, rest.s);
     } else {
       // Handle simple position commands (legacy format)
       int firstComma = data.indexOf(',');

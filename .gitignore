@@ -224,3 +224,4 @@ weights/
 *.pt
 rendered_videos/
 image_registry/
+image_registry_dtu/

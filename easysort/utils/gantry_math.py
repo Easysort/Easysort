@@ -1,14 +1,20 @@
 import numpy as np
+from easysort.utils.detections import Detection
+from typing import List
+
+# REALSENSE_WIDTH = 1280
+# REALSENSE_HEIGHT = 720
+
+REALSENSE_WIDTH = 640
+REALSENSE_HEIGHT = 480
+REALSENSE_X_CM_ON_CONVEYOR = 90 # 90
+REALSENSE_Y_CM_ON_CONVEYOR = 50 # 49 # 80 worked at times
+MAX_DEPTH = -13
 
 def realsense2gantry(realsense_point: np.ndarray, depth: float) -> np.ndarray:
     """
     Convert a point from the RealSense coordinate system to the Gantry coordinate system.
     """
-    REALSENSE_WIDTH = 1280
-    REALSENSE_HEIGHT = 720
-    REALSENSE_X_CM_ON_CONVEYOR = 90
-    REALSENSE_Y_CM_ON_CONVEYOR = 49
-
     # Move realsense (0,0) to the center of the image
     realsense_mid_x = REALSENSE_WIDTH / 2
     realsense_mid_y = REALSENSE_HEIGHT / 2
@@ -27,19 +33,32 @@ def realsense2gantry(realsense_point: np.ndarray, depth: float) -> np.ndarray:
     gantry_offset_y_cm = 5
     gantry_offset_z_cm = 48
 
-    depth = adjust_realsense_depth(y_cm, depth)
-    return np.array([x_cm + gantry_offset_x_cm, y_cm + gantry_offset_y_cm, -depth + gantry_offset_z_cm])
+    depth = max(-adjust_realsense_depth(y_cm*1.4, depth) + gantry_offset_z_cm, MAX_DEPTH)
+    return np.array([x_cm + gantry_offset_x_cm, -(y_cm - gantry_offset_y_cm), depth])
 
 def adjust_realsense_depth(realsense_y_cm_midpoint: float, depth: float) -> float:
     """
     Adjust the depth of the RealSense camera to account for the pythagorean theorem.
     """
+    print(f"Depth: {depth}, realsense_y_cm_midpoint: {realsense_y_cm_midpoint}, non-sqrt: {(depth**2 - realsense_y_cm_midpoint**2)}")
+    print(f"sqrt: {np.sqrt(depth**2 - realsense_y_cm_midpoint**2)}")
+    print(f"Final depth: {-np.sqrt(depth**2 - realsense_y_cm_midpoint**2) + realsense_y_cm_midpoint}")
     return np.sqrt(depth**2 - realsense_y_cm_midpoint**2)
 
-if __name__ == "__main__":
+def detection_to_pickup(detections: List[Detection]) -> Detection:
+    """
+    Pick the detection closest to center of the image in the x direction and no one that has a negative x value.
+    """
+    print([detection.center_point for detection in detections])
+    detections = [d for d in detections if d.center_point[0] > REALSENSE_WIDTH/2]
+    print(len(detections))
+    return min(detections, key=lambda x: (x.center_point[0] - REALSENSE_WIDTH/2)**2) if len(detections) > 0 else None
 
-    REALSENSE_WIDTH = 1280
-    REALSENSE_HEIGHT = 720
+def gantryExtrapolate1point5sec(point: tuple[float, float, float]) -> tuple[float, float, float]:
+    return np.array([point[0] - 1.5 * 37.5, point[1], point[2]])
+
+
+if __name__ == "__main__":
 
     point1 = np.array([0.5 * REALSENSE_WIDTH, 0.5 * REALSENSE_HEIGHT])
     depth1 = 48

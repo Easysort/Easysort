@@ -20,8 +20,8 @@ def get_pipeline():
             # Test for "Failed to set power state" Error
             pipeline = rs.pipeline()
             config = rs.config()
-            config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 6)
-            config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 6)
+            config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 60)
+            config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 60)
             pipeline.start(config)
             # Test for RuntimeError: Frame didn't arrive within 5000
             frames = pipeline.wait_for_frames()
@@ -56,16 +56,12 @@ class RealSenseConnector:
         return np.asanyarray(color_frame), timestamp
 
     def get_depth_for_detection(self, detection: Detection) -> float:
-        return 10
         assert detection.timestamp is not None
         depth_array = self._depth_cache.get(detection.timestamp)
         if depth_array is None: return -1
-        x, y, _ = map(int, detection.center_point)
-        direct_distance = depth_array[y, x]
-        x_norm = (x - c_x) / f_x
-        y_norm = (y - c_y) / f_y
-        z = direct_distance / np.sqrt(1 + x_norm**2 + y_norm**2)
-        return z
+        y, x, _ = map(int, detection.center_point) 
+        print("REALSENSE DEPTH", depth_array[x, y] / 10)
+        return depth_array[x, y] / 10 # Should output in cm
 
 if __name__ == "__main__":
     connector = RealSenseConnector()

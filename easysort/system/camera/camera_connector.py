@@ -2,7 +2,7 @@ import cv2
 
 class CameraConnector:
     def __init__(self):
-        self.cap = cv2.VideoCapture(2)  # Use the default camera
+        self.cap = cv2.VideoCapture(1)  # Use the default camera
 
     def get_color_image(self):
         ret, frame = self.cap.read()
