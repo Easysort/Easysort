@@ -15,8 +15,8 @@ This plan is updated every Sunday by @Apros7 (Lucas Vilsen)
 
 
 ## Plan (in ranked order of priority)
-1. Redo website
-2. Improve EasyLabeller to a usable state and label first 1000 images.
+1. Label first 1000 images. Start experimenting with Scale Studio and Roboflow Annotation until EasyLabeller is usable.
+2. Improve EasyLabeller to a usable state.
 3. Autoupload and perform selection in samples needed for manual labelling to improve AI sorting.
 4. Have a complete pipeline for recognizing and calculating object 3d positions running faster than >20it/min on Jetson.
 5. Redo EasyTrack
