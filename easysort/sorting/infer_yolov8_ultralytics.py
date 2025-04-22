@@ -15,12 +15,13 @@ RANDOM_IMAGE_TENSOR = torch.rand((980, 1280, 3)).numpy()
 
 class Classifier:
     def __init__(self):
-        self.model = YOLO("__old__/_old/best.pt")
+        print("Loading new model...")
+        self.model = YOLO("easysort/sorting/train6/weights/last.pt")
         LOGGER.info("Classifier initialized")
 
     @TimeIt("Bbox classification")
     def __call__(self, image: np.ndarray) -> List[Detection]:
-        results = self.model(image, stream=True)
+        results = self.model(image, stream=True, conf=0.025)
         results_unlisted = list(results)[0] # You can pass multiple images, we have one, so we take the first results object.
         return Detections.from_ultralytics(results_unlisted)
 

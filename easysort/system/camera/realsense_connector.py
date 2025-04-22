@@ -47,6 +47,12 @@ class RealSenseConnector:
         self._depth_cache = LRUDict(maxsize=3)
         self.pipeline = get_pipeline()
 
+    def get_only_color_image(self) -> Tuple[np.ndarray, float]:
+        frames = self.pipeline.wait_for_frames()
+        timestamp = time.time()
+        color_frame = frames.get_color_frame().get_data()
+        return np.asanyarray(color_frame), timestamp
+
     def get_color_image(self) -> Tuple[np.ndarray, float]:
         frames = self.pipeline.wait_for_frames()
         timestamp = time.time()

@@ -74,7 +74,8 @@ class Mask(np.ndarray):
 class Detections:
     @staticmethod
     def from_ultralytics(result: Results) -> List[Detection]:
+        names_dict = {str(k): v for k, v in result.names.items()}
         return [
-            Detection(box=box.cpu().numpy(), mask=None, class_id=int(class_id.cpu().numpy()), confidence=confidence.cpu().numpy(), names=result.names)
+            Detection(box=box.cpu().numpy(), mask=None, class_id=int(class_id.cpu().numpy()), confidence=confidence.cpu().numpy(), names=names_dict)
             for box, class_id, confidence in zip(result.boxes.xyxy, result.boxes.cls, result.boxes.conf)
         ]

@@ -1,67 +1,62 @@
-
-import cv2
-import numpy as np
+import cv2, numpy as np, matplotlib.pyplot as plt
 from typing import List
-import matplotlib.pyplot as plt
-
 from easysort.utils.detections import Detection
 
-def visualize_sorting_pipeline_image(image: np.ndarray, detections: List[Detection], show_plot: bool = True) -> np.ndarray:
-    assert isinstance(image, np.ndarray), "Image must be a numpy array, got {}".format(type(image))
-    def get_color_for_class(class_name: str) -> tuple:
-        # Generate a unique color based on the class name using HSV color space
-        # Hash the string to get a consistent numeric value
-        class_id = hash(class_name) % 360
-        hue = (class_id * 137) % 360  # Use prime number to get good distribution
-        sat = 255
-        val = 255
 
-        # Convert HSV to BGR
-        h = float(hue) / 2  # OpenCV uses hue values 0-180
-        hsv = np.array([[[h, sat, val]]], dtype=np.uint8)
-        bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-        return tuple(map(int, bgr[0,0]))
+def visualize_sorting_pipeline_image(
+        image: np.ndarray,
+        detections: List[Detection],
+        *,
+        show_plot: bool = True,
+        shorten: bool = False,
+        font_scale: float = 0.35,    # ⬑ smaller default
+) -> np.ndarray:
+    """
+    Draw detections with a small, *stable* label anchored to box top‑left.
 
-    def draw_detection(img: np.ndarray, detection: Detection) -> np.ndarray:
-        color = get_color_for_class(detection.class_name)
+    Parameters
+    ----------
+    image       : BGR numpy image.
+    detections  : list of your Detection objects.
+    show_plot   : pop up matplotlib preview.
+    shorten     : keep only the trailing part after the last ' - '.
+    font_scale  : override font size (0.35 ≈ readable on 1080 p).
+    """
+    out = image.copy()
+    H, W = out.shape[:2]
 
-        cv2.rectangle(img, (int(detection.xyxy[0]), int(detection.xyxy[1])),
-                            (int(detection.xyxy[2]), int(detection.xyxy[3])), color, 2)
+    def color_for(cls: str) -> tuple[int, int, int]:
+        hue = hash(cls) % 179
+        hsv = np.uint8([[[hue, 230, 230]]])
+        return tuple(int(c) for c in cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)[0, 0])
 
-        text_pos = (int(detection.xyxy[0]), int(detection.xyxy[1] - 10))
-        cv2.putText(img, f"{detection.class_name} (z={detection.center_point[2]})", text_pos,
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+    for d in detections:
+        x1, y1, x2, y2 = map(int, d.xyxy)
+        colour = color_for(d.class_name)
+        cv2.rectangle(out, (x1, y1), (x2, y2), colour, 2)
 
-        if detection.mask is not None and len(detection.mask) > 0:
-            mask = cv2.resize(detection.mask.astype(np.uint8), (img.shape[1], img.shape[0]))
-            overlay = img.copy()
-            overlay[mask > 0] = color
-            img = cv2.addWeighted(overlay, 0.5, img, 0.5, 0)
+        label = d.class_name.split(" - ")[-1] if shorten else d.class_name
+        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
 
-        cx, cy, _ = map(int, detection.center_point)
-        size = 10
-        cv2.line(img, (cx - size, cy - size), (cx + size, cy + size), (0, 0, 255), 2)
-        cv2.line(img, (cx - size, cy + size), (cx + size, cy - size), (0, 0, 255), 2)
-        return img
+        # anchor just above top‑left; if that clips, drop it inside the box
+        lx, by = x1, y1 - 4
+        if by - th - 4 < 0:
+            by = y1 + th + 4
 
-    n_plots = len(detections) + 1
-    main_view = image.copy()
-    for det in detections: main_view = draw_detection(main_view, det)
+        # opaque bar
+        cv2.rectangle(out, (lx, by - th - 4), (lx + tw + 6, by + 2), colour, cv2.FILLED)
+
+        # choose black/white text for contrast
+        brightness = 0.299 * colour[2] + 0.587 * colour[1] + 0.114 * colour[0]
+        txt_col = (0, 0, 0) if brightness > 127 else (255, 255, 255)
+
+        cv2.putText(out, label, (lx + 3, by), cv2.FONT_HERSHEY_SIMPLEX,
+                    font_scale, txt_col, 1, cv2.LINE_AA)
 
     if show_plot:
-        plt.figure(figsize=(12, 4))
-        plt.subplot(1, n_plots, 1)
-        plt.imshow(cv2.cvtColor(main_view, cv2.COLOR_BGR2RGB))
-        plt.title('All Detections')
-        plt.axis('off')
-
-        for idx, det in enumerate(detections, 1):
-            plt.subplot(1, n_plots, idx + 1)
-            det_view = draw_detection(image.copy(), det)
-            plt.imshow(cv2.cvtColor(det_view, cv2.COLOR_BGR2RGB))
-            plt.title(f'Detection {idx} ({det.class_name})')
-            plt.axis('off')
-
-        plt.tight_layout()
+        plt.figure(figsize=(8, 6))
+        plt.imshow(cv2.cvtColor(out, cv2.COLOR_BGR2RGB))
+        plt.axis("off")
         plt.show()
-    return main_view
+
+    return out
