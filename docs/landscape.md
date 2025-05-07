@@ -84,6 +84,14 @@ Sections with over 30% burned: (Manufacturing of ...) (not complete list):
 
 Largest subfractions of waste produced:
 | Fraction | 2022 (1000 tons) |
+|----------|------------------|
+| Concrete | 1.107 |
+| Mixtures or separate fractions of concrete, bricks, tiles, and ceramics | 686 |
+| Asphalt and coal tar-containing waste | 1.112 |
+| Railway track ballast | 427 |
+| Mixed construction and demolition waste | 427 |
+| Iron and steel | 362 |
+
 
 A large portion of this waste is used for other material use: roads, parking areas, etc.
 
@@ -110,7 +118,51 @@ All sections need to sort waste for recycling. How much of the sorted waste is a
 
 **Notes: Items sorted in household way be sorted well enough as most is recycled. Garden waste and household like waste from industry may not be pure enough, as the difference is higher here.**
 
+# Deep dive into each fraction being processed:[4]
+
+## Food waste:
+
+Waste Source -> Collection -> Sorting + Pulping -> Car with tank -> Biogas plant -> Energy + fertilizer
+
+Sorting + Pulping companies:
+- https://organicumbiomass.com/?avia_forced_reroute=1
+- https://remondisdanmark.dk/
+- https://gemidan.dk/behandlingsanlaeg-til-madaffald-og-have-parkaffald/
+- https://ecogi.dk/
+
+## Paper:
+
+Waste Source -> Collection -> Pressed to bales -> Paper mill + Dried -> Sold to paper makers
+
+In Denmark >130 companies doing Transportation or Paper mill + drying. Here are some of the more serious ones:
+
+- https://www.denovarc.dk
+- https://dk-miljoe.dk/
+- https://www.hartmann-packaging.com/
+
+## Cardboard:
+
+The process of recycling cardboard is similar to paper.[5]
+
+Waste Source -> Collection -> Pressed to bales -> Cardboard mill -> Sold to paper makers
+
+:w
+
+
+
+
+## Dirt:
+
+- http://compsoil.dk/
+
+
+
+
+
+
 ## References:
 [1]: [Altinget, Danish Political Newsplatform](https://www.altinget.dk/hovedstaden/artikel/koebenhavnerne-sorterer-affald-som-aldrig-foer-alligevel-er-genanvendelsen-kun-steget-faa-procent)
 [2]: [Vestforbrænding, Danish Energy Company, Food waste](https://vestfor.dk/bliv-klogere/viden/madaffald)
 [3]: [Danish Department of Environment, Full report 2024](https://www2.mst.dk/Udgiv/publikationer/2024/11/978-87-7038-665-4.pdf)
+[4]: [Danish registry for waste handling companies](https://ens.dk/forsyning-og-forbrug/affaldsregistret)
+[5]: [Red Office Cardboard distributer for offices](https://konpap.dk/hvordan-genanvendes-papir)
