@@ -1,0 +1,146 @@
+
+// Visualize with Sankey view: https://sankeymatic.com/build/
+// Height 950, Width 1900
+// Source [AMOUNT] Target
+
+// Colors:
+// Blue: Problem identified, Company already doing it (#0000FF)
+// Red: No problem identified, No need or money (#FF0000)
+// Green: Problem identified, Company not doing it (#00FF00)
+// Yellow: Unknown, need more information (#FFFF00)
+// Gray: Not relevant (#808080)
+
+// Color = :Budget #057 
+// Color = Budget [160] Other Necessities #606
+// Rest  = Budget [*] Savings
+
+// Row 1: Waste sources
+
+Household(55%) [3139] Danish Waste
+Service(60%) [1574] Danish Waste
+Industry(74%) [1147] Danish Waste
+Building and demolition(87%) [5213] Danish Waste
+Other(60%) [1118] Danish Waste
+Not Identified [8684] Danish Waste
+
+:Household(55%) #808080
+:Service(60%) #808080
+:Industry(74%) #808080
+:Building and demolition(87%) #808080
+:Other(60%) #808080
+:Danish Waste #808080
+:Not Identified #808080
+
+Foreign [532] Incineration
+Danish Waste [3146] Residual Waste
+Residual Waste [3146] Law (1/1/2025) #FFFF00
+Law (1/1/2025) [3146] Incineration #FFFF00
+
+:Foreign #808080
+:Residual Waste #808080
+:Law (1/1/2025) #FFFF00
+:Incineration #808080
+
+Danish Waste [401] Food Waste
+Danish Waste [183] Paper
+Danish Waste [415] Cardboard
+Danish Waste [41] Glass
+Danish Waste [363] Wood
+Danish Waste [53] Plastic
+Danish Waste [1018] Metal
+Danish Waste [6] Textile
+Danish Waste [77] Electronics
+Danish Waste [872] Garden Waste
+Danish Waste [3996] Building and demolition
+Danish Waste [467] Dangerous Waste
+Danish Waste [9837] Dirt
+
+:Food Waste #808080
+:Paper #808080
+:Cardboard #808080
+:Glass #808080
+:Wood #808080
+:Plastic #808080
+:Metal #808080
+:Textile #808080
+:Electronics #808080
+:Garden Waste #808080
+:Building and demolition #808080
+:Dangerous Waste #808080
+:Dirt #808080
+
+// Food waste
+
+Food Waste [401] Sorting + Pulping (Gemidan) #00FF00
+
+:Sorting + Pulping (Gemidan) #00FF00
+
+Sorting + Pulping (Gemidan) [401] Biogas Plant #00FF00
+
+:Biogas Plant #00FF00
+
+Biogas Plant [300] Energy
+Biogas Plant [101] Fertilizer
+
+:Energy #808080
+:Fertilizer #808080
+
+// Paper and Cardboard
+
+Paper [183] P&C (Sorting) #FFFF00
+Cardboard [415] P&C (Sorting) #FFFF00
+
+:P&C (Sorting) #FFFF00
+
+P&C (Sorting) [598] Paper Mill (Hartmann) #00FF00
+
+:Paper Mill (Hartmann) #00FF00
+
+Paper Mill (Hartmann) [598] New Products #00FF00
+
+:New Products #808080
+
+// Glass
+
+Glass [20] Direct Sorting #FFFF00
+Direct Sorting [5] Remelting #FFFF00
+Glass [21] Remelting #808080
+Direct Sorting [15] New Bottles #FFFF00
+Remelting [26] New Bottles #808080
+
+:Direct Sorting #FFFF00
+:Remelting #FFFF00
+:New Bottles #808080
+
+// Plastics
+
+Plastic [53] Sorting #0000FF
+
+:Sorting #0000FF
+
+Sorting [53] Recycling #0000FF
+
+:Recycling #0000FF
+
+Recycling [25] New Plastic Products #808080
+Recycling [28] Incineration #808080
+
+:New Plastic Products #808080
+:Incineration #808080
+
+// Dirt
+
+Dirt [8837] Dirt Sorting #FF0000
+Dirt [1000] Dumping #808080
+
+:Dirt Sorting #FF0000
+:Dumping #808080
+
+Dirt Sorting [8837] Reuse #808080
+
+:Reuse #808080
+
+
+
+
+

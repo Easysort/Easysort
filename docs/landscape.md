@@ -25,18 +25,18 @@ Copenhagen Municipality:
 | Fraction | 2022 (1000 tons) | Amount burned/landfilled (%) |
 |----------|------|
 | Waste for incineration | 956 | 95% |
-| Residual waste | 1380 | 100% |
-| Food waste | 401 | 100% |
-| Paper | 183 | 100% |
-| Cardboard | 415 | 100% |
-| Glass | 41 | 100% |
-| Wood | 363 | 100% |
-| Plastic | 53 | 100% |
-| Metal | 1018 | 100% |
-| Textile | 6 | 100% |
+| Residual waste | 1380 | -- |
+| Food waste | 401 | -- |
+| Paper | 183 | -- |
+| Cardboard | 415 | -- |
+| Glass | 41 | -- |
+| Wood | 363 | -- |
+| Plastic | 53 | -- |
+| Metal | 1018 | -- |
+| Textile | 6 | -- |
 | Electronics | 77 | 83% |
-| Garden waste | 872 | 100% |
-| Mixed construction and demolition waste | 3996 | 100% |
+| Garden waste | 872 | -- |
+| Mixed construction and demolition waste | 3996 | -- |
 | Dangerous waste | 467 | 39%/19% |
 | Dirt | 9837 | 14% |
 
@@ -146,14 +146,30 @@ The process of recycling cardboard is similar to paper.[5]
 
 Waste Source -> Collection -> Pressed to bales -> Cardboard mill -> Sold to paper makers
 
-:w
+## Glass
 
+Glass can be handled two different ways:
 
+1. Sorted extremely specifically and then reuse directly as glass bottles
+2. Shards of glass are melted into new bottles
 
+(1.) is much less energy intensive and hence the best solution. (2.) is good, if the objects are broken or bottles is of low quality. 
+
+Waste Source -> Collection -> Sorting -> Whole Bottles/Shards
+Whole bottles -> Sorting -> New Bottles
+Shards -> Remelting -> New Bottles
+
+- http://www.flaskegenbrug.dk/
+- https://www.reiling.dk/ (55 56 57 22)
+- https://www.ardaghgroup.com/glass/europe/ardagh-group-holmegaard-dk/ (55 54 62 00)
 
 ## Dirt:
 
+Traditional sorting is super efficient for dirt. Usually analyzed into 5 different types based on the purity [7].
+Getting the dirt handled and sorted properly is fairly cheap, but dumping is easier/cheaper, hence we have issues with dumping on landfields [8].
+
 - http://compsoil.dk/
+- https://mis.dk/
 
 
 
@@ -166,3 +182,7 @@ Waste Source -> Collection -> Pressed to bales -> Cardboard mill -> Sold to pape
 [3]: [Danish Department of Environment, Full report 2024](https://www2.mst.dk/Udgiv/publikationer/2024/11/978-87-7038-665-4.pdf)
 [4]: [Danish registry for waste handling companies](https://ens.dk/forsyning-og-forbrug/affaldsregistret)
 [5]: [Red Office Cardboard distributer for offices](https://konpap.dk/hvordan-genanvendes-papir)
+[6]: [Danish Department of Statistics, Waste](https://www.statistikbanken.dk/affald)
+[7]: [JunkBusters, Dirt analysis](https://www.junkbusters.dk/affaldstyper/jord/)
+[8]: [Danish Radio Station (National TV station), Contamiated dirt ends up on landfields](https://www.dr.dk/nyheder/indland/aegtepars-udsigt-forsvandt-da-transportgigant-dumpede-450000-tons-jord-paa-naboens)
+[9]: [FORS, Detailed explanation of each waste fraction](https://www.fors.dk/affald/afhentning-af-affald/hvad-sker-der-med-affaldet/)

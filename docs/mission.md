@@ -15,3 +15,7 @@ In the future, robots and intelligent systems will be perform many tasks for hum
 
 We want to make sure that robots doing key tasks in society are open-sourced: not owned by a company that can control you, but freely available to everyone. 
 This is why we are open-sourcing everything we do.
+
+# Vision:
+
+- Do we really want tech billionaries or do we really want tech: https://asiatimes.com/2024/07/chinas-subsidies-create-not-destroy-value/# + Hefie model for goverment VC funds
