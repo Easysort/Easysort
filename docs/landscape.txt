@@ -105,11 +105,11 @@ Paper Mill (Hartmann) [598] New Products #00FF00
 Glass [20] Direct Sorting #FFFF00
 Direct Sorting [5] Remelting #FFFF00
 Glass [21] Remelting #808080
-Direct Sorting [15] New Bottles #FFFF00
+Direct Sorting [15] New Bottles #FF0000
 Remelting [26] New Bottles #808080
 
 :Direct Sorting #FFFF00
-:Remelting #FFFF00
+:Remelting #FF0000
 :New Bottles #808080
 
 // Plastics
