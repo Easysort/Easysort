@@ -1,0 +1,25 @@
+site_name: My Project Docs
+site_url:  https://docs.myproject.dev          # your custom domain (optional)
+
+theme:
+  name: material
+  logo: assets/logo.png
+  favicon: assets/favicon.png
+  palette:
+    scheme: slate     # built‑in dark mode
+    primary: cyan
+    accent: indigo
+
+nav:
+  - Home: index.md
+  - Getting Started: getting‑started.md
+  - API:
+      - REST: api/rest.md
+      - Python: api/python.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.extra
+  - pymdownx.highlight
+  - toc:
+      permalink: true
