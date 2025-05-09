@@ -1,25 +1,41 @@
-site_name: My Project Docs
-site_url:  https://docs.myproject.dev          # your custom domain (optional)
+site_name: Easysort Docs
+repo_url: https://github.com/easysort/easysort
+site_url: https://docs.easysort.org
+
+exclude_docs: README.md
+
+strict: true
+docs_dir: docs
+site_dir: docs_site/
 
 theme:
-  name: material
-  logo: assets/logo.png
-  favicon: assets/favicon.png
-  palette:
-    scheme: slate     # built‑in dark mode
-    primary: cyan
-    accent: indigo
+  name: readthedocs
+  navigation_depth: 3
 
 nav:
-  - Home: index.md
-  - Getting Started: getting‑started.md
-  - API:
-      - REST: api/rest.md
-      - Python: api/python.md
-
-markdown_extensions:
-  - admonition
-  - pymdownx.extra
-  - pymdownx.highlight
-  - toc:
-      permalink: true
+  - Getting Started:
+    - What is Easysort?: what-is-easysort.md
+    - Run Easysort: run-easysort.md
+  # - How-to:
+  #   - Turn the speed blue: how-to/turn-the-speed-blue.md
+  #   - Connect to a comma 3/3X: how-to/connect-to-comma.md
+  #   # - Make your first pull request: how-to/make-first-pr.md
+  #   #- Replay a drive: how-to/replay-a-drive.md
+  # - Concepts:
+  #   - Logs: concepts/logs.md
+  #   - Safety: concepts/safety.md
+  #   - Glossary: concepts/glossary.md
+  # - Car Porting:
+  #   - What is a car port?: car-porting/what-is-a-car-port.md
+  #   - Porting a car brand: car-porting/brand-port.md
+  #   - Porting a car model: car-porting/model-port.md
+  # - Contributing:
+  #   - Roadmap: contributing/roadmap.md
+  #   #- Architecture: contributing/architecture.md
+  #   - Contributing Guide →: https://github.com/commaai/openpilot/blob/master/docs/CONTRIBUTING.md
+  # - Links:
+  #   - Blog →: https://blog.comma.ai
+  #   - Bounties →: https://comma.ai/bounties
+  #   - GitHub →: https://github.com/commaai
+  #   - Discord →: https://discord.comma.ai
+  #   - X →: https://x.com/comma_ai
