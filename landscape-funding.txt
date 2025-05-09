@@ -1,0 +1,18 @@
+
+// Visualize with Sankey view: https://sankeymatic.com/build/
+// Source [AMOUNT] Target
+
+// Colors:
+// Blue: Good opportunity, Company already doing it (#0000FF)
+// Red: Bad opportunity, No need or money (#FF0000)
+// Green: Good opportunity, Company not doing it (#00FF00)
+// Yellow: Unknown, need more information (#FFFF00)
+
+// Funding:
+
+Copenhagen Municipality (mil. DKK) [600] Waste Handling #004
+Copenhagen Municipality (mil. DKK) [200] Waste Sorting Points #004
+
+
+
+

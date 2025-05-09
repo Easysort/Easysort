@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://docs.easysort.org/projects/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Projects and subtasks - Easysort Docs</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Projects and subtasks";
+        var mkdocs_page_input_path = "projects.md";
+        var mkdocs_page_url = "/projects/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> Easysort Docs
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption"><span class="caption-text">Getting Started</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../what-is-easysort/">What is Easysort?</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../run-easysort/">Run Easysort</a>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">Easysort Docs</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Projects and subtasks</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/easysort/easysort/edit/master/docs/projects.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="projects-and-subtasks">Projects and subtasks</h1>
+<p>This document outlines the projects needed to prove robotic sorting can be done reliably and at a low cost.
+Truely scaling operations comes after.</p>
+<p>Each project has a list of subtasks. Some subtasks might be missing, and will be added when we find them.</p>
+<p>This list is updated every Sunday by @Apros7 (Lucas Vilsen)</p>
+<h3 id="reliable-tracking-and-path-planning">Reliable tracking and path planning</h3>
+<p>We need to reliably be able to track the position of an object in 3d space, it's position over time on the conveyor belt, and plan the best path for the robot to pick up the object. We use an Intel Realsense D435 Stereo Camera. The inference pipeline outputs a bounding box and a pickup point. Based on the center point, we can get a 3d position of the object at a specific time. This point should then be tracked, a plan should be made, and the robot should perform the path to pick up the object.</p>
+<ul>
+<li>[x] Get pickup point from AI inference pipeline</li>
+<li>[x] Get depth data from pickup point</li>
+<li>[ ] Calculate 3d position of object accurately (&lt;1cm error)</li>
+<li>[ ] Track object over time</li>
+<li>[ ] Be able to follow object over time with the robot</li>
+<li>[ ] Calculate path to pickup object with the robot (<a href="https://github.com/Easysort/Easysort/issues/39">Issue #39</a>)</li>
+</ul>
+<h3 id="automated-data-collection-and-selection-for-labelling">Automated data collection and selection for labelling</h3>
+<p>Data collection is happening at all times when the robot is running. The data should be automatically uploaded. The images should be run through our model, based on active learning methods (other uncertainty methods?) pick the datapoints needed for training, and automate the labelling process.</p>
+<ul>
+<li>[x] Upload data automatically </li>
+<li>[ ] Run images through model</li>
+<li>[ ] Perform active learning to select datapoints for labelling</li>
+<li>[ ] Send datapoints to be labelled</li>
+<li>[ ] Workflow for downloaded labelled data</li>
+<li>[ ] Released first 1000 labelled images for public use</li>
+</ul>
+<h3 id="standardization-of-training-and-inference">Standardization of training and inference</h3>
+<p>The training and inference pipeline should be standardised. This will allow us to test new models and ideas faster.</p>
+<ul>
+<li>[ ] Standardize training pipeline</li>
+<li>[ ] Standardize inference pipeline</li>
+<li>[ ] Use Neptune for logging</li>
+<li>[ ] Be able to evaluate any model from Neptune with a single workflow</li>
+</ul>
+<h3 id="stability-and-speed-of-robot">Stability and speed of robot</h3>
+<p>We need to be able to run the robot at full speed with no stability issues. This requires a proper frame design, figuring out how to mount the robot, and test of speed and limitation.</p>
+<ul>
+<li>[ ] Design frame</li>
+<li>[ ] Manifacture frame</li>
+<li>[ ] Test stability</li>
+<li>[ ] Design robot mount</li>
+<li>[ ] Construct robot mount</li>
+<li>[ ] Test speed</li>
+</ul>
+<h3 id="reliable-operation">Reliable operation</h3>
+<p>A realiable process for how to process a bag of waste from drop off to sorting to output fractions needs to be established. What exactly is required for this to happen, how to we setup a small scale operation to test our approach, and what should the floor plan look like?</p>
+<ul>
+<li>[ ] Design floor plan</li>
+<li>[ ] Process requirements</li>
+<li>[ ] Design process flow</li>
+</ul>
+<h3 id="product-market-fit">Product market fit</h3>
+<p>We need to find the right customers. Our long vision is set, but we need to find the right customers in the short term to start scaling operations and make the business sustainable.</p>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/easysort/easysort" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
