@@ -1,41 +1,70 @@
-site_name: Easysort Docs
-repo_url: https://github.com/easysort/easysort
+site_name: EasySort Documentation
+repo_url: https://github.com/EasySort/easysort
 site_url: https://docs.easysort.org
-
-exclude_docs: README.md
-
-strict: true
-docs_dir: docs
-site_dir: docs_site/
+site_description: Documentation for EasySort - An open-source waste sorting system
+site_author: EasySort Team
 
 theme:
-  name: readthedocs
-  navigation_depth: 3
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - toc.follow
+  palette:
+    # Light mode
+    - scheme: default
+      primary: green
+      accent: green
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: black
+      accent: green
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
 
 nav:
-  - Getting Started:
-    - What is Easysort?: what-is-easysort.md
-    - Run Easysort: run-easysort.md
-  # - How-to:
-  #   - Turn the speed blue: how-to/turn-the-speed-blue.md
-  #   - Connect to a comma 3/3X: how-to/connect-to-comma.md
-  #   # - Make your first pull request: how-to/make-first-pr.md
-  #   #- Replay a drive: how-to/replay-a-drive.md
-  # - Concepts:
-  #   - Logs: concepts/logs.md
-  #   - Safety: concepts/safety.md
-  #   - Glossary: concepts/glossary.md
-  # - Car Porting:
-  #   - What is a car port?: car-porting/what-is-a-car-port.md
-  #   - Porting a car brand: car-porting/brand-port.md
-  #   - Porting a car model: car-porting/model-port.md
-  # - Contributing:
-  #   - Roadmap: contributing/roadmap.md
-  #   #- Architecture: contributing/architecture.md
-  #   - Contributing Guide →: https://github.com/commaai/openpilot/blob/master/docs/CONTRIBUTING.md
-  # - Links:
-  #   - Blog →: https://blog.comma.ai
-  #   - Bounties →: https://comma.ai/bounties
-  #   - GitHub →: https://github.com/commaai
-  #   - Discord →: https://discord.comma.ai
-  #   - X →: https://x.com/comma_ai
+  - GETTING STARTED:
+    - index.md
+    - Quick-start: getting-started/quick-start.md
+  - ABOUT EASYSORT:
+    - Our Mission: why/mission.md
+    - Waste Landscape: why/landscape.md
+    - Market Players: why/competitors.md
+    - Industry Funding: why/funding.md
+  - THE SOLUTION:
+    - What we offer: products/index.md
+  - CONTRIBUTING:
+    - How to contribute: contributing/index.md
+    - Our projects: contributing/projects.md
+    - Our current priorities: contributing/plan-for-victory.md
+    - What we still don't know: contributing/open-questions.md
+  - LINKS:
+    - Website: https://easysort.org
+    - Github: https://github.com/easysort
