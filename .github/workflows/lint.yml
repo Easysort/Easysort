@@ -3,6 +3,8 @@ name: build-and-deploy-docs
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 permissions:            # ← NEW (top‑level applies to every job)
   contents: write        # allow git push via GITHUB_TOKEN
