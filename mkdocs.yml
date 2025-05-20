@@ -1,53 +1,8 @@
-site_name: EasySort Documentation
+site_name: Easysort Documentation
 repo_url: https://github.com/EasySort/easysort
 site_url: https://docs.easysort.org
-site_description: Documentation for EasySort - An open-source waste sorting system
-site_author: EasySort Team
-
-theme:
-  name: material
-  features:
-    - navigation.instant
-    - navigation.tracking
-    - navigation.sections
-    - navigation.expand
-    - navigation.top
-    - search.suggest
-    - search.highlight
-    - toc.follow
-  palette:
-    # Light mode
-    - scheme: default
-      primary: green
-      accent: green
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    # Dark mode
-    - scheme: slate
-      primary: black
-      accent: green
-      toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
-
-extra_css:
-  - stylesheets/extra.css
-
-markdown_extensions:
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.inlinehilite
-  - pymdownx.snippets
-  - pymdownx.superfences
-  - admonition
-  - pymdownx.details
-  - pymdownx.tabbed:
-      alternate_style: true
-  - toc:
-      permalink: true
-  - attr_list
-  - md_in_html
+site_description: Documentation for Easysort - An open-source waste sorting system
+site_author: Easysort Team
 
 nav:
   - GETTING STARTED:
@@ -68,3 +23,87 @@ nav:
   - LINKS:
     - Website: https://easysort.org
     - Github: https://github.com/easysort
+    - Pitch Deck: https://easysort.org/pitch-deck.pdf
+    - 2 Page Summary: https://easysort.org/2-page-summary.pdf
+
+extra_css:
+  - stylesheets/extra.css
+
+validation:
+  links:
+    anchors: warn
+
+markdown_extensions:
+- attr_list
+- admonition
+- footnotes
+- pymdownx.details
+- pymdownx.emoji:
+    emoji_index: !!python/name:material.extensions.emoji.twemoji
+    emoji_generator: !!python/name:material.extensions.emoji.to_svg
+- pymdownx.highlight:
+    pygments_lang_class: true
+- pymdownx.inlinehilite:
+    style_plain_text: python
+- pymdownx.magiclink
+- pymdownx.snippets:
+    base_path: [!relative $config_dir]
+    check_paths: true
+- pymdownx.superfences
+- pymdownx.tabbed:
+    alternate_style: true
+    slugify: !!python/object/apply:pymdownx.slugs.slugify
+      kwds:
+        case: lower
+- pymdownx.tasklist:
+    custom_checkbox: true
+- pymdownx.tilde
+- toc:
+    permalink: "¤"
+
+theme:
+  name: material
+  logo: assets/easysort-small-logo-white.png
+  favicon: assets/easysort-logo.png
+  features:
+  - announce.dismiss
+  - content.action.edit
+  - content.action.view
+  - content.code.annotate
+  - content.code.copy
+  - content.tooltips
+  - navigation.footer
+  - navigation.indexes
+  - navigation.sections
+  - navigation.expand
+  - navigation.top
+  - navigation.path
+  - search.highlight
+  - search.suggest
+  - toc.follow
+  - toc.integrate
+  palette:
+    scheme: slate
+    primary: black
+    accent: lime
+  palette:
+    - media: "(prefers-color-scheme)"
+      accent: lime
+      primary: black
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      accent: lime
+      primary: black
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      accent: lime
+      primary: black
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
