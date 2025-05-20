@@ -5,4 +5,4 @@ lint:
     uv run pre-commit run --all-files
 
 dev:
-    uv run easysort/sorting/pipeline.py
+    DEBUG=1 uv run easysort/sorting/pipeline.py
