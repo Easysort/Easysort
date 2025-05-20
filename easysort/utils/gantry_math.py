@@ -52,7 +52,7 @@ if __name__ == "__main__":
 
     point2 = np.array([0.5 * REALSENSE_WIDTH, 0 * REALSENSE_HEIGHT])
     depth2 = 48
-    print("running function")   
+    print("running function")
     x, y, z = realsense2gantry(point2, depth2)
     print("--- done ---")
     print("Gantry point 2:")
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     point3 = np.array([0.5 * REALSENSE_WIDTH, 1 * REALSENSE_HEIGHT])
     depth3 = 48
-    print("running function")   
+    print("running function")
     x, y, z = realsense2gantry(point3, depth3)
     print("--- done ---")
     print("Gantry point 3:")
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     point3 = np.array([0 * REALSENSE_WIDTH, 0 * REALSENSE_HEIGHT])
     depth3 = 48
-    print("running function")   
+    print("running function")
     x, y, z = realsense2gantry(point3, depth3)
     print("--- done ---")
     print("Gantry point 4:")
@@ -79,7 +79,7 @@ if __name__ == "__main__":
 
     point3 = np.array([0.2 * REALSENSE_WIDTH, 0.8 * REALSENSE_HEIGHT])
     depth3 = 48
-    print("running function")   
+    print("running function")
     x, y, z = realsense2gantry(point3, depth3)
     print("--- done ---")
     print("Gantry point 5:")

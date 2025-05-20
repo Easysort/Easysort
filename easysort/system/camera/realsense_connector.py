@@ -2,7 +2,7 @@ from easysort.utils.detections import Detection
 from typing import Tuple
 import time
 import numpy as np
-import pyrealsense2 as rs
+import pyrealsense2 as rs # type: ignore
 import os
 import sys
 from collections import OrderedDict
@@ -62,7 +62,6 @@ class RealSenseConnector:
         return np.asanyarray(color_frame), timestamp
 
     def get_depth_for_detection(self, detection: Detection) -> float:
-        return 10
         assert detection.timestamp is not None
         depth_array = self._depth_cache.get(detection.timestamp)
         if depth_array is None: return -1

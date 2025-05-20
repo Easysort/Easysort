@@ -1,5 +1,6 @@
-from tinygrad.examples.yolov8 import YOLOv8
-from tinygrad.tinygrad import Tensor
+# pylint: disable=no-name-in-module
+from tinygrad.examples.yolov8 import YOLOv8 # pylint: disable=no-name-in-module
+from tinygrad.tinygrad import Tensor # pylint: disable=no-name-in-module
 
 import cv2
 import supervision as sv

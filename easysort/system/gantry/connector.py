@@ -10,7 +10,6 @@ import numpy as np
 from easysort.system.camera.camera_connector import CameraConnector
 from easysort.system.camera.realsense_connector import RealSenseConnector, f_x, f_y, c_x, c_y
 import cv2
-import matplotlib.pyplot as plt
 
 _LOGGER = EasySortLogger()
 _MAX_TIME_TO_WAIT_FOR_MOVEMENT_MESSAGE = 5 # seconds
@@ -44,7 +43,7 @@ class GantryConnector:
         self.arduino_time_offset: float = 0.0
         self._sync_time()
         self.camera = camera
-        self.start_pos_offset = np.array([37, 0, -11]) # Offset from start position to marker position 
+        self.start_pos_offset = np.array([37, 0, -11]) # Offset from start position to marker position
 
     def go_to(self, x: int, y: int, z: int) -> None:
         self.send_information((x, y, z), self.suction_state)
@@ -64,7 +63,7 @@ class GantryConnector:
         except serial.SerialException as err:
             open_ports = [port.device for port in serial.tools.list_ports.comports()]
             raise serial.SerialException(f"No open port at {self.port}, instead use one of: {open_ports}") from err
-        
+
     def calibrate(self) -> np.ndarray: # Returns camera position to robot coordinate system transformation matrix
         while not self.is_ready: pass
         self.go_to(*self.start_pos_offset)
@@ -74,14 +73,14 @@ class GantryConnector:
             color_image, _ = self.camera.get_color_image()
             this_aruco_dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
             this_aruco_parameters = cv2.aruco.DetectorParameters()
-            corners, marker_ids, rejected = cv2.aruco.detectMarkers(
+            corners, marker_ids, _ = cv2.aruco.detectMarkers( # type: ignore
                 color_image, this_aruco_dictionary, parameters=this_aruco_parameters
             )
-            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, .03, mtx, dst)
-            
+            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, .03, mtx, dst) # type: ignore
+
             if marker_ids is None or len(marker_ids) == 0:
                 raise Exception("No marker found")
-            
+
             if 216 not in marker_ids: raise Exception("No marker found")
             i = np.where(marker_ids == 216)[0][0]
             R_m, _ = cv2.Rodrigues(rvecs[i])
@@ -118,51 +117,12 @@ class GantryConnector:
             _LOGGER.error(f"Time sync failed: {e}")
 
     def pickup_detection(self, detection: Detection) -> None:
+        if detection._robot_center_point is None:
+            _LOGGER.error(f"Detection robot center point is None for detection: {detection}")
+            return
         dx, dy, dz = detection._robot_center_point
         print("Picking up detection: ", dx, dy, dz)
         dx, dy, dz = int(dx), int(dy), int(dz)
-        if detection.timestamp is None:
-            _LOGGER.error(f"Detection timestamp is None for detection: {detection}")
-            return
-        detection_time = self.start_time - detection.timestamp + self.arduino_time_offset
-        time.sleep(10)
-        return
-        self.go_to(dx, dy, dz)
-        while not self.is_ready: pass
-        self.suction_on()
-        while not self.is_ready: pass
-        self.go_to(0, 0, 0)
-        while not self.is_ready: pass
-        self.suction_off()
-        while not self.is_ready: pass
-        # tx, ty, tz = (10, 0, 0)
-        # rx, ry, rz = (0, 0, 0)
-        # ds, ts, rs = (1, 0, 0)
-        # instructions = f"pickup({dx},{dy},{dz},{ds}).({tx},{ty},{tz},{ts}).({rx},{ry},{rz},{rs}).({detection_time})"
-        # try: self.ser.write(instructions.encode())
-        # except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
-
-    def _sync_time(self) -> None:
-        """
-        Get time offset between Arduino startup and connector startup
-        """
-        while not self.is_ready: pass
-        self.ser.reset_input_buffer()
-        self.ser.write(b"SYNC?\n")
-        while not self.ser.in_waiting: pass
-        not_ready_msg = self.ser.readline().decode().strip()
-        assert not_ready_msg == "-NOT-READY-"
-        while not self.ser.in_waiting: pass
-        message = self.ser.readline().decode().strip()
-        try:
-            arduino_ms = float(message) / 1000.0  # Convert Arduino milliseconds to seconds
-            self.arduino_time_offset = (time.time() - self.start_time) - arduino_ms
-            _LOGGER.info(f"Time sync established. Arduino offset: {self.arduino_time_offset}")
-        except (ValueError, serial.SerialException) as e:
-            _LOGGER.error(f"Time sync failed: {e}")
-
-    def pickup_detection(self, detection: Detection) -> None:
-        dx, dy, dz = detection.center_point
         if detection.timestamp is None:
             _LOGGER.error(f"Detection timestamp is None for detection: {detection}")
             return
@@ -208,7 +168,8 @@ class GantryConnector:
         self.ser.close()
 
 if __name__ == "__main__":
-    connector = GantryConnector(Environment.GANTRY_PORT)
+    camera = CameraConnector()
+    connector = GantryConnector(Environment.GANTRY_PORT, camera)
     time.sleep(5)
     detection = Detection(box=np.array([0, 0, 100, 100]), timestamp=time.time())
     # while not connector.is_ready: pass

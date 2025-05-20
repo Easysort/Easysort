@@ -5,7 +5,6 @@ from easysort.common.environment import Environment
 from easysort.utils.image_sample import VideoMetadata
 from datetime import datetime
 
-import time
 import cv2
 
 class Observer:
@@ -13,9 +12,9 @@ class Observer:
         self.camera = RealSenseConnector()
         self.image_registry = ImageRegistry()
 
-    def observe_single_class(self, type: str):
+    def observe_single_class(self, type_name: str):
         metadata = VideoMetadata(date=datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), robot_id=Environment.CURRENT_ROBOT_ID)
-        metadata.uuid = metadata.uuid + "_" + type
+        metadata.uuid = metadata.uuid + "_" + type_name
         self.image_registry.set_video_metadata(metadata)
         while True:
             color_image, timestamp = self.camera.get_color_image()

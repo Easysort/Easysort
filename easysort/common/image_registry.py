@@ -41,7 +41,7 @@ class ImageRegistry:
 
     def exists(self, uuid: str) -> bool:
         return Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid)).exists()
-    
+
     def cleanup(self, min_len: int = 10) -> None:
         for path in set([p.parent for p in Path(Environment.IMAGE_REGISTRY_PATH).glob("**/*.sample")]):
             if len(list(path.glob("*.sample"))) < min_len:
