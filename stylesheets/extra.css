@@ -1,0 +1,36 @@
+
+.md-nav__item--section > .md-nav__link {
+    color: #444444 !important;
+    font-weight: 700 !important;
+    font-size: 1.2em !important;
+    padding: 0 0 0 0 !important;
+    letter-spacing: 0.05em !important;
+    border-bottom: 2px solid #444444 !important;
+    text-transform: uppercase !important;
+    display: block !important;
+}
+
+.md-nav__item .md-nav__item {
+    padding-left: 12px !important;
+}
+
+.md-content h1 {
+    font-weight: 700 !important;
+    font-size: 2em !important;
+    color: #000000 !important;
+    margin-bottom: 1em !important;
+}
+
+.md-content h2 {
+    font-weight: 600 !important;
+    font-size: 1.5em !important;
+    color: #222222 !important;
+    margin-top: 1.5em !important;
+    margin-bottom: 0.8em !important;
+}
+
+.md-content h3 {
+    font-weight: 600 !important;
+    font-size: 1.2em !important;
+    color: #333333 !important;
+}
