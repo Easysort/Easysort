@@ -23,12 +23,12 @@ def visualize_sorting_pipeline_image(
     font_scale  : override font size (0.35 ≈ readable on 1080 p).
     """
     out = image.copy()
-    H, W = out.shape[:2]
+    H, W = out.shape[:2] # pylint: disable=unused-variable
 
     def color_for(cls: str) -> tuple[int, int, int]:
         hue = hash(cls) % 179
-        hsv = np.uint8([[[hue, 230, 230]]])
-        return tuple(int(c) for c in cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)[0, 0])
+        hsv = np.uint8([[[hue, 230, 230]]]) # type: ignore
+        return tuple(int(c) for c in cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)[0, 0]) # type: ignore
 
     for d in detections:
         x1, y1, x2, y2 = map(int, d.xyxy)

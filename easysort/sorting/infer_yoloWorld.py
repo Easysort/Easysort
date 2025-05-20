@@ -9,7 +9,7 @@ import numpy as np
 import torch
 
 from easysort.common.logger import EasySortLogger
-from easysort.utils.detections import Detection, Detections
+from easysort.utils.detections import Detection
 from inference.models.yolo_world.yolo_world import YOLOWorld
 import time
 from easysort.common.timer import TimeIt
@@ -88,7 +88,7 @@ test_yoloworld_classes = [
     "soda can",
     "paper_document",
     "plastic_wrap",
-    "snack_box", 
+    "snack_box",
     "cardboard_box",
     "plastic_lid"
 ]
@@ -105,7 +105,7 @@ class ClassifierYoloWorld:
         results = self.model.infer(image)
         detections = []
         for prediction in results.predictions:
-            bbox = np.array([prediction.x - prediction.width/2, prediction.y + prediction.height/2, 
+            bbox = np.array([prediction.x - prediction.width/2, prediction.y + prediction.height/2,
                              prediction.x + prediction.width/2, prediction.y - prediction.height/2])
             detections.append(Detection(
                 box=bbox,

@@ -2,21 +2,28 @@ name: build-and-deploy-docs
 
 on:
   push:
-    branches: [ main ]          # rebuild on every push to main
-  workflow_dispatch:            # manual trigger button
+    branches: [ main ]
+
+permissions:            # ← NEW (top‑level applies to every job)
+  contents: write        # allow git push via GITHUB_TOKEN
 
 jobs:
   docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4   # leaves the token in the origin URL
+        with:
+          fetch-depth: 0            # mkdocs needs history for version plug‑ins
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with: { python-version: '3.x' }
 
       - name: Install MkDocs
-        run:  pip install mkdocs mkdocs-material
+        run: pip install mkdocs mkdocs-material
 
       - name: Deploy to gh-pages
-        run:  mkdocs gh-deploy --force --clean     # builds + pushes
+        env:
+          # mkdocs/ghp‑import will read this automatically
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mkdocs gh-deploy --force --clean

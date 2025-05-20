@@ -5,8 +5,7 @@ import argparse
 from pathlib import Path
 from tqdm import tqdm
 
-from easysort.common.image_registry import SupabaseHelper, ImageRegistry
-from easysort.common.environment import Environment
+from easysort.common.image_registry import ImageRegistry
 from easysort.sorting.pipeline import SortingPipeline
 from easysort.visualize.helpers import visualize_sorting_pipeline_image
 

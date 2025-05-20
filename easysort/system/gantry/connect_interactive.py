@@ -4,6 +4,7 @@ import tty
 
 from easysort.system.gantry.connector import GantryConnector
 from easysort.common.environment import Environment
+from easysort.system.camera.camera_connector import CameraConnector
 
 def get_key():
     fd = sys.stdin.fileno()
@@ -16,7 +17,7 @@ def get_key():
     return ch
 
 if __name__ == "__main__":
-    connector = GantryConnector(Environment.GANTRY_PORT, None)
+    connector = GantryConnector(Environment.GANTRY_PORT, CameraConnector())
     x, y, z = 0, 0, 0
 
     while True:
