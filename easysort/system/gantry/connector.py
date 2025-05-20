@@ -79,9 +79,9 @@ class GantryConnector:
             rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, .03, mtx, dst) # type: ignore
 
             if marker_ids is None or len(marker_ids) == 0:
-                raise Exception("No marker found")
+                raise RuntimeError("No marker found")
 
-            if 216 not in marker_ids: raise Exception("No marker found")
+            if 216 not in marker_ids: raise RuntimeError("No marker found")
             i = np.where(marker_ids == 216)[0][0]
             R_m, _ = cv2.Rodrigues(rvecs[i])
             t_m = tvecs[i].reshape((3, 1))
@@ -93,7 +93,7 @@ class GantryConnector:
             T_C_R = None
         self.go_to(0,0,0)
         while not self.is_ready: pass
-        if T_C_R is None: raise Exception("Failed to calibrate")
+        if T_C_R is None: raise RuntimeError("Failed to calibrate - no valid transformation matrix found")
         print("Transform matrix: ", T_C_R)
         return np.linalg.inv(T_C_R)
 
