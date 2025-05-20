@@ -1,8 +1,8 @@
 <div align="center">
 
-<h1 style="font-size: 3em">EasySort</h1>
+<h1 style="font-size: 7em">Easysort</h1>
 
-EasySort: An open-source waste sorting system. Maintained by [EasySort](https://github.com/Easysort).
+Easysort: An open-source waste sorting system. Maintained by [EasySort](https://github.com/Easysort).
 
 [Website](https://easysort.org) • [Documentation](https://docs.easysort.org) • [Discord](https://discord.com/invite/2Bh3SBFbdP)
 </div>
