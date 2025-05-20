@@ -1,41 +1,109 @@
-site_name: Easysort Docs
-repo_url: https://github.com/easysort/easysort
+site_name: Easysort Documentation
+repo_url: https://github.com/EasySort/easysort
 site_url: https://docs.easysort.org
-
-exclude_docs: README.md
-
-strict: true
-docs_dir: docs
-site_dir: docs_site/
-
-theme:
-  name: readthedocs
-  navigation_depth: 3
+site_description: Documentation for Easysort - An open-source waste sorting system
+site_author: Easysort Team
 
 nav:
-  - Getting Started:
-    - What is Easysort?: what-is-easysort.md
-    - Run Easysort: run-easysort.md
-  # - How-to:
-  #   - Turn the speed blue: how-to/turn-the-speed-blue.md
-  #   - Connect to a comma 3/3X: how-to/connect-to-comma.md
-  #   # - Make your first pull request: how-to/make-first-pr.md
-  #   #- Replay a drive: how-to/replay-a-drive.md
-  # - Concepts:
-  #   - Logs: concepts/logs.md
-  #   - Safety: concepts/safety.md
-  #   - Glossary: concepts/glossary.md
-  # - Car Porting:
-  #   - What is a car port?: car-porting/what-is-a-car-port.md
-  #   - Porting a car brand: car-porting/brand-port.md
-  #   - Porting a car model: car-porting/model-port.md
-  # - Contributing:
-  #   - Roadmap: contributing/roadmap.md
-  #   #- Architecture: contributing/architecture.md
-  #   - Contributing Guide →: https://github.com/commaai/openpilot/blob/master/docs/CONTRIBUTING.md
-  # - Links:
-  #   - Blog →: https://blog.comma.ai
-  #   - Bounties →: https://comma.ai/bounties
-  #   - GitHub →: https://github.com/commaai
-  #   - Discord →: https://discord.comma.ai
-  #   - X →: https://x.com/comma_ai
+  - GETTING STARTED:
+    - index.md
+    - Quick-start: getting-started/quick-start.md
+  - ABOUT EASYSORT:
+    - Our Mission: why/mission.md
+    - Waste Landscape: why/landscape.md
+    - Market Players: why/competitors.md
+    - Industry Funding: why/funding.md
+  - THE SOLUTION:
+    - What we offer: products/index.md
+  - CONTRIBUTING:
+    - How to contribute: contributing/index.md
+    - Our projects: contributing/projects.md
+    - Our current priorities: contributing/plan-for-victory.md
+    - What we still don't know: contributing/open-questions.md
+  - LINKS:
+    - Website: https://easysort.org
+    - Github: https://github.com/easysort
+    - Pitch Deck: https://easysort.org/pitch-deck.pdf
+    - 2 Page Summary: https://easysort.org/2-page-summary.pdf
+
+extra_css:
+  - stylesheets/extra.css
+
+validation:
+  links:
+    anchors: warn
+
+markdown_extensions:
+- attr_list
+- admonition
+- footnotes
+- pymdownx.details
+- pymdownx.emoji:
+    emoji_index: !!python/name:material.extensions.emoji.twemoji
+    emoji_generator: !!python/name:material.extensions.emoji.to_svg
+- pymdownx.highlight:
+    pygments_lang_class: true
+- pymdownx.inlinehilite:
+    style_plain_text: python
+- pymdownx.magiclink
+- pymdownx.snippets:
+    base_path: [!relative $config_dir]
+    check_paths: true
+- pymdownx.superfences
+- pymdownx.tabbed:
+    alternate_style: true
+    slugify: !!python/object/apply:pymdownx.slugs.slugify
+      kwds:
+        case: lower
+- pymdownx.tasklist:
+    custom_checkbox: true
+- pymdownx.tilde
+- toc:
+    permalink: "¤"
+
+theme:
+  name: material
+  logo: assets/easysort-small-logo-white.png
+  favicon: assets/easysort-logo.png
+  features:
+  - announce.dismiss
+  - content.action.edit
+  - content.action.view
+  - content.code.annotate
+  - content.code.copy
+  - content.tooltips
+  - navigation.footer
+  - navigation.indexes
+  - navigation.sections
+  - navigation.expand
+  - navigation.top
+  - navigation.path
+  - search.highlight
+  - search.suggest
+  - toc.follow
+  - toc.integrate
+  palette:
+    scheme: slate
+    primary: black
+    accent: lime
+  palette:
+    - media: "(prefers-color-scheme)"
+      accent: lime
+      primary: black
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      accent: lime
+      primary: black
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      accent: lime
+      primary: black
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference

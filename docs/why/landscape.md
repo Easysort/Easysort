@@ -4,16 +4,6 @@ Values are based on 2022, as this the latest year with complete data.
 
 In all possible cases, the values for 2024 are also collected.
 
-
-
-## Funding
-Copenhagen Municipality:
-
-2024: ~600 mil DKK on waste handling
-2022: ~500 mil DKK on waste handling
-
-2024: ~200 mil DKK on 750 waste sorting points[1]
-
 ## Total waste:
 
 **Total waste (excluding dirt) received at Danish Facilities mainly for incineration:**
@@ -23,7 +13,7 @@ Copenhagen Municipality:
 ## Fractions:
 
 | Fraction | 2022 (1000 tons) | Amount burned/landfilled (%) |
-|----------|------|
+|----------|------------------|----------------------------|
 | Waste for incineration | 956 | 95% |
 | Residual waste | 1380 | -- |
 | Food waste | 401 | -- |
