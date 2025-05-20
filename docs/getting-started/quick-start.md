@@ -1,6 +1,8 @@
 # Quick Start
 
-We have spent and still spend a lot of time on making Easysort easy to use. In just 10 minutes you should be able to make simple changes to our code and run it on your own machine.
+We have spent and still spend a lot of time on making Easysort easy to use. In just 10 minutes, Easysort should be running on your machine.
+
+ <!-- In just 10 minutes you should be able to make simple changes to our code and run it on your own machine. -->
 
 ## 1. Setup your development environment
 
@@ -34,7 +36,7 @@ You can start the UI and API locally by running:
 just dev
 ```
 
-## 3. Make changes to the code
+<!-- ## 3. Make changes to the code
 
 Search for 
 
@@ -70,4 +72,4 @@ Again, start UI and API locally:
 
 ```bash
 just dev
-```
+``` -->
