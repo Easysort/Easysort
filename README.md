@@ -1,8 +1,10 @@
 <div align="center">
 
-<h1>EasySort</h1>
+<h1 style="font-size: 3em">EasySort</h1>
 
 EasySort: An open-source waste sorting system. Maintained by [EasySort](https://github.com/Easysort).
+
+[Website](https://easysort.org) • [Documentation](https://docs.easysort.org) • [Discord](https://discord.com/invite/2Bh3SBFbdP)
 </div>
 
 ---
@@ -17,17 +19,32 @@ Our annotation tool we use at EasySort is also open-source and called [EasyLabel
 
 # How to setup EasySort
 
-The recommended way to setup EasySort is to install it in a virtual environment. The easiest way to do that is using [uv](https://github.com/astral-sh/uv?tab=readme-ov-file#installation):
+We used the following tools. Make sure you have all of them installed.
+
+- [uv](https://github.com/astral-sh/uv)
+- [just](https://github.com/casey/just)
+
+Clone our repo:
+
+```bash
+git clone --recurse-submodules https://github.com/EasySort/easysort
+```
+
+Setup uv and run our tests:
 
 ```bash
 # This will install all the dependencies and setup the virtual environment
 uv sync
 # Run the tests to make sure everything is working
-uv run pytest
-# Install git hooks
-uv run pre-commit install
-# Activate the virtual environment (or just prefix your commands with uv run)
-source .venv/bin/activate
+just test
+```
+
+Notice: If you wish to run any specific file, use `uv run <file>` as opposed to `python <file>`.
+
+You can start the UI and API locally by running:
+
+```bash
+just dev
 ```
 
 # Why open-source?
