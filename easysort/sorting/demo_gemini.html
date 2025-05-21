@@ -1,0 +1,292 @@
+<!-- Simple Demo that showcase how easily AI models can identify and sorte objects for waste sorting. -->
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Easysort Sorting Demo (Gemini)</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        padding: 5px;
+        background-color: #f0f0f0;
+      }
+      .main-container {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        width: 100%;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .controls,
+      .io-areas {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        background-color: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      .io-areas {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      textarea {
+        width: 400px;
+        height: 200px;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      #videoFeed {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: 6px;
+        object-fit: cover;
+      }
+      #videoContainer {
+        position: relative;
+        width: 960px;
+        height: 720px;
+        border: 2px solid #333;
+        background-color: #000;
+        border-radius: 8px;
+        flex-shrink: 0;
+      }
+      .right-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+      #loadingOverlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 10;
+        border-radius: 6px;
+        color: #ffffff;
+        font-size: 1.5em;
+        font-weight: bold;
+      }
+      #startButton {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        border: none;
+        border-radius: 4px;
+        color: white;
+      }
+      #startButton.start {
+        background-color: #28a745; /* Green */
+      }
+      #startButton.stop {
+        background-color: #dc3545; /* Red */
+      }
+      label {
+        font-weight: bold;
+      }
+      select {
+        padding: 8px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+      }
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Easysort Sorting Demo</h1>
+
+    <div class="main-container">
+      <div id="videoContainer">
+        <video id="videoFeed" autoplay playsinline></video>
+        <div id="loadingOverlay">Loading...</div>
+      </div>
+      <canvas id="canvas" class="hidden"></canvas>
+      <!-- For capturing frames -->
+
+      <div class="right-panel">
+        <div class="io-areas">
+          <div>
+            <label for="instructionText">Instruction:</label><br />
+            <textarea
+              id="instructionText"
+              style="height: 2em; width: 40em"
+              name="Instruction"
+            ></textarea>
+          </div>
+          <div>
+            <label for="responseText">Response:</label><br />
+            <textarea
+              id="responseText"
+              style="height: 2em; width: 40em"
+              name="Response"
+              readonly
+              placeholder="Server response will appear here..."
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="startButton" class="start">Run once</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const video = document.getElementById("videoFeed");
+      const canvas = document.getElementById("canvas");
+      const responseText = document.getElementById("responseText");
+      const startButton = document.getElementById("startButton");
+      const loadingOverlay = document.getElementById("loadingOverlay");
+
+      let stream;
+      let isProcessing = false;
+
+      const GEMINI_API_KEY = '<Your-API-Key>'; // You'll need to replace this
+      const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent';
+
+      async function initCamera() {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+          video.srcObject = stream;
+          responseText.value = "Camera access granted. Ready to start.";
+        } catch (err) {
+          console.error("Error accessing camera:", err);
+          responseText.value = `Error accessing camera: ${err.message}`;
+        }
+      }
+
+      function captureImage() {
+        if (!stream || !video.videoWidth) return null;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext("2d");
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL('image/jpeg').split(',')[1];
+      }
+
+      async function queryGemini(imageBase64) {
+        const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: "What type is this object: Glass, Metal, Cardboard, Paper, Plastic or Other."
+              }, {
+                inline_data: {
+                  mime_type: "image/jpeg",
+                  data: imageBase64
+                }
+              }]
+            }]
+          })
+        });
+
+        const data = await response.json();
+        
+        if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+          throw new Error(`API Error: ${JSON.stringify(data.error || data)}`);
+        }
+        
+        return data.candidates[0].content.parts[0].text;
+      }
+
+      async function sendData() {
+        if (!isProcessing) return;
+        const imageBase64 = captureImage();
+        if (!imageBase64) {
+          responseText.value = "Capture failed";
+          return;
+        }
+        try {
+          const result = await queryGemini(imageBase64);
+          responseText.value = result;
+        } catch (e) {
+          console.error(e);
+          responseText.value = `Error: ${e.message}`;
+        }
+      }
+
+      function sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      async function processingLoop() {
+        while (isProcessing) {
+          await sendData();
+          if (!isProcessing) break;
+          handleStop();
+        }
+      }
+
+      function handleStart() {
+        if (!stream) {
+          responseText.value = "Camera not available. Cannot start.";
+          alert("Camera not available. Please grant permission first.");
+          return;
+        }
+        isProcessing = true;
+        startButton.textContent = "Stop";
+        startButton.classList.replace("start", "stop");
+        responseText.value = "Processing started...";
+        processingLoop();
+      }
+
+      function handleStop() {
+        isProcessing = false;
+        startButton.textContent = "Run again";
+        startButton.classList.replace("stop", "start");
+        if (responseText.value.startsWith("Processing started...")) {
+          responseText.value = "Processing stopped.";
+        }
+      }
+
+      startButton.addEventListener("click", () => {
+        if (isProcessing) {
+          handleStop();
+        } else {
+          handleStart();
+        }
+      });
+
+      window.addEventListener("beforeunload", () => {
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+        }
+      });
+
+      window.addEventListener("DOMContentLoaded", async () => {
+        try {
+          await initCamera();
+        } catch (error) {
+          console.error("Initialization error:", error);
+          responseText.value = `Initialization failed: ${error.message}`;
+        }
+      });
+    </script>
+  </body>
+</html>
