@@ -2,7 +2,7 @@ import zenoh
 import msgspec
 from typing import Callable, Generic, Self, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 ZENOH_SESSION: zenoh.Session | None = None
 
@@ -68,9 +68,7 @@ class Subscriber(Generic[T]):
     ```
     """
 
-    def __init__(
-        self, topic: str, type_: type[T], callback: Callable[[T], None]
-    ) -> None:
+    def __init__(self, topic: str, type_: type[T], callback: Callable[[T], None]) -> None:
         self._decoder = msgspec.msgpack.Decoder(type=type_)
         self._callback = callback
         self._sub = zenoh_session().declare_subscriber(topic, self._handle_message)
