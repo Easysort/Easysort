@@ -23,7 +23,9 @@ class Classifier:
     @TimeIt("Bbox classification")
     def __call__(self, image: np.ndarray) -> List[Detection]:
         results = self.model(image, stream=True, conf=0.025)
-        results_unlisted = list(results)[0]  # You can pass multiple images, we have one, so we take the first results object.
+        results_unlisted = list(results)[
+            0
+        ]  # You can pass multiple images, we have one, so we take the first results object.
         return Detections.from_ultralytics(results_unlisted)
 
     def test_speed(self) -> None:
@@ -59,6 +61,8 @@ if __name__ == "__main__":
 
     annotated_image = BOUNDING_BOX_ANNOTATOR.annotate(annotated_image, detections_formatted)
     annotated_image = LABEL_ANNOTATOR.annotate(
-        annotated_image, detections_formatted, labels=[detections[0].names[class_id] for class_id in detections_formatted.class_id]
+        annotated_image,
+        detections_formatted,
+        labels=[detections[0].names[class_id] for class_id in detections_formatted.class_id],
     )
     sv.plot_image(annotated_image)

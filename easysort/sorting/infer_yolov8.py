@@ -24,7 +24,9 @@ class Classifier:
 
     def __call__(self, image):
         results = self.model(image)
-        results_unlisted = list(results)[0]  # You can pass multiple images, we have one, so we take the first results object.
+        results_unlisted = list(results)[
+            0
+        ]  # You can pass multiple images, we have one, so we take the first results object.
         return results_unlisted
 
     def test_speed(self) -> None:

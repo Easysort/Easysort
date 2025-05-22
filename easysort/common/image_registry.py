@@ -30,7 +30,9 @@ class ImageRegistry:
         with open(path, "w") as f:
             json.dump(asdict(self.video_metadata), f)
 
-    def add(self, image: Image.Image | np.ndarray, timestamp: float, detections: Optional[List[Detection]] = None) -> None:  # Saves locally
+    def add(
+        self, image: Image.Image | np.ndarray, timestamp: float, detections: Optional[List[Detection]] = None
+    ) -> None:  # Saves locally
         assert self.video_metadata is not None, "Video metadata not set, please call set_video_metadata first"
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image)
@@ -58,7 +60,9 @@ class ImageRegistry:
         image_paths = list(Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid)).glob("*.sample"))
         image_paths.sort(key=lambda x: int(x.stem))
         samples = [ImageSample.from_json(json.load(open(path))) for path in image_paths]
-        metadata = VideoMetadata(**json.load(open(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid, "metadata.json"))))
+        metadata = VideoMetadata(
+            **json.load(open(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid, "metadata.json")))
+        )
         video_sample = VideoSample(samples, metadata)
         if delete:
             for path in Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid)).glob("*"):

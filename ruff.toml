@@ -14,7 +14,7 @@ lint.select = [
   "RUF018", # assignment-in-assert
 ]
 
-line-length = 150
+line-length = 120
 
 exclude = [
   "docs/",

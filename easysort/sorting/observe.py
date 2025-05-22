@@ -13,7 +13,9 @@ class Observer:
         self.image_registry = ImageRegistry()
 
     def observe_single_class(self, type_name: str):
-        metadata = VideoMetadata(date=datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), robot_id=Environment.CURRENT_ROBOT_ID)
+        metadata = VideoMetadata(
+            date=datetime.now().strftime("%Y-%m-%d_%H-%M-%S"), robot_id=Environment.CURRENT_ROBOT_ID
+        )
         metadata.uuid = metadata.uuid + "_" + type_name
         self.image_registry.set_video_metadata(metadata)
         while True:

@@ -33,7 +33,11 @@ class ImageSample:
         self.image.save(img_byte_arr, format="JPEG", optimize=True)
         img_byte_arr.seek(0)
         image_data = img_byte_arr.getvalue().hex()
-        return json.dumps({"image": image_data, "detections": [det.to_json() for det in self.detections], "metadata": asdict(self.metadata)})
+        return json.dumps({
+            "image": image_data,
+            "detections": [det.to_json() for det in self.detections],
+            "metadata": asdict(self.metadata),
+        })
 
     @classmethod
     def from_json(cls, json_data: Union[str, Dict[str, Any]]) -> "ImageSample":
@@ -53,7 +57,10 @@ class VideoSample:
         self.samples[sample.metadata.frame_idx] = sample
 
     def to_json(self) -> str:
-        return json.dumps({"images": [sample.to_json() for sample in self.samples.values()], "metadata": asdict(self.metadata)})
+        return json.dumps({
+            "images": [sample.to_json() for sample in self.samples.values()],
+            "metadata": asdict(self.metadata),
+        })
 
     @classmethod
     def from_json(cls, json_data: Union[str, Dict[str, Any]]) -> "VideoSample":

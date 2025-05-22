@@ -68,7 +68,9 @@ class Detection:
         )
 
     def __repr__(self):
-        return f"Detection(box={self.box}, mask={self.mask}, class_name={self.class_name}, confidence={self.confidence})"
+        return (
+            f"Detection(box={self.box}, mask={self.mask}, class_name={self.class_name}, confidence={self.confidence})"
+        )
 
 
 class Mask(np.ndarray):
@@ -86,6 +88,12 @@ class Detections:
     @staticmethod
     def from_ultralytics(result: Results) -> List[Detection]:
         return [
-            Detection(box=box.cpu().numpy(), mask=None, class_id=int(class_id.cpu().numpy()), confidence=confidence.cpu().numpy(), names=result.names)
+            Detection(
+                box=box.cpu().numpy(),
+                mask=None,
+                class_id=int(class_id.cpu().numpy()),
+                confidence=confidence.cpu().numpy(),
+                names=result.names,
+            )
             for box, class_id, confidence in zip(result.boxes.xyxy, result.boxes.cls, result.boxes.conf)
         ]

@@ -39,7 +39,12 @@ def visualize_video(uuid: str, save_images: bool = False, rerun_pipeline: bool =
             cv2.imwrite(str(rendered_images_path / f"{i}.jpg"), image)
 
     fourcc = cv2.VideoWriter.fourcc(*"mp4v")
-    video_writer = cv2.VideoWriter(str(rendered_images_path / f"{uuid}.mp4"), fourcc, 24, (rendered_images[0].shape[1], rendered_images[0].shape[0]))
+    video_writer = cv2.VideoWriter(
+        str(rendered_images_path / f"{uuid}.mp4"),
+        fourcc,
+        24,
+        (rendered_images[0].shape[1], rendered_images[0].shape[0]),
+    )
     for image in rendered_images:
         video_writer.write(image)
     video_writer.release()
@@ -53,4 +58,9 @@ if __name__ == "__main__":
     parser.add_argument("--dont-plot-detections", action="store_true", help="Don't plot detections")
     args = parser.parse_args()
 
-    visualize_video(args.uuid, save_images=args.save_images, rerun_pipeline=args.rerun_pipeline, plot_detections=not args.dont_plot_detections)
+    visualize_video(
+        args.uuid,
+        save_images=args.save_images,
+        rerun_pipeline=args.rerun_pipeline,
+        plot_detections=not args.dont_plot_detections,
+    )
