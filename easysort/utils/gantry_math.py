@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def realsense2gantry(realsense_point: np.ndarray, depth: float) -> np.ndarray:
     """
     Convert a point from the RealSense coordinate system to the Gantry coordinate system.
@@ -14,8 +15,8 @@ def realsense2gantry(realsense_point: np.ndarray, depth: float) -> np.ndarray:
     realsense_mid_y = REALSENSE_HEIGHT / 2
 
     # Convert the pixel point to cm
-    x_pixel2cm = REALSENSE_X_CM_ON_CONVEYOR / REALSENSE_WIDTH # x_pixels/cm_that_camera_sees
-    y_pixel2cm = REALSENSE_Y_CM_ON_CONVEYOR / REALSENSE_HEIGHT # y_pixels/cm_that_camera_sees
+    x_pixel2cm = REALSENSE_X_CM_ON_CONVEYOR / REALSENSE_WIDTH  # x_pixels/cm_that_camera_sees
+    y_pixel2cm = REALSENSE_Y_CM_ON_CONVEYOR / REALSENSE_HEIGHT  # y_pixels/cm_that_camera_sees
 
     x_cm = (realsense_point[0] - realsense_mid_x) * x_pixel2cm
     y_cm = (realsense_point[1] - realsense_mid_y) * y_pixel2cm
@@ -30,14 +31,15 @@ def realsense2gantry(realsense_point: np.ndarray, depth: float) -> np.ndarray:
     depth = adjust_realsense_depth(y_cm, depth)
     return np.array([x_cm + gantry_offset_x_cm, y_cm + gantry_offset_y_cm, -depth + gantry_offset_z_cm])
 
+
 def adjust_realsense_depth(realsense_y_cm_midpoint: float, depth: float) -> float:
     """
     Adjust the depth of the RealSense camera to account for the pythagorean theorem.
     """
     return np.sqrt(depth**2 - realsense_y_cm_midpoint**2)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     REALSENSE_WIDTH = 1280
     REALSENSE_HEIGHT = 720
 
@@ -85,8 +87,3 @@ if __name__ == "__main__":
     print("Gantry point 5:")
     print(x, y, z)
     print("---")
-
-
-
-
-

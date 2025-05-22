@@ -12,17 +12,14 @@ from easysort.system.camera.realsense_connector import RealSenseConnector, f_x, 
 import cv2
 
 _LOGGER = EasySortLogger()
-_MAX_TIME_TO_WAIT_FOR_MOVEMENT_MESSAGE = 5 # seconds
+_MAX_TIME_TO_WAIT_FOR_MOVEMENT_MESSAGE = 5  # seconds
 
-mtx =  np.array([
-                        [f_x, 0., c_x],
-                        [0., f_y, c_y],
-                        [0., 0., 1.]
-                    ]).astype(float)
-dst = np.array([['-0.011645', '2.151450', '0.003982', '-0.006386', '-10.850711']]).astype(float)
+mtx = np.array([[f_x, 0.0, c_x], [0.0, f_y, c_y], [0.0, 0.0, 1.0]]).astype(float)
+dst = np.array([["-0.011645", "2.151450", "0.003982", "-0.006386", "-10.850711"]]).astype(float)
 t_R_M = np.array([[0.0], [0.01], [0.16]])  # Example: Marker to Suction cup offset # TODO
 R_R_M = np.eye(3)  # no rotation
 T_R_M = np.vstack((np.hstack((R_R_M, t_R_M)), [0, 0, 0, 1]))
+
 
 class GantryConnector:
     """
@@ -43,7 +40,7 @@ class GantryConnector:
         self.arduino_time_offset: float = 0.0
         self._sync_time()
         self.camera = camera
-        self.start_pos_offset = np.array([37, 0, -11]) # Offset from start position to marker position
+        self.start_pos_offset = np.array([37, 0, -11])  # Offset from start position to marker position
 
     def go_to(self, x: int, y: int, z: int) -> None:
         self.send_information((x, y, z), self.suction_state)
@@ -57,31 +54,35 @@ class GantryConnector:
     def establish_connection(self) -> serial.Serial:
         try:
             ser = serial.Serial(self.port, 115200, timeout=1)
-            if not ser.is_open: raise serial.SerialTimeoutException(f"Failed to open serial connection on port {self.port}")
+            if not ser.is_open:
+                raise serial.SerialTimeoutException(f"Failed to open serial connection on port {self.port}")
             _LOGGER.info(f"Established connection to {self.name} on {self.port}")
             return ser
         except serial.SerialException as err:
             open_ports = [port.device for port in serial.tools.list_ports.comports()]
             raise serial.SerialException(f"No open port at {self.port}, instead use one of: {open_ports}") from err
 
-    def calibrate(self) -> np.ndarray: # Returns camera position to robot coordinate system transformation matrix
-        while not self.is_ready: pass
+    def calibrate(self) -> np.ndarray:  # Returns camera position to robot coordinate system transformation matrix
+        while not self.is_ready:
+            pass
         self.go_to(*self.start_pos_offset)
-        while not self.is_ready: pass
+        while not self.is_ready:
+            pass
         time.sleep(3)
         try:
             color_image, _ = self.camera.get_color_image()
             this_aruco_dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
             this_aruco_parameters = cv2.aruco.DetectorParameters()
-            corners, marker_ids, _ = cv2.aruco.detectMarkers( # type: ignore
+            corners, marker_ids, _ = cv2.aruco.detectMarkers(  # type: ignore
                 color_image, this_aruco_dictionary, parameters=this_aruco_parameters
             )
-            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, .03, mtx, dst) # type: ignore
+            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners, 0.03, mtx, dst)  # type: ignore
 
             if marker_ids is None or len(marker_ids) == 0:
                 raise RuntimeError("No marker found")
 
-            if 216 not in marker_ids: raise RuntimeError("No marker found")
+            if 216 not in marker_ids:
+                raise RuntimeError("No marker found")
             i = np.where(marker_ids == 216)[0][0]
             R_m, _ = cv2.Rodrigues(rvecs[i])
             t_m = tvecs[i].reshape((3, 1))
@@ -91,9 +92,11 @@ class GantryConnector:
         except Exception as e:
             _LOGGER.error(f"Error calibrating: {e}")
             T_C_R = None
-        self.go_to(0,0,0)
-        while not self.is_ready: pass
-        if T_C_R is None: raise RuntimeError("Failed to calibrate - no valid transformation matrix found")
+        self.go_to(0, 0, 0)
+        while not self.is_ready:
+            pass
+        if T_C_R is None:
+            raise RuntimeError("Failed to calibrate - no valid transformation matrix found")
         print("Transform matrix: ", T_C_R)
         return np.linalg.inv(T_C_R)
 
@@ -101,13 +104,16 @@ class GantryConnector:
         """
         Get time offset between Arduino startup and connector startup
         """
-        while not self.is_ready: pass
+        while not self.is_ready:
+            pass
         self.ser.reset_input_buffer()
         self.ser.write(b"SYNC?\n")
-        while not self.ser.in_waiting: pass
+        while not self.ser.in_waiting:
+            pass
         not_ready_msg = self.ser.readline().decode().strip()
         assert not_ready_msg == "-NOT-READY-"
-        while not self.ser.in_waiting: pass
+        while not self.ser.in_waiting:
+            pass
         message = self.ser.readline().decode().strip()
         try:
             arduino_ms = float(message) / 1000.0  # Convert Arduino milliseconds to seconds
@@ -131,41 +137,52 @@ class GantryConnector:
         rx, ry, rz = (0, 0, 0)
         ds, ts, rs = (1, 0, 0)
         instructions = f"pickup({dx},{dy},{dz},{ds}).({tx},{ty},{tz},{ts}).({rx},{ry},{rz},{rs}).({detection_time})"
-        try: self.ser.write(instructions.encode())
-        except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
+        try:
+            self.ser.write(instructions.encode())
+        except serial.SerialException as err:
+            _LOGGER.error(f"Error sending information to {self.port}: {err}")
 
     def send_information(self, position: tuple, suction_state: int) -> None:
-        if not self.is_ready: return
-        if self.position == position and self.suction_state == suction_state: return
+        if not self.is_ready:
+            return
+        if self.position == position and self.suction_state == suction_state:
+            return
         self.position = position
         self.suction_state = suction_state
         msg = f"{','.join(map(str, position))},{suction_state}\n".encode()
-        try: self.ser.write(msg)
-        except serial.SerialException as err: _LOGGER.error(f"Error sending information to {self.port}: {err}")
+        try:
+            self.ser.write(msg)
+        except serial.SerialException as err:
+            _LOGGER.error(f"Error sending information to {self.port}: {err}")
 
     def receive_information(self, timeout_seconds: int = _MAX_TIME_TO_WAIT_FOR_MOVEMENT_MESSAGE) -> str:
         start_time = time.time()
         while (time.time() - start_time) < (timeout_seconds):
-            if self.ser.in_waiting <= 0: time.sleep(0.1)
+            if self.ser.in_waiting <= 0:
+                time.sleep(0.1)
             msg = self.ser.readline().decode().strip()
             _LOGGER.info(f"Received message from {self.port}: {msg}")
             return msg
         _LOGGER.warning(f"Timeout occurred while waiting for response from {self.port}")
-        return '' # TODO: How to handle this?
+        return ""  # TODO: How to handle this?
 
     @property
     def is_ready(self) -> bool:
         lines = self.ser.readlines()
         not_ready_lines = max([i for i, line in enumerate(lines) if line.decode().strip() == "-NOT-READY-"] or [-1])
         ready_lines = max([i for i, line in enumerate(lines) if line.decode().strip() == "-READY-"] or [-1])
-        if not_ready_lines == -1 and ready_lines == -1: return self._is_ready
+        if not_ready_lines == -1 and ready_lines == -1:
+            return self._is_ready
         self._is_ready = not_ready_lines <= ready_lines
         return self._is_ready
 
     def quit(self, return_to_start: bool = True) -> None:
-        if return_to_start: self.send_information((0, 0, 0), 0)
-        while not self.is_ready: pass
+        if return_to_start:
+            self.send_information((0, 0, 0), 0)
+        while not self.is_ready:
+            pass
         self.ser.close()
+
 
 if __name__ == "__main__":
     camera = CameraConnector()

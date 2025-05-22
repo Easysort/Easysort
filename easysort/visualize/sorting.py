@@ -1,4 +1,3 @@
-
 import cv2
 import numpy as np
 import argparse
@@ -41,7 +40,8 @@ def visualize_video(uuid: str, save_images: bool = False, rerun_pipeline: bool =
 
     fourcc = cv2.VideoWriter.fourcc(*"mp4v")
     video_writer = cv2.VideoWriter(str(rendered_images_path / f"{uuid}.mp4"), fourcc, 24, (rendered_images[0].shape[1], rendered_images[0].shape[0]))
-    for image in rendered_images: video_writer.write(image)
+    for image in rendered_images:
+        video_writer.write(image)
     video_writer.release()
 
 

@@ -1,4 +1,3 @@
-
 from easysort.system.camera.realsense_connector import RealSenseConnector
 from easysort.common.image_registry import ImageRegistry
 from easysort.common.environment import Environment
@@ -6,6 +5,7 @@ from easysort.utils.image_sample import VideoMetadata
 from datetime import datetime
 
 import cv2
+
 
 class Observer:
     def __init__(self):
@@ -20,9 +20,10 @@ class Observer:
             color_image, timestamp = self.camera.get_color_image()
             self.image_registry.add(color_image, timestamp=timestamp)
             cv2.imshow("Main View", color_image)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
             # time.sleep()
+
 
 if __name__ == "__main__":
     observer = Observer()

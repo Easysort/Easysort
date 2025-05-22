@@ -7,17 +7,20 @@ from typing import Dict, Any, Union, List
 from dataclasses import field
 from uuid import uuid4
 
+
 @dataclass
 class VideoMetadata:
     date: str
     robot_id: str
     uuid: str = field(default_factory=lambda: str(uuid4()))
 
+
 @dataclass
 class ImageMetadata:
     frame_idx: int
     timestamp: float
     uuid: str
+
 
 @dataclass
 class ImageSample:
@@ -27,14 +30,10 @@ class ImageSample:
 
     def to_json(self) -> str:
         img_byte_arr = io.BytesIO()
-        self.image.save(img_byte_arr, format='JPEG', optimize=True)
+        self.image.save(img_byte_arr, format="JPEG", optimize=True)
         img_byte_arr.seek(0)
         image_data = img_byte_arr.getvalue().hex()
-        return json.dumps({
-            "image": image_data,
-            "detections": [det.to_json() for det in self.detections],
-            "metadata": asdict(self.metadata)
-        })
+        return json.dumps({"image": image_data, "detections": [det.to_json() for det in self.detections], "metadata": asdict(self.metadata)})
 
     @classmethod
     def from_json(cls, json_data: Union[str, Dict[str, Any]]) -> "ImageSample":
@@ -54,10 +53,7 @@ class VideoSample:
         self.samples[sample.metadata.frame_idx] = sample
 
     def to_json(self) -> str:
-        return json.dumps({
-            "images": [sample.to_json() for sample in self.samples.values()],
-            "metadata": asdict(self.metadata)
-        })
+        return json.dumps({"images": [sample.to_json() for sample in self.samples.values()], "metadata": asdict(self.metadata)})
 
     @classmethod
     def from_json(cls, json_data: Union[str, Dict[str, Any]]) -> "VideoSample":

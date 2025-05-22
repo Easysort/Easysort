@@ -3,9 +3,17 @@ from ultralytics.engine.results import Results
 from typing import List, Optional, Tuple, Dict, Union, Any
 import cv2
 
+
 class Detection:
-    def __init__(self, box: np.ndarray, mask: Optional[np.ndarray] = None, class_id: int = -1, confidence: Optional[float] = None,
-                 names: Optional[Dict[Union[int, str], str]] = None, timestamp: Optional[float] = None) -> None:
+    def __init__(
+        self,
+        box: np.ndarray,
+        mask: Optional[np.ndarray] = None,
+        class_id: int = -1,
+        confidence: Optional[float] = None,
+        names: Optional[Dict[Union[int, str], str]] = None,
+        timestamp: Optional[float] = None,
+    ) -> None:
         self.box = box
         self.mask = mask
         self.class_id = class_id
@@ -23,16 +31,19 @@ class Detection:
 
     @property
     def center_point(self) -> Tuple[float, float, float]:
-        if self._center_point is not None: return self._center_point
-        if self.mask is None: center_point = ((self.xyxy[0] + self.xyxy[2]) / 2, (self.xyxy[1] + self.xyxy[3]) / 2, 0)
+        if self._center_point is not None:
+            return self._center_point
+        if self.mask is None:
+            center_point = ((self.xyxy[0] + self.xyxy[2]) / 2, (self.xyxy[1] + self.xyxy[3]) / 2, 0)
         else:
             center_point = np.mean(np.argwhere(self.mask), axis=0)
-            center_point = (center_point[1], center_point[0], 0) # for some reason this is reversed
+            center_point = (center_point[1], center_point[0], 0)  # for some reason this is reversed
         self._center_point = center_point
         return center_point
 
     def current_center_point(self, speed: float) -> Tuple[float, float, float]:
-        if self.timestamp is None: raise NotImplementedError("Timestamp is not set")
+        if self.timestamp is None:
+            raise NotImplementedError("Timestamp is not set")
         return (self.center_point[0] + speed * self.timestamp, self.center_point[1], self.center_point[2])
 
     def to_json(self):
@@ -53,11 +64,12 @@ class Detection:
             class_id=data["class_id"],
             confidence=data["confidence"],
             names=names,
-            timestamp=data.get("timestamp")
+            timestamp=data.get("timestamp"),
         )
 
     def __repr__(self):
         return f"Detection(box={self.box}, mask={self.mask}, class_name={self.class_name}, confidence={self.confidence})"
+
 
 class Mask(np.ndarray):
     def __new__(cls, mask: np.ndarray):
@@ -67,9 +79,8 @@ class Mask(np.ndarray):
     @staticmethod
     def from_ultralytics(result: Results, image_shape: tuple) -> List[np.ndarray]:
         assert len(result) == 1, "Only one result is supported"
-        return [
-            cv2.resize(mask.cpu().numpy(), (image_shape[1], image_shape[0])) for mask in result[0].masks.data
-        ]
+        return [cv2.resize(mask.cpu().numpy(), (image_shape[1], image_shape[0])) for mask in result[0].masks.data]
+
 
 class Detections:
     @staticmethod
