@@ -108,7 +108,7 @@ class SupabaseHelper:
         return VideoSample.from_json(json_str)
 
     def delete(self, uuid: str) -> None:
-        self.client.storage.from_(self.bucket_name).remove(f"{uuid}.json")
+        self.client.storage.from_(self.bucket_name).remove([f"{uuid}.json"])
 
 
 if __name__ == "__main__":

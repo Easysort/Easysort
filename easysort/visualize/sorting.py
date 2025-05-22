@@ -27,7 +27,7 @@ def visualize_video(uuid: str, save_images: bool = False, rerun_pipeline: bool =
     rendered_images = []
     for image_sample in tqdm(video_sample.samples.values(), desc="Visualizing video"):
         image = np.array(image_sample.image)
-        detections = pipeline(image) if rerun_pipeline else image_sample.detections
+        detections = pipeline.detect(image) if rerun_pipeline else image_sample.detections
         detections = detections if plot_detections else []
         main_view = visualize_sorting_pipeline_image(image, detections, show_plot=False)
         rendered_images.append(main_view)

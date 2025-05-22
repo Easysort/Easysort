@@ -8,20 +8,21 @@ from easysort.utils.image_sample import VideoMetadata
 from easysort.system.camera.camera_connector import CameraConnector
 
 import numpy as np
-from typing import List, Optional
+from typing import Generator, List, Optional
 import cv2
 import time
 from datetime import datetime
 
 
 class SortingPipeline:
-    def __init__(self, use_yolo_world: bool = False):
+    def __init__(self, use_yolo_world: bool = False, interval: float = 0.0):
         self.camera = CameraConnector()
         self.classifier = ClassifierYoloWorld(test_yoloworld_classes) if use_yolo_world else Classifier()
         # self.segmentation = Segmentation()
         self.image_registry = ImageRegistry()
+        self.interval = interval
 
-    def __call__(self, image: np.ndarray, timestamp: Optional[float] = None) -> List[Detection]:
+    def detect(self, image: np.ndarray, timestamp: Optional[float] = None) -> List[Detection]:
         if timestamp is None:
             timestamp = time.time()
         detections = self.classifier(image)
@@ -30,15 +31,16 @@ class SortingPipeline:
             detection.timestamp = timestamp
         return detections
 
-    def stream(self):
+    def stream(self, use_depth: bool = True) -> Generator[tuple[list[Detection]], None, None]:
         metadata = VideoMetadata(date=datetime.now().strftime("%Y-%m-%d"), robot_id=Environment.CURRENT_ROBOT_ID)
         self.image_registry.set_video_metadata(metadata)
         while True:
             color_image, timestamp = self.camera.get_color_image()
             self.image_registry.add(color_image, timestamp=timestamp)
-            detections = self(color_image, timestamp)
-            for d in detections:
-                d.set_center_point((d.center_point[0], d.center_point[1], self.camera.get_depth_for_detection(d)))
+            detections = self.detect(color_image, timestamp)
+            if use_depth:
+                for d in detections:
+                    d.set_center_point((d.center_point[0], d.center_point[1], self.camera.get_depth_for_detection(d)))
             yield detections
             if Environment.DEBUG:
                 main_view = visualize_sorting_pipeline_image(color_image, detections, show_plot=False)
@@ -52,7 +54,7 @@ class SortingPipeline:
         while True:
             color_image, timestamp = self.camera.get_color_image()
             self.image_registry.add(color_image, timestamp=timestamp)
-            detections = self(color_image, timestamp)
+            detections = self.detect(color_image, timestamp)
             for d in detections:
                 d.set_center_point((d.center_point[0], d.center_point[1], self.camera.get_depth_for_detection(d)))
             yield detections[0]
@@ -65,7 +67,7 @@ class SortingPipeline:
 if __name__ == "__main__":
     # Has to be run with sudo if DEBUG is False
     pipeline = SortingPipeline(use_yolo_world=True)
-    for detection in pipeline.stream():
+    for image, detection in pipeline.stream():
         print("------PICKED UP DETECTION--------")
         print(detection)
         print("--------------------------------")
