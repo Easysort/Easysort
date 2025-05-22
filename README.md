@@ -39,6 +39,12 @@ uv sync
 just test
 ```
 
+Before you start developing, make sure to install the pre-commit hooks:
+
+```bash
+just install-hooks
+```
+
 Notice: If you wish to run any specific file, use `uv run <file>` as opposed to `python <file>`.
 
 You can start the UI and API locally by running:
