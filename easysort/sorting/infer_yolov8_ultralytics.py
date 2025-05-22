@@ -13,6 +13,7 @@ import numpy as np
 LOGGER = EasySortLogger()
 RANDOM_IMAGE_TENSOR = torch.rand((980, 1280, 3)).numpy()
 
+
 class Classifier:
     def __init__(self):
         print("Loading new model...")
@@ -22,7 +23,9 @@ class Classifier:
     @TimeIt("Bbox classification")
     def __call__(self, image: np.ndarray) -> List[Detection]:
         results = self.model(image, stream=True, conf=0.025)
-        results_unlisted = list(results)[0] # You can pass multiple images, we have one, so we take the first results object.
+        results_unlisted = list(results)[
+            0
+        ]  # You can pass multiple images, we have one, so we take the first results object.
         return Detections.from_ultralytics(results_unlisted)
 
     def test_speed(self) -> None:
@@ -39,6 +42,7 @@ class Classifier:
         # Do computations hehe..
         return detections
 
+
 if __name__ == "__main__":
     SOURCE_IMAGE_PATH = "__old__/_old/test.jpg"
     image = cv2.imread(SOURCE_IMAGE_PATH)
@@ -52,13 +56,13 @@ if __name__ == "__main__":
     detections_formatted = sv.Detections(
         xyxy=np.array([d.box for d in detections]),
         class_id=np.array([d.class_id for d in detections]),
-        confidence=np.array([d.confidence for d in detections])
+        confidence=np.array([d.confidence for d in detections]),
     )
 
     annotated_image = BOUNDING_BOX_ANNOTATOR.annotate(annotated_image, detections_formatted)
     annotated_image = LABEL_ANNOTATOR.annotate(
-        annotated_image, detections_formatted,
-        labels=[detections[0].names[class_id] for class_id in detections_formatted.class_id]
+        annotated_image,
+        detections_formatted,
+        labels=[detections[0].names[class_id] for class_id in detections_formatted.class_id],
     )
     sv.plot_image(annotated_image)
-

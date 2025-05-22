@@ -2,7 +2,7 @@ from easysort.utils.detections import Detection
 from typing import Tuple
 import time
 import numpy as np
-import pyrealsense2 as rs # type: ignore
+import pyrealsense2 as rs  # type: ignore
 import os
 import sys
 from collections import OrderedDict
@@ -11,6 +11,7 @@ f_x = 635.47505771
 f_y = 636.69651825
 c_x = 323.90900467
 c_y = 244.25395186
+
 
 def get_pipeline():
     # On Mac the Intel Realsense library is extremely bad.
@@ -30,7 +31,8 @@ def get_pipeline():
         except (RuntimeError, ConnectionError) as e:
             print(f"[MAC REALSENSE ERROR]: Trying to restart pipeline. Got: {e}")
             time.sleep(1)
-            os.execv(sys.executable, ['python'] + sys.argv)
+            os.execv(sys.executable, ["python"] + sys.argv)
+
 
 class LRUDict(OrderedDict):
     def __init__(self, maxsize=1000):
@@ -38,9 +40,12 @@ class LRUDict(OrderedDict):
         self.maxsize = maxsize
 
     def __setitem__(self, key, value):
-        if key in self: self.move_to_end(key)
+        if key in self:
+            self.move_to_end(key)
         super().__setitem__(key, value)
-        if len(self) > self.maxsize: self.popitem(last=False)
+        if len(self) > self.maxsize:
+            self.popitem(last=False)
+
 
 class RealSenseConnector:
     def __init__(self):
@@ -64,13 +69,15 @@ class RealSenseConnector:
     def get_depth_for_detection(self, detection: Detection) -> float:
         assert detection.timestamp is not None
         depth_array = self._depth_cache.get(detection.timestamp)
-        if depth_array is None: return -1
+        if depth_array is None:
+            return -1
         x, y, _ = map(int, detection.center_point)
         direct_distance = depth_array[y, x]
         x_norm = (x - c_x) / f_x
         y_norm = (y - c_y) / f_y
         z = direct_distance / np.sqrt(1 + x_norm**2 + y_norm**2)
         return z
+
 
 if __name__ == "__main__":
     connector = RealSenseConnector()

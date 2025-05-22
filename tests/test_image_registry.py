@@ -1,9 +1,9 @@
-
 import unittest
 import os
 from PIL import Image
 import numpy as np
 import time
+
 
 @unittest.skipIf(os.getenv("DEEP_TEST") is None, "Skipping deep test")
 class TestImageRegistry(unittest.TestCase):
@@ -12,26 +12,24 @@ class TestImageRegistry(unittest.TestCase):
         from easysort.utils.image_sample import VideoSample, VideoMetadata, ImageSample, ImageMetadata
         from easysort.utils.detections import Detection
         from easysort.common.environment import Environment
+
         helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
         metadata = VideoMetadata(date="2021-01-01", robot_id="1")
         image_sample = ImageSample(
             image=Image.open("__old__/_old/test.jpg"),
             detections=[Detection(box=np.array([10, 10, 20, 20]), class_id=0, confidence=0.5, names={0: "test"})],
-            metadata=ImageMetadata(frame_idx=0, timestamp=0, uuid=metadata.uuid)
+            metadata=ImageMetadata(frame_idx=0, timestamp=0, uuid=metadata.uuid),
         )
         image_sample2 = ImageSample(
             image=Image.open("__old__/_old/test.jpg"),
             detections=[
                 Detection(box=np.array([10, 10, 20, 20]), class_id=0, confidence=0.5, names={0: "test"}),
-                Detection(box=np.array([10, 10, 20, 20]), class_id=0, confidence=0.5, names={0: "test"})
+                Detection(box=np.array([10, 10, 20, 20]), class_id=0, confidence=0.5, names={0: "test"}),
             ],
-            metadata=ImageMetadata(frame_idx=1, timestamp=1, uuid=metadata.uuid)
+            metadata=ImageMetadata(frame_idx=1, timestamp=1, uuid=metadata.uuid),
         )
 
-        sample = VideoSample(
-            samples=[image_sample, image_sample2],
-            metadata=metadata
-        )
+        sample = VideoSample(samples=[image_sample, image_sample2], metadata=metadata)
         helper.upload_sample(sample)
         sample2 = helper.get(metadata.uuid)
         helper.delete(metadata.uuid)
@@ -67,6 +65,7 @@ class TestImageRegistry(unittest.TestCase):
         assert video_sample.metadata.date == metadata.date
         assert video_sample.metadata.robot_id == metadata.robot_id
         assert not os.path.exists(os.path.join(Environment.IMAGE_REGISTRY_PATH, metadata.uuid))
+
 
 if __name__ == "__main__":
     unittest.main()

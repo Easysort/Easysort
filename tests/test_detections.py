@@ -2,9 +2,11 @@ import unittest
 from ultralytics import YOLO
 import cv2
 
+
 class TestDetections(unittest.TestCase):
     def test_detections(self):
         from easysort.utils.detections import Detections, Detection
+
         model = YOLO("__old__/_old/best.pt")
         image = cv2.imread("__old__/_old/test.jpg")
         detections = Detections.from_ultralytics(list(model(image))[0])
@@ -13,6 +15,7 @@ class TestDetections(unittest.TestCase):
 
     def test_detection(self):
         from easysort.utils.detections import Detection
+
         detection1 = Detection(box=(100, 100, 200, 200), class_id=0, confidence=0.9)
         detection2 = Detection(box=(100, 100, 200, 200), class_id=0, confidence=0.9)
         assert detection1.box == detection2.box

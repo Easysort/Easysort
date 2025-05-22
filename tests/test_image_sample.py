@@ -7,7 +7,7 @@ from easysort.utils.image_sample import ImageSample, VideoSample, ImageMetadata,
 
 class TestImageSample(unittest.TestCase):
     def test_image_sample_to_json(self):
-        image = Image.new('RGB', (10, 10), color = 'red')
+        image = Image.new("RGB", (10, 10), color="red")
         detections = [Detection(box=np.array([1, 1, 5, 5]), class_id=0, confidence=0.9, names={0: "test"})]
         metadata = ImageMetadata(frame_idx=0, timestamp=123.456, uuid="test-uuid")
         sample = ImageSample(image=image, detections=detections, metadata=metadata)
@@ -17,7 +17,7 @@ class TestImageSample(unittest.TestCase):
         self.assertIn('"metadata":', json_data)
 
     def test_image_sample_from_json(self):
-        image = Image.new('RGB', (10, 10), color = 'red')
+        image = Image.new("RGB", (10, 10), color="red")
         detections = [Detection(box=np.array([1, 1, 5, 5]), class_id=0, confidence=0.9, names={0: "test"})]
         metadata = ImageMetadata(frame_idx=0, timestamp=123.456, uuid="test-uuid")
         sample = ImageSample(image=image, detections=detections, metadata=metadata)
@@ -29,7 +29,7 @@ class TestImageSample(unittest.TestCase):
         self.assertEqual(len(new_sample.detections), len(sample.detections))
 
     def test_video_sample_to_json(self):
-        image = Image.new('RGB', (10, 10), color = 'red')
+        image = Image.new("RGB", (10, 10), color="red")
         detections = [Detection(box=np.array([1, 1, 5, 5]), class_id=0, confidence=0.9, names={0: "test"})]
         metadata = VideoMetadata(date="2021-01-01", robot_id="1")
         image_metadata = ImageMetadata(frame_idx=0, timestamp=123.456, uuid=metadata.uuid)
@@ -40,7 +40,7 @@ class TestImageSample(unittest.TestCase):
         self.assertIn('"metadata":', json_data)
 
     def test_video_sample_from_json(self):
-        image = Image.new('RGB', (10, 10), color = 'red')
+        image = Image.new("RGB", (10, 10), color="red")
         detections = [Detection(box=np.array([1, 1, 5, 5]), class_id=0, confidence=0.9, names={0: "test"})]
         metadata = VideoMetadata(date="2021-01-01", robot_id="1")
         image_metadata = ImageMetadata(frame_idx=0, timestamp=123.456, uuid=metadata.uuid)

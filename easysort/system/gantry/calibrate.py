@@ -1,4 +1,3 @@
-
 class Calibrator:
     """
     Works in the following way:
@@ -10,6 +9,7 @@ class Calibrator:
     6) Do a fast moving sequence twice and stop and the start location: If it is at the same location, we are good.
     7) If not, show error message and stop robot
     """
+
     def __init__(self) -> None:
         pass
 

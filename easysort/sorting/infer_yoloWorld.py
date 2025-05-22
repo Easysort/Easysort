@@ -79,7 +79,7 @@ YOLO_WORLD_CLASSES = {
     "Clothes/Fabric": "Clothing and textiles",
     "Fine (small granular material)": "Fine granular waste",
     "Sanitary": "Sanitary waste",
-    "Other (General waste)": "General miscellaneous waste"
+    "Other (General waste)": "General miscellaneous waste",
 }
 
 test_yoloworld_classes = [
@@ -90,8 +90,9 @@ test_yoloworld_classes = [
     "plastic_wrap",
     "snack_box",
     "cardboard_box",
-    "plastic_lid"
+    "plastic_lid",
 ]
+
 
 class ClassifierYoloWorld:
     def __init__(self, classes: list[str]):
@@ -105,15 +106,21 @@ class ClassifierYoloWorld:
         results = self.model.infer(image)
         detections = []
         for prediction in results.predictions:
-            bbox = np.array([prediction.x - prediction.width/2, prediction.y + prediction.height/2,
-                             prediction.x + prediction.width/2, prediction.y - prediction.height/2])
-            detections.append(Detection(
-                box=bbox,
-                class_id=prediction.class_id,
-                names={str(prediction.class_id): prediction.class_name},
-                confidence=prediction.confidence,
-                timestamp=timestamp
-            ))
+            bbox = np.array([
+                prediction.x - prediction.width / 2,
+                prediction.y + prediction.height / 2,
+                prediction.x + prediction.width / 2,
+                prediction.y - prediction.height / 2,
+            ])
+            detections.append(
+                Detection(
+                    box=bbox,
+                    class_id=prediction.class_id,
+                    names={str(prediction.class_id): prediction.class_name},
+                    confidence=prediction.confidence,
+                    timestamp=timestamp,
+                )
+            )
         return detections
 
     def test_speed(self) -> None:
@@ -130,6 +137,7 @@ class ClassifierYoloWorld:
         # Do computations...
         return detections
 
+
 if __name__ == "__main__":
     SOURCE_IMAGE_PATH = "__old__/_old/test.jpg"
     image = cv2.imread(SOURCE_IMAGE_PATH)
@@ -143,4 +151,3 @@ if __name__ == "__main__":
     # annotated_image = BOUNDING_BOX_ANNOTATOR.annotate(annotated_image, detections)
     # annotated_image = LABEL_ANNOTATOR.annotate(annotated_image, detections)
     # sv.plot_image(annotated_image, (10, 10))
-

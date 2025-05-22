@@ -24,18 +24,25 @@ class ImageRegistry:
     def save_video_metadata(self) -> None:
         assert self.video_metadata is not None, "Video metadata not set, please call set_video_metadata first"
         path = Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, self.video_metadata.uuid, "metadata.json"))
-        if path.exists(): return
+        if path.exists():
+            return
         os.makedirs(path.parent, exist_ok=True)
-        with open(path, "w") as f: json.dump(asdict(self.video_metadata), f)
+        with open(path, "w") as f:
+            json.dump(asdict(self.video_metadata), f)
 
-    def add(self, image: Image.Image | np.ndarray, timestamp: float, detections: Optional[List[Detection]] = None) -> None: # Saves locally
+    def add(
+        self, image: Image.Image | np.ndarray, timestamp: float, detections: Optional[List[Detection]] = None
+    ) -> None:  # Saves locally
         assert self.video_metadata is not None, "Video metadata not set, please call set_video_metadata first"
-        if isinstance(image, np.ndarray): image = Image.fromarray(image)
-        if detections is None: detections = []
+        if isinstance(image, np.ndarray):
+            image = Image.fromarray(image)
+        if detections is None:
+            detections = []
         sample = ImageSample(image, detections, ImageMetadata(self.frame_idx, timestamp, self.video_metadata.uuid))
         path = Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, self.video_metadata.uuid, f"{self.frame_idx}.sample"))
         os.makedirs(path.parent, exist_ok=True)
-        with path.open("w") as f: json.dump(sample.to_json(), f)
+        with path.open("w") as f:
+            json.dump(sample.to_json(), f)
         self.save_video_metadata()
         self.frame_idx += 1
 
@@ -45,26 +52,31 @@ class ImageRegistry:
     def cleanup(self, min_len: int = 10) -> None:
         for path in set([p.parent for p in Path(Environment.IMAGE_REGISTRY_PATH).glob("**/*.sample")]):
             if len(list(path.glob("*.sample"))) < min_len:
-                for p in path.glob("*"): p.unlink()
+                for p in path.glob("*"):
+                    p.unlink()
                 os.rmdir(path)
 
     def compress_image_samples_to_video(self, uuid: str, delete: Optional[bool] = True) -> VideoSample:
         image_paths = list(Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid)).glob("*.sample"))
         image_paths.sort(key=lambda x: int(x.stem))
         samples = [ImageSample.from_json(json.load(open(path))) for path in image_paths]
-        metadata = VideoMetadata(**json.load(open(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid, "metadata.json"))))
+        metadata = VideoMetadata(
+            **json.load(open(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid, "metadata.json")))
+        )
         video_sample = VideoSample(samples, metadata)
         if delete:
-            for path in Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid)).glob("*"): path.unlink()
+            for path in Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid)).glob("*"):
+                path.unlink()
             os.rmdir(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid))
         return video_sample
 
-    def upload(self) -> None: # Uploads images to Supabase and deletes them locally
+    def upload(self) -> None:  # Uploads images to Supabase and deletes them locally
         self.supabase_helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
         uuids = set([p.parts[1] for p in Path(Environment.IMAGE_REGISTRY_PATH).glob("**/*.sample")])
         for uuid in uuids:
             video_sample = self.compress_image_samples_to_video(uuid)
             self.supabase_helper.upload_sample(video_sample)
+
 
 class SupabaseHelper:
     def __init__(self, bucket_name: str) -> None:
@@ -72,30 +84,32 @@ class SupabaseHelper:
         self.client = supabase.create_client(Environment.SUPABASE_URL, Environment.SUPABASE_KEY)
 
     def upload_sample(self, sample: VideoSample) -> None:
-        file_obj = sample.to_json().encode('utf-8')
+        file_obj = sample.to_json().encode("utf-8")
         self.client.storage.from_(self.bucket_name).upload(
             path=f"{sample.metadata.uuid}.json",
             file=file_obj,
             file_options={
                 "content-type": "application/json",
                 "cache-control": "3600",
-                "upsert": "false"  # False = Error if file already exists
-            }
+                "upsert": "false",  # False = Error if file already exists
+            },
         )
 
     def exists(self, uuid: str) -> bool:
         try:
             self.client.storage.from_(self.bucket_name).download(f"{uuid}.json")
             return True
-        except storage3.exceptions.StorageApiError: return False
+        except storage3.exceptions.StorageApiError:
+            return False
 
     def get(self, uuid: str) -> VideoSample:
         response = self.client.storage.from_(self.bucket_name).download(f"{uuid}.json")
-        json_str = response.decode('utf-8')
+        json_str = response.decode("utf-8")
         return VideoSample.from_json(json_str)
 
     def delete(self, uuid: str) -> None:
         self.client.storage.from_(self.bucket_name).remove(f"{uuid}.json")
+
 
 if __name__ == "__main__":
     image_registry = ImageRegistry()
