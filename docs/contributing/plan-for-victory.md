@@ -10,24 +10,15 @@ Our primary concern is going fast and staying on the track we consciously choose
 This plan is updated every Sunday by @Apros7 (Lucas Vilsen)
 
 ## Upcomings goals:
-1. Have a working product for sorting waste at Startup Day on Thursday, 15th of May.
-2. Sort >3 tons of waste May 26th, 27th & 28th.
+1. Have a working waste detection system 31. August 2025.
 
 
 ## Plan (in ranked order of priority)
-1. Label first 1000 images. Start experimenting with Scale Studio and Roboflow Annotation until EasyLabeller is usable.
-2. Improve EasyLabeller to a usable state.
-3. Autoupload and perform selection in samples needed for manual labelling to improve AI sorting.
-4. Have a complete pipeline for recognizing and calculating object 3d positions running faster than >20it/min on Jetson.
-5. Redo EasyTrack
-
-## Secondary
-- Autoupload information (Weight, CO2, classification) to SupaBase at least every 6 hours.
-
-
-## Who is responsible for what?
-- Lucas: 1, 2, 3, 5
-- Erik: 4
+1. Release first dataset version with SAM2 and Gemini.
+2. Develop first demo version of Easysort 1.0.
+3. Be able to notify users of critical detections.
+4. Be able to generate daily reports.
+5. Auto-detect new objects in the image.
 
 
 ## Links:

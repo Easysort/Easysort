@@ -47,7 +47,12 @@ You can start the UI and API locally by running:
 just dev
 ```
 
-# Why open-source?
-I believe this is a positive-sum game. The market is so large that we can all win. This technology should be so cheap that it exists everywhere on earth helping everyone better sort items and improve the average quality of products running through their system.
+# Why Easysort?
+
+Europe pushed the resposibility of sorting waste to the citizens. This is expensive both in time and money, but also inefficient. Easysort is paving the way for intelligent, robotic sorting, which improves the efficiency and reduces the cost of sorting waste for every party involved.
+
+So why was the responsibility pushed to the citizens in the first place? The main reasons complete automated waste sorting hasn't happened yet is: 1) the cost of the technology is too high and 2) the recognition systems are not good enough. Having one central system pushing the technology forward, and making that technology as cheap as possible, is one way to solve both problems.
+
+Crucial technology should be so cheap that basically no one profits. This is why Easysort is open source. Let's make one good solution for everyone, and make it free for the world to use, improve and build on.
 
 You can use EasySort as you like, copy it, modify it, sell it, do whatever you like with it. The project is in active development, so issues and pull requests are welcome.
