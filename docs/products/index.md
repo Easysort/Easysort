@@ -2,9 +2,9 @@
 
 At Easysort, we have two main products.
 
-## Easysort Eye
+## Easysort 1.0
 
-The Easysort Eye is: Lights + Camera + AI + Onboard Compute + Data management all in a plastic case.
+The Easysort 1.0 is: Lights + Camera + AI + Onboard Compute + Data management all in a plastic case.
 
 ## Easysort Sorting System
 

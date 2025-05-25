@@ -1,6 +1,28 @@
 
 There are many players doing AI/Robotic sorting in the waste industry. Easysort is the only open source solution.
 
+Below is a list of most players. First lets make a broader distinction between the players.
+
+### 2 Groups
+
+1. **Complete large scale sorting**
+Companies here include: ZenRobotics, AMP Robotics, Waste Robotics, Tomra and Banzo.
+
+Usually both sensors and robots, sometimes provided through partners. Some build the facilities for others, some through partners. These systems are expensive, require large space, high lead time (usually >6 months), and hard to install into existing operations. This issues make it hard to existing operators to upgrade their operations and have a clear ROI.
+
+2. **Monitoring systems**
+Companies here include: Sortrace, Aris Robotics, WeSortAI and GreyParrot.
+
+These companies provide monitoring systems in one form or another. They are not focused on sorting, but rather on monitoring the waste stream. GreyParrot is the only company which can be used with robots. They are overpriced, at times hard to install as large sensors are required.  
+
+**How is Easysort different?**
+
+The most present issue in the industry is the correction classification of waste and estimation of purity. As such systems are highly overpriced, it is hard to justify the investment. Many of them don't directly provide a modular approach to adding robots, which makes it hard to scale.
+
+Easysort is focused on making an easy-to-install, high-performing detection system. It is modular, open source and can be installed into existing operations in a cost effective way. Down the line, we expect to be able to provide robots that can be added to the system. Our goal is to make the most reliable, modular and cost effective solution for small and existing scale sorting. 
+
+### Each player in depth
+
 Here is a list of most players in the market and their approach to waste sorting rated in the following categories:
 
 - **Cost:** (Without Taxes/Tariffs) Low/Medium/High (based on information from website - must prices are hidden, which is common for this industry)
@@ -23,6 +45,8 @@ Here is a list of most players in the market and their approach to waste sorting
 | Sortrace | --- | --- | --- | --- | No | No |
 | LogiWaste | --- | Long | High | Hard | No | No |
 | Waste Robotics | 2.5-3.5 mil. | 12 weeks | High | Medium | Yes, but through partner | No |
+| Banzo | 
+| Tomra |
 | Easysort | 15-200k | 2-8 weeks | Low | Easy | Yes | Yes |
 
 ### ZenRobotics
@@ -86,6 +110,22 @@ Only camera, camera based, low cost:
 **Pros:** Large scale sorting, high accuracy, complete solution, somewhat modular.
 
 **Cons:** Expensive, requires large changes to existing operations, large space required, Medium lead time.
+
+### Banzo
+
+[Banzo](https://banzo.nl/) builds complete sorting facilities mostly using others technology. Tomra is one of their partners. Banzo provides a complete solution when it comes to sorting.
+
+**Pros:** Large scale sorting, high accuracy, complete solution, custom solutions.
+
+**Cons:** Expensive, really only for new facilities, large space required, High lead time (~2 years for a small facility)
+
+### Tomra
+
+[Tomra](https://www.tomra.com/) develops machines and sensors for many machine applications usually regarding carbon footprint in some way. They are a leader in this field. Tomra does not provide a complete solution and does not build facilities themselves. They sell their technology to other partners, which then build the facilities.
+
+**Pros:** Large scale sorting, high accuracy, modular
+
+**Cons:** Really expensive, only through partners
 
 ### Easysort
 
