@@ -18,6 +18,7 @@ from easysort.utils.image_sample import ImageMetadata, ImageSample, VideoMetadat
 class ImageRegistry:
     def __init__(self) -> None:
         self.video_metadata: Optional[VideoMetadata] = None
+        self._supabase_helper: "SupabaseHelper | None" = None
 
     def set_video_metadata(self, metadata: VideoMetadata) -> None:
         self.video_metadata = metadata
@@ -25,9 +26,19 @@ class ImageRegistry:
         self.save_path.mkdir(parents=True, exist_ok=True)
 
     @property
-    def save_path(self) -> Path:
+    def uuid(self) -> str:
         assert self.video_metadata is not None, "Video metadata not set, please call set_video_metadata first"
-        return Environment.IMAGE_REGISTRY_PATH / self.video_metadata.uuid
+        return self.video_metadata.uuid
+
+    @property
+    def save_path(self) -> Path:
+        return Environment.IMAGE_REGISTRY_PATH / self.uuid
+
+    @property
+    def supabase_helper(self) -> "SupabaseHelper":
+        if self._supabase_helper is None:
+            self._supabase_helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
+        return self._supabase_helper
 
     def save_video_metadata(self) -> None:
         assert self.video_metadata is not None, "Video metadata not set, please call set_video_metadata first"
@@ -45,7 +56,7 @@ class ImageRegistry:
             image = Image.fromarray(image)
         if detections is None:
             detections = []
-        sample = ImageSample(image, ImageMetadata(self.frame_idx, timestamp, self.video_metadata.uuid, detections))
+        sample = ImageSample(image, ImageMetadata(self.frame_idx, timestamp, self.uuid, detections))
         metadata_path = self.save_path / f"{self.frame_idx}.json"
         image_path = self.save_path / f"{self.frame_idx}.png"
         sample.save_metadata(metadata_path)
@@ -88,12 +99,18 @@ class ImageRegistry:
             samples.append(sample)
         return VideoSample(samples, metadata)
 
-    def upload(self) -> None:  # Uploads images to Supabase and deletes them locally
-        self.supabase_helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
+    def upload(self, uuid: str) -> None:
+        """
+        Uploads a single video sample to Supabase.
+        """
+        video_sample = self.convert_to_video(uuid)
+        self.supabase_helper.upload_sample(video_sample)
+
+    def upload_all(self, delete: bool = False) -> None:
         for uuid in ImageRegistry.uuids():
-            video_sample = self.convert_to_video(uuid)
-            self.supabase_helper.upload_sample(video_sample)
-            shutil.rmtree(Environment.IMAGE_REGISTRY_PATH / uuid)
+            self.upload(uuid)
+            if delete:
+                shutil.rmtree(Environment.IMAGE_REGISTRY_PATH / uuid)
 
 
 class SupabaseHelper:
@@ -149,5 +166,5 @@ class SupabaseHelper:
 
 if __name__ == "__main__":
     image_registry = ImageRegistry()
-    # image_registry.upload()
+    # image_registry.upload_all()
     image_registry.cleanup()
