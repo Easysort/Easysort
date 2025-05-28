@@ -4,11 +4,10 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-import imageio.v3 as iio
-import numpy as np
 from PIL import Image
 
 from easysort.utils.detections import Detection
+from easysort.utils.lossless_video import read_mkv, save_lossless_mkv
 
 
 @dataclass
@@ -92,8 +91,8 @@ class VideoSample:
         assert path.suffix == ".mkv", "Video must be saved as MKV"
         if not path.parent.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
-        images = [np.array(sample.image) for sample in self.samples_list]
-        iio.imwrite(path, images, plugin="pyav", codec="ffv1", fps=fps)
+        images = [sample.image for sample in self.samples_list]
+        save_lossless_mkv(images, path, fps=fps)
 
     def save_metadata(self, path: Path) -> None:
         assert path.suffix == ".json", "Metadata must be saved as JSON"
@@ -112,8 +111,28 @@ class VideoSample:
                 f,
             )
 
+    @staticmethod
+    def video_path(path: Path) -> Path:
+        return path / "video.mkv"
+
+    @staticmethod
+    def metadata_path(path: Path) -> Path:
+        return path / "metadata.json"
+
+    def save(self, path: Path, fps: int = 1) -> tuple[Path, Path]:
+        path.mkdir(parents=True, exist_ok=True)
+        video_path = self.video_path(path)
+        metadata_path = self.metadata_path(path)
+        self.save_video(video_path, fps=fps)
+        self.save_metadata(metadata_path)
+        return video_path, metadata_path
+
     @classmethod
-    def load(cls, video_path: Path, metadata_path: Path) -> "VideoSample":
+    def load(cls, path: Path) -> "VideoSample":
+        video_path = cls.video_path(path)
+        metadata_path = cls.metadata_path(path)
+        assert video_path.exists(), f"Video file does not exist at {video_path}"
+        assert metadata_path.exists(), f"Metadata file does not exist at {metadata_path}"
         with metadata_path.open("r") as f:
             metadata = json.load(f)
         timestamps = metadata.pop("timestamps")
@@ -124,12 +143,12 @@ class VideoSample:
                 for frame_detections in detections
             ]
         metadata = VideoMetadata(**metadata)
-        images = iio.imread(video_path, plugin="pyav")
+        images = read_mkv(video_path)
         assert len(images) == len(timestamps), "Number of frames and timestamps do not match"
         assert len(images) == len(detections), "Number of frames and detections do not match"
         samples = [
             ImageSample(
-                image=Image.fromarray(img),
+                image=img,
                 metadata=ImageMetadata(frame_idx=i, timestamp=t, uuid=metadata.uuid, detections=d),
             )
             for i, (img, t, d) in enumerate(zip(images, timestamps, detections))

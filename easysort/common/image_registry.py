@@ -104,10 +104,7 @@ class SupabaseHelper:
 
     def upload_sample(self, sample: VideoSample) -> None:
         with TemporaryDirectory() as tmpdir:
-            metadata_path = Path(tmpdir) / "metadata.json"
-            video_path = Path(tmpdir) / "video.mkv"
-            sample.save_metadata(metadata_path)
-            sample.save_video(video_path, fps=1)
+            video_path, metadata_path = sample.save(Path(tmpdir), fps=1)
             self.bucket.upload(
                 path=f"{self.bucket_name}/{sample.metadata.uuid}.json",
                 file=metadata_path,
@@ -136,13 +133,14 @@ class SupabaseHelper:
 
     def get(self, uuid: str) -> VideoSample:
         with TemporaryDirectory() as tmpdir:
-            metadata_path = Path(tmpdir) / "metadata.json"
-            video_path = Path(tmpdir) / "video.mkv"
+            path = Path(tmpdir)
+            video_path = VideoSample.video_path(path)
+            metadata_path = VideoSample.metadata_path(path)
             with open(metadata_path, "wb") as f:
                 f.write(self.bucket.download(f"{self.bucket_name}/{uuid}.json"))
             with open(video_path, "wb") as f:
                 f.write(self.bucket.download(f"{self.bucket_name}/{uuid}.mkv"))
-            return VideoSample.load(video_path, metadata_path)
+            return VideoSample.load(path)
 
     def delete(self, uuid: str) -> None:
         self.bucket.remove([f"{self.bucket_name}/{uuid}.json"])

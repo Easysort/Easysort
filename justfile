@@ -5,6 +5,7 @@ test *PATHS:
     uv run pytest {{PATHS}}
 
 format:
+    uv run ruff check --select I --fix  # sort imports
     uv run ruff format
 
 lint:
