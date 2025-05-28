@@ -28,6 +28,9 @@ dependencies = [
     "openai-clip==1.0.1",
     "mkdocs",
     "mkdocs-material",
+    "eclipse-zenoh>=1.2.1",
+    "msgpack>=1.1.0",
+    "msgspec>=0.19.0"
 ]
 
 [tool.hatch.build.targets.wheel]
