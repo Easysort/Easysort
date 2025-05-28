@@ -6,6 +6,7 @@ import json
 from typing import Dict, Any, Union, List
 from dataclasses import field
 from uuid import uuid4
+import ast
 
 
 @dataclass
@@ -42,6 +43,10 @@ class ImageSample:
     @classmethod
     def from_json(cls, json_data: Union[str, Dict[str, Any]]) -> "ImageSample":
         data = json.loads(json_data) if isinstance(json_data, str) else json_data
+        if isinstance(data, str): data = ast.literal_eval(data)
+        if not all(key in data for key in ["image", "detections", "metadata"]): 
+            print("Invalid image sample")
+            return None
         image_data = bytes.fromhex(data["image"])
         image = Image.open(io.BytesIO(image_data))
         detections = [Detection.from_json(det_data) for det_data in data["detections"]]
