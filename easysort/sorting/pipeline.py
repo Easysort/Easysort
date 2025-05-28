@@ -1,9 +1,10 @@
 import time
 from datetime import datetime
-from typing import List, Optional
+from typing import Generator, List, Optional
 
 import cv2
 import numpy as np
+from cv2.typing import MatLike
 
 from easysort.common.environment import Environment
 from easysort.common.image_registry import ImageRegistry
@@ -22,7 +23,7 @@ class SortingPipeline:
         # self.segmentation = Segmentation()
         self.image_registry = ImageRegistry()
 
-    def __call__(self, image: np.ndarray, timestamp: Optional[float] = None) -> List[Detection]:
+    def detect(self, image: np.ndarray, timestamp: Optional[float] = None) -> List[Detection]:
         if timestamp is None:
             timestamp = time.time()
         detections = self.classifier(image)
@@ -31,42 +32,37 @@ class SortingPipeline:
             detection.timestamp = timestamp
         return detections
 
-    def stream(self):
+    def stream(self, use_depth: bool = True) -> Generator[tuple[list[Detection], MatLike], None, None]:
         metadata = VideoMetadata(date=datetime.now().strftime("%Y-%m-%d"), robot_id=Environment.CURRENT_ROBOT_ID)
         self.image_registry.set_video_metadata(metadata)
         while True:
             color_image, timestamp = self.camera.get_color_image()
-            self.image_registry.add(color_image, timestamp=timestamp)
-            detections = self(color_image, timestamp)
-            for d in detections:
-                d.set_center_point((d.center_point[0], d.center_point[1], self.camera.get_depth_for_detection(d)))
-            yield detections
+            detections = self.detect(color_image, timestamp)
+            if use_depth:
+                for d in detections:
+                    d.set_center_point((d.center_point[0], d.center_point[1], self.camera.get_depth_for_detection(d)))
+            self.image_registry.add(color_image, timestamp=timestamp, detections=detections)
+            yield detections, color_image
             if Environment.DEBUG:
                 main_view = visualize_sorting_pipeline_image(color_image, detections, show_plot=False)
                 cv2.imshow("Main View", main_view)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 
-    def stream_pickup(self):
-        metadata = VideoMetadata(date=datetime.now().strftime("%Y-%m-%d"), robot_id=Environment.CURRENT_ROBOT_ID)
-        self.image_registry.set_video_metadata(metadata)
-        while True:
-            color_image, timestamp = self.camera.get_color_image()
-            self.image_registry.add(color_image, timestamp=timestamp)
-            detections = self(color_image, timestamp)
-            for d in detections:
-                d.set_center_point((d.center_point[0], d.center_point[1], self.camera.get_depth_for_detection(d)))
-            yield detections[0]
-            # if len(detections) > 0:
-            #     self.connector.pickup_detection(self.transform_camera_to_robot(detections[0]))
-            #     while not self.connector.is_ready: pass
-            #     yield detections[0]
+    def stream_pickup(self) -> Generator[tuple[Detection | None, MatLike], None, None]:
+        for detections, color_image in self.stream():
+            if not detections:
+                yield None, color_image
+                continue
+            yield detections[0], color_image
+            # self.connector.pickup_detection(self.transform_camera_to_robot(detections[0]))
+            # while not self.connector.is_ready: pass
 
 
 if __name__ == "__main__":
     # Has to be run with sudo if DEBUG is False
     pipeline = SortingPipeline(use_yolo_world=True)
-    for detection in pipeline.stream():
+    for detection, image in pipeline.stream():
         print("------PICKED UP DETECTION--------")
         print(detection)
         print("--------------------------------")

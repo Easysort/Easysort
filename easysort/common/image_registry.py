@@ -1,7 +1,8 @@
 import json
-import os
+import shutil
 from dataclasses import asdict
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import List, Optional
 
 import numpy as np
@@ -21,13 +22,18 @@ class ImageRegistry:
     def set_video_metadata(self, metadata: VideoMetadata) -> None:
         self.video_metadata = metadata
         self.frame_idx = 0
+        self.save_path.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def save_path(self) -> Path:
+        assert self.video_metadata is not None, "Video metadata not set, please call set_video_metadata first"
+        return Environment.IMAGE_REGISTRY_PATH / self.video_metadata.uuid
 
     def save_video_metadata(self) -> None:
         assert self.video_metadata is not None, "Video metadata not set, please call set_video_metadata first"
-        path = Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, self.video_metadata.uuid, "metadata.json"))
+        path = self.save_path / "metadata.json"
         if path.exists():
             return
-        os.makedirs(path.parent, exist_ok=True)
         with open(path, "w") as f:
             json.dump(asdict(self.video_metadata), f)
 
@@ -39,77 +45,108 @@ class ImageRegistry:
             image = Image.fromarray(image)
         if detections is None:
             detections = []
-        sample = ImageSample(image, detections, ImageMetadata(self.frame_idx, timestamp, self.video_metadata.uuid))
-        path = Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, self.video_metadata.uuid, f"{self.frame_idx}.sample"))
-        os.makedirs(path.parent, exist_ok=True)
-        with path.open("w") as f:
-            json.dump(sample.to_json(), f)
+        sample = ImageSample(image, ImageMetadata(self.frame_idx, timestamp, self.video_metadata.uuid, detections))
+        metadata_path = self.save_path / f"{self.frame_idx}.json"
+        image_path = self.save_path / f"{self.frame_idx}.png"
+        sample.save_metadata(metadata_path)
+        sample.save_image(image_path)
         self.save_video_metadata()
         self.frame_idx += 1
 
-    def exists(self, uuid: str) -> bool:
-        return Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid)).exists()
+    @staticmethod
+    def exists(uuid: str) -> bool:
+        return (Environment.IMAGE_REGISTRY_PATH / uuid).exists()
 
-    def cleanup(self, min_len: int = 10) -> None:
-        for path in set([p.parent for p in Path(Environment.IMAGE_REGISTRY_PATH).glob("**/*.sample")]):
-            if len(list(path.glob("*.sample"))) < min_len:
-                for p in path.glob("*"):
-                    p.unlink()
-                os.rmdir(path)
+    @staticmethod
+    def uuids() -> set[str]:
+        """
+        Returns a list of all UUIDs in the image registry.
+        """
+        return set([p.parent.name for p in Environment.IMAGE_REGISTRY_PATH.glob("**/*.json")])
 
-    def compress_image_samples_to_video(self, uuid: str, delete: Optional[bool] = True) -> VideoSample:
-        image_paths = list(Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid)).glob("*.sample"))
-        image_paths.sort(key=lambda x: int(x.stem))
-        samples = [ImageSample.from_json(json.load(open(path))) for path in image_paths]
-        metadata = VideoMetadata(
-            **json.load(open(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid, "metadata.json")))
-        )
-        video_sample = VideoSample(samples, metadata)
-        if delete:
-            for path in Path(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid)).glob("*"):
-                path.unlink()
-            os.rmdir(os.path.join(Environment.IMAGE_REGISTRY_PATH, uuid))
-        return video_sample
+    @staticmethod
+    def cleanup(min_len: int = 10) -> None:
+        """
+        Cleans up the image registry by removing directories that contain fewer than `min_len` samples.
+        """
+        for uuid in ImageRegistry.uuids():
+            path = Environment.IMAGE_REGISTRY_PATH / uuid
+            if len(list(path.glob("*.json"))) < min_len:
+                shutil.rmtree(path)
+
+    @staticmethod
+    def convert_to_video(uuid: str) -> VideoSample:
+        path = Environment.IMAGE_REGISTRY_PATH / uuid
+        metadata = VideoMetadata(**json.load(open(path / "metadata.json")))
+        image_paths = list(sorted(path.glob("*.png"), key=lambda x: int(x.stem)))
+        json_paths = [path / f"{p.stem}.json" for p in image_paths]
+        samples = []
+        for image_path, json_path in zip(image_paths, json_paths):
+            assert image_path.exists(), f"Image {image_path} does not exist"
+            assert json_path.exists(), f"Metadata {json_path} does not exist"
+            sample = ImageSample.load(image_path=image_path, metadata_path=json_path)
+            samples.append(sample)
+        return VideoSample(samples, metadata)
 
     def upload(self) -> None:  # Uploads images to Supabase and deletes them locally
         self.supabase_helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
-        uuids = set([p.parts[1] for p in Path(Environment.IMAGE_REGISTRY_PATH).glob("**/*.sample")])
-        for uuid in uuids:
-            video_sample = self.compress_image_samples_to_video(uuid)
+        for uuid in ImageRegistry.uuids():
+            video_sample = self.convert_to_video(uuid)
             self.supabase_helper.upload_sample(video_sample)
+            shutil.rmtree(Environment.IMAGE_REGISTRY_PATH / uuid)
 
 
 class SupabaseHelper:
     def __init__(self, bucket_name: str) -> None:
         self.bucket_name: str = bucket_name
         self.client = supabase.create_client(Environment.SUPABASE_URL, Environment.SUPABASE_KEY)
+        self.bucket = self.client.storage.from_(self.bucket_name)
 
     def upload_sample(self, sample: VideoSample) -> None:
-        file_obj = sample.to_json().encode("utf-8")
-        self.client.storage.from_(self.bucket_name).upload(
-            path=f"{sample.metadata.uuid}.json",
-            file=file_obj,
-            file_options={
-                "content-type": "application/json",
-                "cache-control": "3600",
-                "upsert": "false",  # False = Error if file already exists
-            },
-        )
+        with TemporaryDirectory() as tmpdir:
+            metadata_path = Path(tmpdir) / "metadata.json"
+            video_path = Path(tmpdir) / "video.mkv"
+            sample.save_metadata(metadata_path)
+            sample.save_video(video_path, fps=1)
+            self.bucket.upload(
+                path=f"{self.bucket_name}/{sample.metadata.uuid}.json",
+                file=metadata_path,
+                file_options={
+                    "content-type": "application/json",
+                    "cache-control": "3600",
+                    "upsert": "false",  # False = Error if file already exists
+                },
+            )
+            self.bucket.upload(
+                path=f"{self.bucket_name}/{sample.metadata.uuid}.mkv",
+                file=video_path,
+                file_options={
+                    "content-type": "video/matroska",
+                    "cache-control": "3600",
+                    "upsert": "false",  # False = Error if file already exists
+                },
+            )
 
     def exists(self, uuid: str) -> bool:
         try:
-            self.client.storage.from_(self.bucket_name).download(f"{uuid}.json")
+            self.bucket.download(f"{self.bucket_name}/{uuid}.json")
             return True
         except storage3.exceptions.StorageApiError:
             return False
 
     def get(self, uuid: str) -> VideoSample:
-        response = self.client.storage.from_(self.bucket_name).download(f"{uuid}.json")
-        json_str = response.decode("utf-8")
-        return VideoSample.from_json(json_str)
+        with TemporaryDirectory() as tmpdir:
+            metadata_path = Path(tmpdir) / "metadata.json"
+            video_path = Path(tmpdir) / "video.mkv"
+            with open(metadata_path, "wb") as f:
+                f.write(self.bucket.download(f"{self.bucket_name}/{uuid}.json"))
+            with open(video_path, "wb") as f:
+                f.write(self.bucket.download(f"{self.bucket_name}/{uuid}.mkv"))
+            return VideoSample.load(video_path, metadata_path)
 
     def delete(self, uuid: str) -> None:
-        self.client.storage.from_(self.bucket_name).remove(f"{uuid}.json")
+        self.bucket.remove([f"{self.bucket_name}/{uuid}.json"])
+        self.bucket.remove([f"{self.bucket_name}/{uuid}.mkv"])
 
 
 if __name__ == "__main__":

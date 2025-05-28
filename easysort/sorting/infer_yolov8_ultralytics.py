@@ -61,9 +61,12 @@ if __name__ == "__main__":
     )
 
     annotated_image = BOUNDING_BOX_ANNOTATOR.annotate(annotated_image, detections_formatted)
+    labels: List[str] | None = None
+    if detections and detections[0].names and detections_formatted.class_id:
+        labels = [detections[0].names[class_id] for class_id in detections_formatted.class_id]
     annotated_image = LABEL_ANNOTATOR.annotate(
         annotated_image,
         detections_formatted,
-        labels=[detections[0].names[class_id] for class_id in detections_formatted.class_id],
+        labels=labels,  # type: ignore
     )
     sv.plot_image(annotated_image)

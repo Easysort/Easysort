@@ -23,6 +23,7 @@ repos:
         types: [python]
         files: ^easysort/.*\.py$
         pass_filenames: true
+        require_serial: true  # mypy can't run in parallel
       - id: tests
         name: subset of tests
         entry: uv run pytest tests/

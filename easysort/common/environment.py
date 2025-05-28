@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -15,7 +16,7 @@ class Environment:
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
     SUPABASE_AI_IMAGES_BUCKET: str = "ai-images"
-    IMAGE_REGISTRY_PATH: str = "image_registry"
+    IMAGE_REGISTRY_PATH: Path = Path("image_registry")
 
     # Gantry:
     GANTRY_PORT: str = os.getenv("GANTRY_PORT", "")

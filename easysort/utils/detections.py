@@ -1,37 +1,50 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from dataclasses import dataclass, field
+from typing import Any
 
 import cv2
 import numpy as np
 from ultralytics.engine.results import Results
 
 
+@dataclass
 class Detection:
-    def __init__(
-        self,
-        box: np.ndarray,
-        mask: Optional[np.ndarray] = None,
-        class_id: int = -1,
-        confidence: Optional[float] = None,
-        names: Optional[Dict[Union[int, str], str]] = None,
-        timestamp: Optional[float] = None,
-    ) -> None:
-        self.box = box
-        self.mask = mask
-        self.class_id = class_id
-        self.confidence = confidence
-        self.names = names if names is not None else {}
-        self.class_name = self.names.get(str(class_id), "")
+    box: np.ndarray
+    mask: np.ndarray | None = None
+    class_id: int = -1
+    confidence: float | None = None
+    names: dict[int | str, str] | None = field(default_factory=dict)
+    timestamp: float | None = None
+    _center_point: tuple[float, float, float] | None = field(default=None, init=False, repr=False)
+    _robot_center_point: np.ndarray | None = field(default=None, init=False, repr=False)
+
+    def __eq__(self, other):
+        if not isinstance(other, Detection):
+            return NotImplemented
+        return (
+            np.array_equal(self.box, other.box)
+            and (
+                np.array_equal(self.mask, other.mask)
+                if self.mask is not None and other.mask is not None
+                else self.mask == other.mask
+            )
+            and self.class_id == other.class_id
+            and self.confidence == other.confidence
+            and self.names == other.names
+            and self.timestamp == other.timestamp
+        )
+
+    def __post_init__(self):
+        if self.names is None:
+            self.names = {}
+        self.class_name = self.names.get(str(self.class_id), "")
         self.xyxy = [int(x) for x in self.box]
         self.area = (self.xyxy[2] - self.xyxy[0]) * (self.xyxy[3] - self.xyxy[1])
-        self._center_point: Optional[Tuple[float, float, float]] = None
-        self.timestamp = timestamp
-        self._robot_center_point: Optional[np.ndarray] = None
 
-    def set_center_point(self, center_point: Optional[Tuple[float, float, float]] = None) -> None:
+    def set_center_point(self, center_point: tuple[float, float, float] | None = None) -> None:
         self._center_point = center_point
 
     @property
-    def center_point(self) -> Tuple[float, float, float]:
+    def center_point(self) -> tuple[float, float, float]:
         if self._center_point is not None:
             return self._center_point
         if self.mask is None:
@@ -42,12 +55,12 @@ class Detection:
         self._center_point = center_point
         return center_point
 
-    def current_center_point(self, speed: float) -> Tuple[float, float, float]:
+    def current_center_point(self, speed: float) -> tuple[float, float, float]:
         if self.timestamp is None:
             raise NotImplementedError("Timestamp is not set")
         return (self.center_point[0] + speed * self.timestamp, self.center_point[1], self.center_point[2])
 
-    def to_json(self):
+    def to_dict(self):
         return {
             "box": self.box.tolist(),
             "mask": self.mask.tolist() if self.mask is not None else None,
@@ -57,8 +70,8 @@ class Detection:
         }
 
     @classmethod
-    def from_json(cls, data: Dict[str, Any]) -> "Detection":
-        names = {int(k) if k.isdigit() else k: v for k, v in data.get("names", {}).items()}
+    def from_dict(cls, data: dict[str, Any]) -> "Detection":
+        names = {int(k) if isinstance(k, str) and k.isdigit() else k: v for k, v in data.get("names", {}).items()}
         return cls(
             box=np.array(data["box"]),
             mask=np.array(data["mask"]) if data.get("mask") is not None else None,
@@ -80,20 +93,24 @@ class Mask(np.ndarray):
         return obj
 
     @staticmethod
-    def from_ultralytics(result: Results, image_shape: tuple) -> List[np.ndarray]:
+    def from_ultralytics(result: list[Results], image_shape: tuple) -> list[np.ndarray]:
         assert len(result) == 1, "Only one result is supported"
+        if not result[0].masks:
+            return []
         return [cv2.resize(mask.cpu().numpy(), (image_shape[1], image_shape[0])) for mask in result[0].masks.data]
 
 
 class Detections:
     @staticmethod
-    def from_ultralytics(result: Results) -> List[Detection]:
+    def from_ultralytics(result: Results) -> list[Detection]:
+        if not result.boxes:
+            return []
         return [
             Detection(
                 box=box.cpu().numpy(),
                 mask=None,
                 class_id=int(class_id.cpu().numpy()),
-                confidence=confidence.cpu().numpy(),
+                confidence=float(confidence.cpu().numpy()),
                 names=result.names,
             )
             for box, class_id, confidence in zip(result.boxes.xyxy, result.boxes.cls, result.boxes.conf)
