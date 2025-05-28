@@ -1,12 +1,14 @@
 import cv2
 
+
 class CameraConnector:
     def __init__(self):
         self.cap = cv2.VideoCapture(0)
 
     def get_color_image(self):
         ret, frame = self.cap.read()
-        if not ret: raise RuntimeError("Failed to capture image from camera")
+        if not ret:
+            raise RuntimeError("Failed to capture image from camera")
         timestamp = cv2.getTickCount() / cv2.getTickFrequency()
         return frame, timestamp
 

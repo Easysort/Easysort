@@ -13,6 +13,7 @@ import cv2
 import time
 from datetime import datetime
 
+
 class SortingPipeline:
     def __init__(self, use_yolo_world: bool = False):
         self.camera = CameraConnector()
@@ -21,7 +22,8 @@ class SortingPipeline:
         self.image_registry = ImageRegistry()
 
     def __call__(self, image: np.ndarray, timestamp: Optional[float] = None) -> List[Detection]:
-        if timestamp is None: timestamp = time.time()
+        if timestamp is None:
+            timestamp = time.time()
         detections = self.classifier(image)
         # detections = self.segmentation(image, detections)
         for detection in detections:
@@ -41,7 +43,7 @@ class SortingPipeline:
             if Environment.DEBUG:
                 main_view = visualize_sorting_pipeline_image(color_image, detections, show_plot=False)
                 cv2.imshow("Main View", main_view)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 
     def stream_pickup(self):
@@ -58,6 +60,7 @@ class SortingPipeline:
             #     self.connector.pickup_detection(self.transform_camera_to_robot(detections[0]))
             #     while not self.connector.is_ready: pass
             #     yield detections[0]
+
 
 if __name__ == "__main__":
     # Has to be run with sudo if DEBUG is False
