@@ -1,17 +1,18 @@
-import unittest
 import os
-from PIL import Image
-import numpy as np
 import time
+import unittest
+
+import numpy as np
+from PIL import Image
 
 
 @unittest.skipIf(os.getenv("DEEP_TEST") is None, "Skipping deep test")
 class TestImageRegistry(unittest.TestCase):
     def test_image_registry_connection(self):
-        from easysort.common.image_registry import SupabaseHelper
-        from easysort.utils.image_sample import VideoSample, VideoMetadata, ImageSample, ImageMetadata
-        from easysort.utils.detections import Detection
         from easysort.common.environment import Environment
+        from easysort.common.image_registry import SupabaseHelper
+        from easysort.utils.detections import Detection
+        from easysort.utils.image_sample import ImageMetadata, ImageSample, VideoMetadata, VideoSample
 
         helper = SupabaseHelper(Environment.SUPABASE_AI_IMAGES_BUCKET)
         metadata = VideoMetadata(date="2021-01-01", robot_id="1")
@@ -39,9 +40,9 @@ class TestImageRegistry(unittest.TestCase):
         self.assertEqual(len(sample.samples[1].detections), len(sample2.samples[1].detections))
 
     def test_image_registry_class(self):
+        from easysort.common.environment import Environment
         from easysort.common.image_registry import ImageRegistry
         from easysort.utils.image_sample import VideoMetadata, VideoSample
-        from easysort.common.environment import Environment
 
         image_registry = ImageRegistry()
 

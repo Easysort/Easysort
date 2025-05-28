@@ -3,16 +3,17 @@
 # !pip install -q supervision==0.19.0rc3
 # From: https://colab.research.google.com/github/roboflow/supervision/blob/develop/docs/notebooks/zero-shot-object-detection-with-yolo-world.ipynb#scrollTo=37CMTxw0jSyH
 
+import time
+
 import cv2
-import supervision as sv
 import numpy as np
+import supervision as sv
 import torch
+from inference.models.yolo_world.yolo_world import YOLOWorld
 
 from easysort.common.logger import EasySortLogger
-from easysort.utils.detections import Detection
-from inference.models.yolo_world.yolo_world import YOLOWorld
-import time
 from easysort.common.timer import TimeIt
+from easysort.utils.detections import Detection
 
 LOGGER = EasySortLogger()
 RANDOM_IMAGE_TENSOR = torch.rand((980, 1280, 3))

@@ -1,12 +1,12 @@
 # pylint: disable=no-name-in-module
-from tinygrad.examples.yolov8 import YOLOv8  # pylint: disable=no-name-in-module
-from tinygrad.tinygrad import Tensor  # pylint: disable=no-name-in-module
+import time
 
 import cv2
 import supervision as sv  # type: ignore
 
 from easysort.common.logger import EasySortLogger
-import time
+from tinygrad.examples.yolov8 import YOLOv8  # pylint: disable=no-name-in-module
+from tinygrad.tinygrad import Tensor  # pylint: disable=no-name-in-module
 
 LOGGER = EasySortLogger()
 RANDOM_IMAGE_TENSOR = Tensor.rand((980, 1280, 3))

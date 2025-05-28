@@ -1,14 +1,15 @@
+import time
+from typing import List
+
 import cv2
+import numpy as np
 import supervision as sv
+import torch
+from ultralytics import YOLO
 
 from easysort.common.logger import EasySortLogger
 from easysort.common.timer import TimeIt
-from easysort.utils.detections import Detections, Detection
-from ultralytics import YOLO
-import time
-import torch
-from typing import List
-import numpy as np
+from easysort.utils.detections import Detection, Detections
 
 LOGGER = EasySortLogger()
 RANDOM_IMAGE_TENSOR = torch.rand((980, 1280, 3)).numpy()

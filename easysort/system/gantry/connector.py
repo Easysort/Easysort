@@ -1,15 +1,16 @@
-from typing import Optional
 import time
+from typing import Optional
 
+import cv2
+import numpy as np
 import serial
 import serial.tools.list_ports
-from easysort.common.logger import EasySortLogger
+
 from easysort.common.environment import Environment
-from easysort.utils.detections import Detection
-import numpy as np
+from easysort.common.logger import EasySortLogger
 from easysort.system.camera.camera_connector import CameraConnector
-from easysort.system.camera.realsense_connector import RealSenseConnector, f_x, f_y, c_x, c_y
-import cv2
+from easysort.system.camera.realsense_connector import RealSenseConnector, c_x, c_y, f_x, f_y
+from easysort.utils.detections import Detection
 
 _LOGGER = EasySortLogger()
 _MAX_TIME_TO_WAIT_FOR_MOVEMENT_MESSAGE = 5  # seconds

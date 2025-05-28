@@ -1,7 +1,8 @@
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import cv2
 import numpy as np
 from ultralytics.engine.results import Results
-from typing import List, Optional, Tuple, Dict, Union, Any
-import cv2
 
 
 class Detection:

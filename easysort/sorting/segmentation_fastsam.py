@@ -1,8 +1,10 @@
+from typing import List
+
 import numpy as np
 from ultralytics import FastSAM
+
 from easysort.common.timer import TimeIt
 from easysort.utils.detections import Detection, Mask
-from typing import List
 
 
 class Segmentation:

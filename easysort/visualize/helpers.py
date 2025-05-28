@@ -1,7 +1,9 @@
-import cv2
-import numpy as np
-import matplotlib.pyplot as plt
 from typing import List
+
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+
 from easysort.utils.detections import Detection
 
 

@@ -1,8 +1,10 @@
 import unittest
-from PIL import Image
+
 import numpy as np
+from PIL import Image
+
 from easysort.utils.detections import Detection
-from easysort.utils.image_sample import ImageSample, VideoSample, ImageMetadata, VideoMetadata
+from easysort.utils.image_sample import ImageMetadata, ImageSample, VideoMetadata, VideoSample
 
 
 class TestImageSample(unittest.TestCase):

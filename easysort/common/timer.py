@@ -1,5 +1,5 @@
-import time
 import contextlib
+import time
 
 
 class TimeIt(contextlib.ContextDecorator):

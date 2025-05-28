@@ -2,9 +2,9 @@ import sys
 import termios
 import tty
 
-from easysort.system.gantry.connector import GantryConnector
 from easysort.common.environment import Environment
 from easysort.system.camera.camera_connector import CameraConnector
+from easysort.system.gantry.connector import GantryConnector
 
 
 def get_key():

@@ -1,11 +1,13 @@
-from easysort.utils.detections import Detection
-from typing import Tuple
-import time
-import numpy as np
-import pyrealsense2 as rs  # type: ignore
 import os
 import sys
+import time
 from collections import OrderedDict
+from typing import Tuple
+
+import numpy as np
+import pyrealsense2 as rs  # type: ignore
+
+from easysort.utils.detections import Detection
 
 f_x = 635.47505771
 f_y = 636.69651825

@@ -1,6 +1,7 @@
-import zenoh
-import msgspec
 from typing import Callable, Generic, Self, TypeVar
+
+import msgspec
+import zenoh
 
 T = TypeVar("T")
 

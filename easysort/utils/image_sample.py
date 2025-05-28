@@ -1,11 +1,12 @@
-from dataclasses import dataclass, asdict
-from PIL import Image
-from easysort.utils.detections import Detection
 import io
 import json
-from typing import Dict, Any, Union, List
-from dataclasses import field
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Union
 from uuid import uuid4
+
+from PIL import Image
+
+from easysort.utils.detections import Detection
 
 
 @dataclass

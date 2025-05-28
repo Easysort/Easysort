@@ -1,16 +1,17 @@
-import supabase
-import os
-from PIL import Image
-from typing import List, Optional
 import json
-from pathlib import Path
-import numpy as np
+import os
 from dataclasses import asdict
-import storage3.exceptions
+from pathlib import Path
+from typing import List, Optional
 
-from easysort.utils.detections import Detection
-from easysort.utils.image_sample import VideoSample, ImageSample, VideoMetadata, ImageMetadata
+import numpy as np
+import storage3.exceptions
+import supabase
+from PIL import Image
+
 from easysort.common.environment import Environment
+from easysort.utils.detections import Detection
+from easysort.utils.image_sample import ImageMetadata, ImageSample, VideoMetadata, VideoSample
 
 
 class ImageRegistry:

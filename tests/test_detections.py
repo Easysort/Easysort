@@ -1,11 +1,12 @@
 import unittest
-from ultralytics import YOLO
+
 import cv2
+from ultralytics import YOLO
 
 
 class TestDetections(unittest.TestCase):
     def test_detections(self):
-        from easysort.utils.detections import Detections, Detection
+        from easysort.utils.detections import Detection, Detections
 
         model = YOLO("__old__/_old/best.pt")
         image = cv2.imread("__old__/_old/test.jpg")

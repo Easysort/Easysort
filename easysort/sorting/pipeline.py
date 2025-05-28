@@ -1,17 +1,18 @@
-from easysort.sorting.infer_yolov8_ultralytics import Classifier
-from easysort.sorting.infer_yoloWorld import ClassifierYoloWorld, test_yoloworld_classes
-from easysort.utils.detections import Detection
-from easysort.common.environment import Environment
-from easysort.visualize.helpers import visualize_sorting_pipeline_image
-from easysort.common.image_registry import ImageRegistry
-from easysort.utils.image_sample import VideoMetadata
-from easysort.system.camera.camera_connector import CameraConnector
-
-import numpy as np
-from typing import List, Optional
-import cv2
 import time
 from datetime import datetime
+from typing import List, Optional
+
+import cv2
+import numpy as np
+
+from easysort.common.environment import Environment
+from easysort.common.image_registry import ImageRegistry
+from easysort.sorting.infer_yolov8_ultralytics import Classifier
+from easysort.sorting.infer_yoloWorld import ClassifierYoloWorld, test_yoloworld_classes
+from easysort.system.camera.camera_connector import CameraConnector
+from easysort.utils.detections import Detection
+from easysort.utils.image_sample import VideoMetadata
+from easysort.visualize.helpers import visualize_sorting_pipeline_image
 
 
 class SortingPipeline:

@@ -1,7 +1,8 @@
-import cv2
-import numpy as np
 import argparse
 from pathlib import Path
+
+import cv2
+import numpy as np
 from tqdm import tqdm
 
 from easysort.common.image_registry import ImageRegistry

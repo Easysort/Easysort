@@ -1,10 +1,11 @@
-from easysort.system.camera.realsense_connector import RealSenseConnector
-from easysort.common.image_registry import ImageRegistry
-from easysort.common.environment import Environment
-from easysort.utils.image_sample import VideoMetadata
 from datetime import datetime
 
 import cv2
+
+from easysort.common.environment import Environment
+from easysort.common.image_registry import ImageRegistry
+from easysort.system.camera.realsense_connector import RealSenseConnector
+from easysort.utils.image_sample import VideoMetadata
 
 
 class Observer:
