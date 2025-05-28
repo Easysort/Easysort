@@ -3,7 +3,7 @@
 [Easysort](https://github.com/EasySort/easysort) is an open source waste sorting system. Currently, Easysort performs the function of waste classification and purity estimation. Additionally, Easysort is starting to include size, weight and value of each object to prioritize sorting.
 ## How do I use it?
 
-Easysort is designed to work on our Easysort Eye.
+Easysort is designed to work on our Easysort 1.0.
 
 ## How does it work?
 
