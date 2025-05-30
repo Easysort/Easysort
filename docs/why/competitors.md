@@ -6,14 +6,14 @@ Below is a list of most players. First lets make a broader distinction between t
 ### 2 Groups
 
 1. **Complete large scale sorting**
-Companies here include: ZenRobotics, AMP Robotics, Waste Robotics, Tomra and Banzo.
+    Companies here include: ZenRobotics, AMP Robotics, Waste Robotics, Tomra and Banzo.
 
-Usually both sensors and robots, sometimes provided through partners. Some build the facilities for others, some through partners. These systems are expensive, require large space, high lead time (usually >6 months), and hard to install into existing operations. This issues make it hard to existing operators to upgrade their operations and have a clear ROI.
+    Usually both sensors and robots, sometimes provided through partners. Some build the facilities for others, some through partners. These systems are expensive, require large space, high lead time (usually >6 months), and hard to install into existing operations. This issues make it hard to existing operators to upgrade their operations and have a clear ROI.
 
 2. **Monitoring systems**
-Companies here include: Sortrace, Aris Robotics, WeSortAI and GreyParrot.
+    Companies here include: Sortrace, Aris Robotics, WeSortAI and GreyParrot.
 
-These companies provide monitoring systems in one form or another. They are not focused on sorting, but rather on monitoring the waste stream. GreyParrot is the only company which can be used with robots. They are overpriced, at times hard to install as large sensors are required.  
+    These companies provide monitoring systems in one form or another. They are not focused on sorting, but rather on monitoring the waste stream. GreyParrot is the only company which can be used with robots. They are overpriced, at times hard to install as large sensors are required.  
 
 **How is Easysort different?**
 
