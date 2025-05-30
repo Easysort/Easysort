@@ -59,4 +59,6 @@ There are multiple levels to being open-source. We believe being open-source is 
 
 3. Should the software become mainstream, we still "own" the software. Everyone can use it, but we are the ones with the most knowledge on how this complex system works. Like Linux and Android, you made a reserved technology accessible and as companies use your software they most likely require help to fit to their exact usecase.
 
-4. We're doing it because we want the world to be a better place. Money is not everything.
+4. We produce and sell custom hardware solutions that are not freely available. This is how we mainly make money.
+
+5. We're doing it because we want the world to be a better place. Money is not everything.
