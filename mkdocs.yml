@@ -10,13 +10,16 @@ nav:
     - Quick-start: getting-started/quick-start.md
   - ABOUT EASYSORT:
     - Our Mission: why/mission.md
+    - Industry Problems: why/issues.md
     - Current State: why/current-state.md
     - Stakeholders: why/stakeholders.md
     - Waste Landscape: why/landscape.md
     - Market Players: why/competitors.md
     - Industry Funding: why/funding.md
+
   - THE SOLUTION:
-    - What we offer: products/index.md
+    - products/index.md
+    - What we offer: products/products.md
   - CONTRIBUTING:
     - How to contribute: contributing/index.md
     - Our projects: contributing/projects.md
