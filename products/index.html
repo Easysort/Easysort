@@ -18,7 +18,7 @@
         <link rel="prev" href="../why/funding/">
       
       
-        <link rel="next" href="../contributing/">
+        <link rel="next" href="products/">
       
       
       <link rel="icon" href="../assets/easysort-logo.png">
@@ -26,7 +26,7 @@
     
     
       
-        <title>What we offer - Easysort Documentation</title>
+        <title>The Solution - Easysort Documentation</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#products" class="md-skip">
+        <a href="#the-solution" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              What we offer
+              The Solution
             
           </span>
         </div>
@@ -380,6 +380,8 @@
       
         
       
+        
+      
     
     
     
@@ -431,6 +433,29 @@
   
   <span class="md-ellipsis">
     Our Mission
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../why/issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Industry Problems
     
   </span>
   
@@ -578,6 +603,8 @@
           
         
       
+        
+      
     
     
     
@@ -607,6 +634,11 @@
 
             </a>
             
+              
+              <label class="md-nav__link md-nav__link--active" for="__nav_3" id="__nav_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
           </div>
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
@@ -616,6 +648,29 @@
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    What we offer
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
               
             
           </ul>
@@ -953,20 +1008,74 @@
   
 
 
-<h1 id="products">Products<a class="headerlink" href="#products" title="Permanent link">¤</a></h1>
-<p>At Easysort, we have two main products. We are currently focusing on the Easysort 1.0, with the Easysort Sorting System being our future, complete solution.</p>
-<h2 id="easysort-10">Easysort 1.0<a class="headerlink" href="#easysort-10" title="Permanent link">¤</a></h2>
-<p>The Easysort 1.0 is: Lights + Camera + AI + Onboard Compute + Data management all in one unit.</p>
-<p>It is currently being used to detect incoming waste and notify the user of critical detections, generate reports generally on the waste stream and link waste scans to specific trucks.</p>
-<p>It functions well as quality control for incoming waste streams on conveyor belts.</p>
-<p><img alt="Easysort 1.0" src="../assets/product.png" /></p>
-<h2 id="easysort-sorting-system">Easysort Sorting System<a class="headerlink" href="#easysort-sorting-system" title="Permanent link">¤</a></h2>
-<p>The Easysort Sorting System is: Easysort Eye + Robotic Sorting System + Control System + Analytics.</p>
-<p>You give the system any kind of mixed waste stream from 90% pure to residual waste and you get a complete sorted waste stream.</p>
-<p>We are currently investigating the best way to do robotic sorting. Generally 3 main options are investigated:
-1. Delta Robot (Easy to implement, high precision, cheaper, slower speeds)
-2. Smart Conveyor (Pushing waste through actuators in conveyor. High speeds, high precision, expensive and hard to implement)
-3. Air cylinder (Blasting waste with air to move it. High speeds, difficult to move heavy objects, hard to implement)</p>
+<h1 id="the-solution">The Solution<a class="headerlink" href="#the-solution" title="Permanent link">¤</a></h1>
+<h2 id="creating-a-complete-sorting-system">Creating a complete sorting system<a class="headerlink" href="#creating-a-complete-sorting-system" title="Permanent link">¤</a></h2>
+<p>The end goal is creating a complete sorting system from all waste types to pure, clean fractions made for recycling. But why doesn't such a system already exists? What is needed to create such a system?</p>
+<p>Generally you can choose two different paths when building a complete sorting system:</p>
+<ol>
+<li>
+<p>Rely mostly on mechanical sorting, wait with detection until the end</p>
+<p><strong>Pros</strong>: Extremely fast, machines mostly already exist</p>
+<p><strong>Cons</strong>: Waste is contaminated, hard to get high purity &amp; high effect, Expensive, hard to add to existing facilities</p>
+</li>
+<li>
+<p>Rely on AI detection, sort larger items as early as possible.</p>
+<p><strong>Pros</strong>: High purity &amp; high effect possible, be able to sort in many (sub)fractions without multiple expensive and specialized machines.</p>
+<p><strong>Cons</strong>: Difficult to get detections right, hard to sort mixed waste, no system has been implemented with this before</p>
+</li>
+</ol>
+<p>To get as high a quality as possible, the current idea is that you want to sort as early as possible. This is why source sorting is happening. For this reason, we believe you want AI system to detect the objects and clever sorting methods to pick these items out at a speed comparable to existing solutions based on mechanical sorting. In this way you can save a large anoumt of items, keep the fractions pure and of high quality, and move the industry away from source and towards central sorting.</p>
+<h2 id="choosing-a-path-forward">Choosing a path forward<a class="headerlink" href="#choosing-a-path-forward" title="Permanent link">¤</a></h2>
+<p>So the goal is to build an automated sorting facility leveraging AI to detect and sort objects fast and accurately. Again two main extreme paths present themselves:</p>
+<ol>
+<li>
+<p>Build a complete sorting facility from scratch and handle all waste sorting yourself.</p>
+</li>
+<li>
+<p>Build the central technology needed to deploy such facility and focus on selling that as intermediate products.</p>
+</li>
+</ol>
+<p>Based on Per Flybjerg's book "Get big things done", we are much close to 2 than 1. First lets look at what is needed to build a complete sorting facility:</p>
+<ol>
+<li>
+<p>AI Detection System of extremely high quality (speed, accuracy, reliability)</p>
+</li>
+<li>
+<p>Fast sorting methods for pure items (delta robot, conveyor belt sorting, etc).</p>
+</li>
+<li>
+<p>Shredder to pull apart mixed items and make ready for waste-2-energy plant</p>
+</li>
+<li>
+<p>Post-shredder sorting machines. Some AI Detection needed mixed with traditional methods.</p>
+</li>
+<li>
+<p>Logistics: Belts, containers, trucks, space, etc.</p>
+</li>
+</ol>
+<p>What is the real big hurdle that would have the largest effect on such facility actually being built? High quality AI detection systems. So this is what we are building.</p>
+<p>Easysort is not meant to be an endless futuristic project. We want to make a difference as soon as possible and make solutions that can be directly added do improve the situation today. Constructing a large facility is insanely risky and requires huge amount of both capital and technological leaps. This is not what we want.</p>
+<p>We develop a strong AI Detection System. When this system is good enough and we can prove it works in real world scenarios, we will develop sorting solutions. We will slowly evolve the industry, while working on exactly those technological leaps necessary for complete central sorting to be a reality. We make our software open-source. Waste management effects everyone and should be as cheap as possible. We are not interested in making money, we are interested in making a difference that everyone benefits from!</p>
+<h2 id="sooo-what-is-your-competitive-edge">Sooo, what is your competitive edge?<a class="headerlink" href="#sooo-what-is-your-competitive-edge" title="Permanent link">¤</a></h2>
+<p>Most investors and business people aren't too happy with open-source software. "If everyone can just steal your software, run it themselves, then how are you ever going to have leverage?".</p>
+<p>There are multiple levels to being open-source. We believe being open-source is great because:</p>
+<ol>
+<li>
+<p>Customers can see who they are dealing with, try our software, see the results for themselves. This builds trust and security in a brand.</p>
+</li>
+<li>
+<p>Competitors can "take" our software yes. If they start using our software, they will be extremely interested in us continuing to do so, which will offer great potential partnersships. If they implement our key functionalities and ideas, their product gets better. This forces us to continue to improve and generally has a positive impact on the industry and planet.</p>
+</li>
+<li>
+<p>Should the software become mainstream, we still "own" the software. Everyone can use it, but we are the ones with the most knowledge on how this complex system works. Like Linux and Android, you made a reserved technology accessible and as companies use your software they most likely require help to fit to their exact usecase.</p>
+</li>
+<li>
+<p>We produce and sell custom hardware solutions that are not freely available. This is how we mainly make money.</p>
+</li>
+<li>
+<p>We're doing it because we want the world to be a better place. Money is not everything.</p>
+</li>
+</ol>
 
 
 
@@ -1019,13 +1128,13 @@
         
         
           
-          <a href="../contributing/" class="md-footer__link md-footer__link--next" aria-label="Next: How to contribute">
+          <a href="products/" class="md-footer__link md-footer__link--next" aria-label="Next: What we offer">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                How to contribute
+                What we offer
               </div>
             </div>
             <div class="md-footer__button md-icon">
