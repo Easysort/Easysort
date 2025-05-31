@@ -1,24 +1,64 @@
-# Products
+# The Solution
 
-At Easysort, we have two main products. We are currently focusing on the Easysort 1.0, with the Easysort Sorting System being our future, complete solution.
+## Creating a complete sorting system
 
-## Easysort 1.0
+The end goal is creating a complete sorting system from all waste types to pure, clean fractions made for recycling. But why doesn't such a system already exists? What is needed to create such a system?
 
-The Easysort 1.0 is: Lights + Camera + AI + Onboard Compute + Data management all in one unit.
+Generally you can choose two different paths when building a complete sorting system:
 
-It is currently being used to detect incoming waste and notify the user of critical detections, generate reports generally on the waste stream and link waste scans to specific trucks.
+1. Rely mostly on mechanical sorting, wait with detection until the end
 
-It functions well as quality control for incoming waste streams on conveyor belts.
+    **Pros**: Extremely fast, machines mostly already exist
 
-![Easysort 1.0](../assets/product.png)
+    **Cons**: Waste is contaminated, hard to get high purity & high effect, Expensive, hard to add to existing facilities
 
-## Easysort Sorting System
+    
+2. Rely on AI detection, sort larger items as early as possible.
 
-The Easysort Sorting System is: Easysort Eye + Robotic Sorting System + Control System + Analytics.
+    **Pros**: High purity & high effect possible, be able to sort in many (sub)fractions without multiple expensive and specialized machines.
 
-You give the system any kind of mixed waste stream from 90% pure to residual waste and you get a complete sorted waste stream.
+    **Cons**: Difficult to get detections right, hard to sort mixed waste, no system has been implemented with this before
 
-We are currently investigating the best way to do robotic sorting. Generally 3 main options are investigated:
-1. Delta Robot (Easy to implement, high precision, cheaper, slower speeds)
-2. Smart Conveyor (Pushing waste through actuators in conveyor. High speeds, high precision, expensive and hard to implement)
-3. Air cylinder (Blasting waste with air to move it. High speeds, difficult to move heavy objects, hard to implement)
+To get as high a quality as possible, the current idea is that you want to sort as early as possible. This is why source sorting is happening. For this reason, we believe you want AI system to detect the objects and clever sorting methods to pick these items out at a speed comparable to existing solutions based on mechanical sorting. In this way you can save a large anoumt of items, keep the fractions pure and of high quality, and move the industry away from source and towards central sorting.
+
+## Choosing a path forward
+
+So the goal is to build an automated sorting facility leveraging AI to detect and sort objects fast and accurately. Again two main extreme paths present themselves:
+
+1. Build a complete sorting facility from scratch and handle all waste sorting yourself.
+
+2. Build the central technology needed to deploy such facility and focus on selling that as intermediate products.
+
+Based on Per Flybjerg's book "Get big things done", we are much close to 2 than 1. First lets look at what is needed to build a complete sorting facility:
+
+1. AI Detection System of extremely high quality (speed, accuracy, reliability)
+
+2. Fast sorting methods for pure items (delta robot, conveyor belt sorting, etc).
+
+3. Shredder to pull apart mixed items and make ready for waste-2-energy plant
+
+4. Post-shredder sorting machines. Some AI Detection needed mixed with traditional methods.
+
+5. Logistics: Belts, containers, trucks, space, etc.
+
+What is the real big hurdle that would have the largest effect on such facility actually being built? High quality AI detection systems. So this is what we are building.
+
+Easysort is not meant to be an endless futuristic project. We want to make a difference as soon as possible and make solutions that can be directly added do improve the situation today. Constructing a large facility is insanely risky and requires huge amount of both capital and technological leaps. This is not what we want.
+
+We develop a strong AI Detection System. When this system is good enough and we can prove it works in real world scenarios, we will develop sorting solutions. We will slowly evolve the industry, while working on exactly those technological leaps necessary for complete central sorting to be a reality. We make our software open-source. Waste management effects everyone and should be as cheap as possible. We are not interested in making money, we are interested in making a difference that everyone benefits from!
+
+## Sooo, what is your competitive edge?
+
+Most investors and business people aren't too happy with open-source software. "If everyone can just steal your software, run it themselves, then how are you ever going to have leverage?".
+
+There are multiple levels to being open-source. We believe being open-source is great because:
+
+1. Customers can see who they are dealing with, try our software, see the results for themselves. This builds trust and security in a brand.
+
+2. Competitors can "take" our software yes. If they start using our software, they will be extremely interested in us continuing to do so, which will offer great potential partnersships. If they implement our key functionalities and ideas, their product gets better. This forces us to continue to improve and generally has a positive impact on the industry and planet.
+
+3. Should the software become mainstream, we still "own" the software. Everyone can use it, but we are the ones with the most knowledge on how this complex system works. Like Linux and Android, you made a reserved technology accessible and as companies use your software they most likely require help to fit to their exact usecase.
+
+4. We produce and sell custom hardware solutions that are not freely available. This is how we mainly make money.
+
+5. We're doing it because we want the world to be a better place. Money is not everything.
