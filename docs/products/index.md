@@ -55,7 +55,7 @@ There are multiple levels to being open-source. We believe being open-source is 
 
 1. Customers can see who they are dealing with, try our software, see the results for themselves. This builds trust and security in a brand.
 
-2. Competitors can "take" our software yes. If they start using our software, they will be extremely interested in us continuing to do so, which will offer great potential partnersships. If they implement our key functionalities and ideas, their product gets better. This forces us to continue to improve and generally has a positive impact on the industry and planet.
+2. Competitors can "take" our software yes. If they start using our software, they will be extremely interested in us continuing to develop, which will offer great potential partnersships. If they implement our key functionalities and ideas, their product gets better, but they will always be a few steps behind. This too forces us to continue to improve and generally has a positive impact on the industry and planet, which overall is a good thing. 
 
 3. Should the software become mainstream, we still "own" the software. Everyone can use it, but we are the ones with the most knowledge on how this complex system works. Like Linux and Android, you made a reserved technology accessible and as companies use your software they most likely require help to fit to their exact usecase.
 
