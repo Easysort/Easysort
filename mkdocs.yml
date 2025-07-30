@@ -9,6 +9,7 @@ nav:
     - index.md
     - Quick-start: getting-started/quick-start.md
   - ABOUT EASYSORT:
+    - about/index.md
     - Our Mission: why/mission.md
     - Industry Problems: why/issues.md
     - Current State: why/current-state.md
