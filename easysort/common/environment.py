@@ -16,6 +16,11 @@ class Environment:
     SUPABASE_AI_IMAGES_BUCKET: str = "ai-images"
     IMAGE_REGISTRY_PATH: str = "image_registry"
 
+    SEQUENCE_TABLE_NAME: str = "sequences"
+    ORGANIZATION_TABLE_NAME: str = "organizations"
+    SEQUENCE_ARTIFACTS_FOLDER: str = "sequence-artifacts"
+    SUPABASE_TRACKING_BUCKET: str = "tracking"
+
     # Gantry:
     GANTRY_PORT: str = os.getenv("GANTRY_PORT", "")
 
