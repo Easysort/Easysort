@@ -4,6 +4,7 @@ import os
 
 load_dotenv()
 
+
 @dataclass
 class Environment:
     # Generel:
@@ -24,4 +25,4 @@ class Environment:
     GANTRY_PORT: str = os.getenv("GANTRY_PORT", "")
 
     # Robot:
-    CURRENT_ROBOT_ID: str = os.getenv("CURRENT_ROBOT_ID", "") # 0001 = Gantry Sorting, 0101 = Delta Sorting
+    CURRENT_ROBOT_ID: str = os.getenv("CURRENT_ROBOT_ID", "")  # 0001 = Gantry Sorting, 0101 = Delta Sorting
