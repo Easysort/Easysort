@@ -1,6 +1,14 @@
 # Products
 
-At Easysort, we have two main products. We are currently focusing on the Easysort 1.0, with the Easysort Sorting System being our future, complete solution.
+At Easysort, we have two main products in addition to our sorting software. We are currently focusing on the Easysort 1.0, with the Easysort Sorting System being our future, complete solution.
+
+## Easysort Sorting Software
+
+Free waste sorting software running to analyze all waste types, purity, weight, size and estimate value if sorted correctly.
+
+## Easytrack (track.easysort.org)
+
+View your cloud data from your easysort 1.0 or implementation of Easysort Sorting Software in the web.
 
 ## Easysort 1.0
 
