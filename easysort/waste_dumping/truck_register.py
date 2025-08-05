@@ -29,14 +29,14 @@ from pathlib import Path
 import numpy as np
 import torch
 from PIL import Image
-from transformers import AutoModelForVision2Seq, AutoProcessor
+from transformers import AutoModelForImageTextToText, AutoProcessor
 import cv2  # type: ignore
 import mss
 import simpleaudio as sa
 
 # ----------------- Configuration -----------------
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-MODEL_NAME = "HuggingFaceTB/SmolVLM-Instruct"
+MODEL_NAME = "HuggingFaceTB/SmolVLM2-256M-Video-Instruct"
 ALERT_WAV_PATH = Path(__file__).with_name("alert.wav")  # optional custom sound
 SLEEP_SECONDS = 2  # pause between iterations (after inference)
 DEBUG = False  # can be toggled at CLI
@@ -44,7 +44,7 @@ DEBUG = False  # can be toggled at CLI
 
 # Pre‑load model and processor once
 processor = AutoProcessor.from_pretrained(MODEL_NAME)
-model = AutoModelForVision2Seq.from_pretrained(
+model = AutoModelForImageTextToText.from_pretrained(
     MODEL_NAME,
     torch_dtype=torch.bfloat16 if DEVICE == "cuda" else torch.float32,
     _attn_implementation="flash_attention_2" if DEVICE == "cuda" else "eager",
