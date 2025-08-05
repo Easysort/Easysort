@@ -17,4 +17,4 @@ Europe pushed the resposibility of sorting waste to the citizens. This is expens
 
 So why was the responsibility pushed to the citizens in the first place? The main reasons complete automated waste sorting hasn't happened yet is: 1) the cost of the technology is too high and 2) the recognition systems are not good enough. Having one central system pushing the technology forward, and making that technology as cheap as possible, is one way to solve both problems.
 
-Crucial technology should be so cheap that basically no one profits. This is why Easysort is open source. Let's make one good solution for everyone, and make it free for the world to use, improve and build on.
+Crucial technology should be so cheap that basically no one profits. This is why most of Easysort is open source. Let's make one good solution for everyone, and make it free for the world to use, improve and build on.

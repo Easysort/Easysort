@@ -17,9 +17,9 @@ Generally you can choose two different paths when building a complete sorting sy
 
     **Pros**: High purity & high effect possible, be able to sort in many (sub)fractions without multiple expensive and specialized machines.
 
-    **Cons**: Difficult to get detections right, hard to sort mixed waste, no system has been implemented with this before
+    **Cons**: Difficult to get detections right, extremely hard to sort mixed waste, no system has been implemented with this before
 
-To get as high a quality as possible, the current idea is that you want to sort as early as possible. This is why source sorting is happening. For this reason, we believe you want AI system to detect the objects and clever sorting methods to pick these items out at a speed comparable to existing solutions based on mechanical sorting. In this way you can save a large anoumt of items, keep the fractions pure and of high quality, and move the industry away from source and towards central sorting.
+To get as high a quality as possible, the current idea is that you want to sort as early as possible. This is why source sorting is happening. For this reason, we believe you want AI system to detect the objects and clever sorting methods to pick these items out at a speed comparable to existing solutions based on mechanical sorting. In this way you can save a large anoumt of items, keep the fractions pure and of high quality, and move the industry away from source sorting and towards central sorting.
 
 ## Choosing a path forward
 
@@ -29,7 +29,7 @@ So the goal is to build an automated sorting facility leveraging AI to detect an
 
 2. Build the central technology needed to deploy such facility and focus on selling that as intermediate products.
 
-Based on Per Flybjerg's book "Get big things done", we are much close to 2 than 1. First lets look at what is needed to build a complete sorting facility:
+Based on Per Flybjerg's book "Get big things done", we are much closer to 2 than 1. First lets look at what is needed to build a complete sorting facility:
 
 1. AI Detection System of extremely high quality (speed, accuracy, reliability)
 
@@ -59,6 +59,6 @@ There are multiple levels to being open-source. We believe being open-source is 
 
 3. Should the software become mainstream, we still "own" the software. Everyone can use it, but we are the ones with the most knowledge on how this complex system works. Like Linux and Android, you made a reserved technology accessible and as companies use your software they most likely require help to fit to their exact usecase.
 
-4. We produce and sell custom hardware solutions that are not freely available. This is how we mainly make money.
+4. We produce and sell custom hardware solutions that are not freely available. We also do implementation for our customers together with cloud hosting. These are some of the ways we are able to make money.
 
 5. We're doing it because we want the world to be a better place. Money is not everything.
