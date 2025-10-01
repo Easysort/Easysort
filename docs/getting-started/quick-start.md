@@ -2,6 +2,8 @@
 
 We have spent and still spend a lot of time on making Easysort easy to use. In just 10 minutes, Easysort should be running on your machine.
 
+You are welcome to try our models on our website ([easysort.org](https://easysort.org)) and try the tracking view for our waste facility customers on our tracking website ([track.easysort.org](https://track.easysort.org)).
+
  <!-- In just 10 minutes you should be able to make simple changes to our code and run it on your own machine. -->
 
 ## 1. Setup your development environment
