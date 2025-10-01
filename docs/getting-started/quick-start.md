@@ -14,7 +14,7 @@ We used the following tools. Make sure you have all of them installed.
 Clone our repo:
 
 ```bash
-git clone --recurse-submodules https://github.com/EasySort/easysort
+git clone https://github.com/EasySort/easysort
 ```
 
 Setup uv and run our tests:
