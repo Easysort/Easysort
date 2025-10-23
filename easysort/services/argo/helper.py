@@ -1,5 +1,5 @@
 
-from typing import Optional, List
+from typing import Optional, List, Union
 import datetime
 import tempfile
 from pathlib import Path
@@ -10,10 +10,11 @@ from dataclasses import dataclass
 from supabase import create_client, Client
 from easysort.common.environment import Environment
 import torch
-from PIL import Image
+# from PIL import Image
 from transformers import AutoProcessor, AutoModelForImageTextToText
 from transformers.image_utils import load_image
 from easysort.common.timer import TimeIt
+import time
 
 if torch.cuda.is_available():
     DEVICE = "cuda"
@@ -22,11 +23,11 @@ elif torch.backends.mps.is_available():
 else:
     DEVICE = "cpu"
 DTYPE = torch.float16 if DEVICE in ("cuda", "mps") else torch.float32
-ATTN_IMPL = "flash_attention_2" if DEVICE == "cuda" else "sdpa"
+ATTN_IMPL = "sdpa" if DEVICE == "cuda" else "sdpa"
 
 @dataclass
 class Locations:
-    EASYSORT128 = Path("/Volumes/EASYSORT128")
+    SD128 = Path("/mnt/sdcard")
     STATS = Path("/easysort/services/argo/stats")
 
 
@@ -41,20 +42,20 @@ class SupabaseLocations:
 
 
 class Downloader:
-    date: datetime
+    date: datetime.datetime
     tmp_dir: Path
     files_per_hour: Optional[dict[int, List[str]]] = None
     model: Optional[AutoModelForImageTextToText] = None
     processor: Optional[AutoProcessor] = None
 
-    def __init__(self, device_id: str, bucket: str, date: Optional[datetime] = None, location: Optional[Path] = Locations.EASYSORT128) -> None:
-        self.date_time = date
+    def __init__(self, device_id: str, bucket: str, date: Optional[Union[datetime.date, datetime.datetime]] = None, location: Optional[Path] = Locations.SD128) -> None:
+        self.date_time = date if date is not None else datetime.datetime.now().date()
         self.bucket = bucket
         self.location = location
         self.device_id = device_id
+        assert self.location is not None
         if not os.path.exists(self.location): raise FileExistsError(f"{self.location} not found. Please check the path again.")
         self.tmp_dir = Path(tempfile.mkdtemp(dir=self.location))
-        if self.date_time is None: self.date_time = datetime.datetime.now().date()
         assert self.date_time is not None and isinstance(self.date_time, (datetime.date))
         self.client: Client = create_client(Environment.SUPABASE_URL, Environment.SUPABASE_KEY)
 
@@ -65,12 +66,12 @@ class Downloader:
         image2 = load_image("https://huggingface.co/spaces/merve/chameleon-7b/resolve/main/bee.jpg")
         print("images loaded")
 
-        processor = AutoProcessor.from_pretrained("HuggingFaceTB/SmolVLM-Instruct")
-        print("processor loaded")
+        model_path = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
+        processor = AutoProcessor.from_pretrained(model_path)
         model = AutoModelForImageTextToText.from_pretrained(
-            "HuggingFaceTB/SmolVLM-Instruct",
-            torch_dtype=DTYPE if DEVICE == "cuda" else torch.float32,
-            _attn_implementation=ATTN_IMPL,
+            model_path,
+            torch_dtype=DTYPE,
+            _attn_implementation=ATTN_IMPL
         ).to(DEVICE)
         print("model loaded")
         self.processor = processor
@@ -87,6 +88,7 @@ class Downloader:
             },
         ]
 
+        start_time = time.time()
         prompt = processor.apply_chat_template(messages, add_generation_prompt=True)
         inputs = processor(text=prompt, images=[image1, image2], return_tensors="pt")
         inputs = inputs.to(DEVICE)
@@ -100,10 +102,13 @@ class Downloader:
             )
             print("generated texts loaded")
             print(generated_texts[0])
-        
+
+        end_time = time.time()
+        print(f"Time taken: {end_time - start_time} seconds")
 
     def list_hour_files(self, force_reload: bool = False) -> None:
-        if self.files_per_hour is not None and not force_reload: return self.files_per_hour
+        if self.files_per_hour is not None and not force_reload: return
+        assert self.date_time is not None
         self.files_per_hour = {}
         for h in range(24):
             self.files_per_hour[h] = []
@@ -114,7 +119,7 @@ class Downloader:
                 entries = self.client.storage.from_(self.bucket).list(prefix,
                     {"limit": limit, "offset": offset, "sortBy": {"column": "name", "order": "asc"}})
                 if not entries: break
-                self.files_per_hour[h].extend([prefix + e.get("name") for e in entries if e.get("name")])
+                self.files_per_hour[h].extend([prefix + e.get("name") for e in entries if e.get("name") is not None])
                 if len(entries) < limit: break
                 offset += len(entries)
 
@@ -146,17 +151,19 @@ class Downloader:
             
 
     def detect_humans(self) -> None:
-        for file in os.listdir(self.tmp_dir):
-            image = Image.open(self.tmp_dir / file)
-            prompt = "Are there any humans in this image, where more than 50% of their body is shows?"
-            inputs = self.processor(text=prompt, images=[image], return_tensors="pt")
-            inputs = inputs.to(DEVICE)
-            generated_ids = self.model.generate(**inputs, max_new_tokens=500)
-            generated_texts = self.processor.batch_decode(
-                generated_ids,
-                skip_special_tokens=True,
-            )
+        pass
+        # for file in os.listdir(self.tmp_dir):
+        #     image = Image.open(self.tmp_dir / file)
+        #     prompt = "Are there any humans in this image, where more than 50% of their body is shows?"
+        #     inputs = self.processor(text=prompt, images=[image], return_tensors="pt")
+        #     inputs = inputs.to(DEVICE)
+        #     generated_ids = self.model.generate(**inputs, max_new_tokens=500)
+        #     generated_texts = self.processor.batch_decode(
+        #         generated_ids,
+        #         skip_special_tokens=True,
+        #     )
 
 if __name__ == "__main__":
     downloader = Downloader(device_id=SupabaseLocations.Argo.Roskilde01, bucket=SupabaseLocations.Argo.bucket)
     downloader._init_model()
+
