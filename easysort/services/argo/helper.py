@@ -17,7 +17,6 @@ from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 import io
 import yaml
-# from PIL import Image
 
 
 @dataclass
@@ -86,9 +85,9 @@ class Downloader:
     def download_hour_files(self, hour: int, max_workers: int = 16) -> None:
         self.list_hour_files()
         assert self.files_per_hour is not None
-        keys = self.files_per_hour.get(hour, [])
         if not os.path.exists(self.tmp_dir / f"hour_{hour}"): os.makedirs(self.tmp_dir / f"hour_{hour}")
-
+        keys = [k for k in tqdm(self.files_per_hour.get(hour, []), desc=f"Filtering hour {hour} files") if not os.path.exists(self.tmp_dir / f"hour_{hour}" / Path(k).name)]
+        
         def _download(key: str): 
             with open(self.tmp_dir / f"hour_{hour}" / Path(key).name, "wb") as f: f.write(self.supabase_client.storage.from_(self.bucket).download(key))
 
@@ -124,7 +123,6 @@ class Downloader:
         with ThreadPoolExecutor(max_workers=max_workers) as ex:
             for _ in tqdm(ex.map(work, files), total=len(files), desc=f"Analyzing hour {hour} files"):
                 pass
-
 
     def encode_image_b64_optimized(self, path: str, max_px: int = 1024, quality: int = 85) -> tuple[str, str]:
         media_type, _ = mimetypes.guess_type(path)
