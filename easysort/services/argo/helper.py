@@ -229,10 +229,18 @@ class Downloader:
             self.clean_broken_images(hour)
 
     def concat_information_all_day(self) -> None:
+        total_people = 0
+        description_of_people = []
+        list_of_items_people_are_carrying = []
         for i in range(24):
             self.get_hour_information(i)
-        
-
+            with open(self.tmp_dir / f"hour_{i}" / "hour_information.json", "r") as f:
+                data = json.load(f)
+                total_people += data["total_people"]
+                description_of_people.extend(data["description_of_people"])
+                list_of_items_people_are_carrying.extend(data["list_of_items_people_are_carrying"])
+        print(f"Total people: {total_people}")
+        print(f"List of items people are carrying: {len(list_of_items_people_are_carrying)}")
 
 
 if __name__ == "__main__":
@@ -241,6 +249,7 @@ if __name__ == "__main__":
     location = Locations.SD128.LINUX
     downloader = Downloader(device_id=SupabaseLocations.Argo.Roskilde01, bucket=SupabaseLocations.Argo.bucket, 
                     location=location, tmp_dir=Path(tmp_dir), date=date)
+    downloader.concat_information_all_day()
     # downloader.cleanup()
     # downloader.download_all_hours()
     # downloader.full_analyze_hours([12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23])
