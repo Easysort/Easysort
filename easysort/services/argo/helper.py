@@ -8,27 +8,26 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from supabase import create_client, Client
-from easysort.common.environment import Environment
-import torch
+from easysort.common.environment import Env
+from openai import OpenAI
+import mimetypes
+import json
+import base64
+from concurrent.futures import ThreadPoolExecutor
+from PIL import Image
+import io
+import yaml
 # from PIL import Image
-from transformers import AutoProcessor, AutoModelForImageTextToText
-from transformers.image_utils import load_image
-from easysort.common.timer import TimeIt
-import time
 
-if torch.cuda.is_available():
-    DEVICE = "cuda"
-elif torch.backends.mps.is_available():
-    DEVICE = "mps"
-else:
-    DEVICE = "cpu"
-DTYPE = torch.float16 if DEVICE in ("cuda", "mps") else torch.float32
-ATTN_IMPL = "sdpa" if DEVICE == "cuda" else "sdpa"
 
 @dataclass
 class Locations:
-    SD128 = Path("/mnt/sdcard")
-    STATS = Path("/easysort/services/argo/stats")
+    @dataclass 
+    class SD128:
+        MAC = Path("/Volumes/Easysort128")
+        WINDOWS = Path("E:/Easysort128")
+        LINUX = Path("/mnt/sdcard")
+    STATS = Path("/easysort/services/argo/stats"),
 
 
 @dataclass
@@ -45,66 +44,22 @@ class Downloader:
     date: datetime.datetime
     tmp_dir: Path
     files_per_hour: Optional[dict[int, List[str]]] = None
-    model: Optional[AutoModelForImageTextToText] = None
-    processor: Optional[AutoProcessor] = None
 
-    def __init__(self, device_id: str, bucket: str, date: Optional[Union[datetime.date, datetime.datetime]] = None, location: Optional[Path] = Locations.SD128) -> None:
+    def __init__(self, device_id: str, bucket: str, location: Path, date: Optional[Union[datetime.date, datetime.datetime]] = None, 
+                tmp_dir: Optional[Path] = None) -> None:
         self.date_time = date if date is not None else datetime.datetime.now().date()
         self.bucket = bucket
         self.location = location
         self.device_id = device_id
         assert self.location is not None
         if not os.path.exists(self.location): raise FileExistsError(f"{self.location} not found. Please check the path again.")
-        self.tmp_dir = Path(tempfile.mkdtemp(dir=self.location))
+        self.tmp_dir = tmp_dir if tmp_dir is not None else Path(tempfile.mkdtemp(dir=self.location))
+        assert os.path.exists(self.tmp_dir)
         assert self.date_time is not None and isinstance(self.date_time, (datetime.date))
-        self.client: Client = create_client(Environment.SUPABASE_URL, Environment.SUPABASE_KEY)
+        self.supabase_client: Client = create_client(Env.SUPABASE_URL, Env.SUPABASE_KEY)
+        # self.openai_client: OpenAI = OpenAI(base_url="https://openrouter.ai/api/v1", api_key = Env.OPENROUTER_API_KEY)
+        self.openai_client: OpenAI = OpenAI(api_key = Env.OPENAI_API_KEY)
 
-    @TimeIt("Initializing model and one it")
-    def _init_model(self) -> None:
-        DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-        image1 = load_image("https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg")
-        image2 = load_image("https://huggingface.co/spaces/merve/chameleon-7b/resolve/main/bee.jpg")
-        print("images loaded")
-
-        model_path = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
-        processor = AutoProcessor.from_pretrained(model_path)
-        model = AutoModelForImageTextToText.from_pretrained(
-            model_path,
-            torch_dtype=DTYPE,
-            _attn_implementation=ATTN_IMPL
-        ).to(DEVICE)
-        print("model loaded")
-        self.processor = processor
-        self.model = model
-
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image"},
-                    {"type": "image"},
-                    {"type": "text", "text": "Can you describe the two images?"}
-                ]
-            },
-        ]
-
-        start_time = time.time()
-        prompt = processor.apply_chat_template(messages, add_generation_prompt=True)
-        inputs = processor(text=prompt, images=[image1, image2], return_tensors="pt")
-        inputs = inputs.to(DEVICE)
-        print("inputs loaded")
-        # Generate outputs
-        with torch.inference_mode():
-            generated_ids = model.generate(**inputs, max_new_tokens=500)
-            generated_texts = processor.batch_decode(
-                generated_ids,
-                skip_special_tokens=True,
-            )
-            print("generated texts loaded")
-            print(generated_texts[0])
-
-        end_time = time.time()
-        print(f"Time taken: {end_time - start_time} seconds")
 
     def list_hour_files(self, force_reload: bool = False) -> None:
         if self.files_per_hour is not None and not force_reload: return
@@ -114,27 +69,33 @@ class Downloader:
             self.files_per_hour[h] = []
             limit, offset = 1000, 0
             hh = f"{h:02d}"
-            prefix = f"{self.device_id}/{self.date_time.year}/{self.date_time.month}/{self.date_time.day}/{hh}/"
+            prefix: str = f"{self.device_id}/{self.date_time.year}/{self.date_time.month}/{self.date_time.day}/{hh}/"
             while True:
-                entries = self.client.storage.from_(self.bucket).list(prefix,
-                    {"limit": limit, "offset": offset, "sortBy": {"column": "name", "order": "asc"}})
+                entries = self.supabase_client.storage.from_(self.bucket).list(prefix, {"limit": limit, "offset": offset, "sortBy": {"column": "name", "order": "asc"}})
                 if not entries: break
-                self.files_per_hour[h].extend([prefix + e.get("name") for e in entries if e.get("name") is not None])
+                self.files_per_hour[h].extend([prefix + (e.get("name") or "") for e in entries if e.get("name") is not None])
                 if len(entries) < limit: break
                 offset += len(entries)
 
+    def download_all_hours(self, max_workers: int = 16) -> None:
+        self.list_hour_files()
+        assert self.files_per_hour is not None
+        for hour in tqdm(self.files_per_hour.keys(), desc="Downloading all hours"):
+            self.download_hour_files(hour, max_workers)
+
     def download_hour_files(self, hour: int, max_workers: int = 16) -> None:
         self.list_hour_files()
+        assert self.files_per_hour is not None
         keys = self.files_per_hour.get(hour, [])
+        if not os.path.exists(self.tmp_dir / f"hour_{hour}"): os.makedirs(self.tmp_dir / f"hour_{hour}")
 
         def _download(key: str): 
-            with open(self.tmp_dir / Path(key).name, "wb") as f: f.write(self.client.storage.from_(self.bucket).download(key))
+            with open(self.tmp_dir / f"hour_{hour}" / Path(key).name, "wb") as f: f.write(self.supabase_client.storage.from_(self.bucket).download(key))
 
         with ThreadPoolExecutor(max_workers=max_workers) as ex:
             futures = {ex.submit(_download, k): k for k in keys}
             for fut in tqdm(as_completed(futures), total=len(futures), desc=f"Downloading hour {hour} files"):
                 fut.result()
-
 
     def create_detection_groups(self) -> list[list[str]]:
         # Not tested
@@ -148,22 +109,103 @@ class Downloader:
                 if abs(seconds_sorted[i] - seconds_sorted[i-1]) < 3: groups[-1].append(seconds[seconds_sorted[i]])
                 else: groups.append([seconds[seconds_sorted[i]]])
         return groups
-            
 
-    def detect_humans(self) -> None:
-        pass
-        # for file in os.listdir(self.tmp_dir):
-        #     image = Image.open(self.tmp_dir / file)
-        #     prompt = "Are there any humans in this image, where more than 50% of their body is shows?"
-        #     inputs = self.processor(text=prompt, images=[image], return_tensors="pt")
-        #     inputs = inputs.to(DEVICE)
-        #     generated_ids = self.model.generate(**inputs, max_new_tokens=500)
-        #     generated_texts = self.processor.batch_decode(
-        #         generated_ids,
-        #         skip_special_tokens=True,
-        #     )
+    def analyze_hour_files(self, hour: int, max_workers: int = 12) -> None:
+        hour_dir = self.tmp_dir / f"hour_{hour}"
+        files = [f for f in os.listdir(hour_dir) 
+        if f.lower().endswith((".jpg", ".jpeg", ".png")) and not f.lower().startswith(".") and not os.path.exists(hour_dir / Path(f.rsplit(".", 1)[0] + ".json"))]
+
+        def work(fname: str):
+            p = hour_dir / fname
+            data = self.analyze_image(str(p))
+            with open(str(p).rsplit(".", 1)[0] + ".json", "w") as f:
+                json.dump(data, f)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            for _ in tqdm(ex.map(work, files), total=len(files), desc=f"Analyzing hour {hour} files"):
+                pass
+
+
+    def encode_image_b64_optimized(self, path: str, max_px: int = 1024, quality: int = 85) -> tuple[str, str]:
+        media_type, _ = mimetypes.guess_type(path)
+        if not media_type:
+            media_type = "image/jpeg"
+        if Image is None:
+            with open(path, "rb") as f:
+                raw = f.read()
+            return media_type, base64.b64encode(raw).decode("utf-8")
+        with Image.open(path) as im:
+            im = im.convert("RGB")
+            w, h = im.size
+            scale = max(w, h) / max_px
+            im_for_encoding = im
+            if scale > 1:
+                im_for_encoding = im.resize((int(w/scale), int(h/scale)))
+            buf = io.BytesIO()
+            im_for_encoding.save(buf, format="JPEG", quality=quality, optimize=True)
+            return "image/jpeg", base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    def analyze_image(self, image_path: str) -> dict:
+        media_type, image_b64 = self.encode_image_b64_optimized(image_path)
+        response = self.openai_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": (
+                        "Return only a YAML object with the following keys: "
+                        "'number_of_people' (int), 'description_of_people' (list[str]), and "
+                        "'list_of_items_people_are_carrying' (list[str]). "
+                        "Make sure the people are actually carrying the items they are described as carrying, "
+                        "not just standing next to. Use only valid YAML, no commentary."
+                    )},  
+                    {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{image_b64}"}},
+                ],
+            }],
+            response_format={"type": "text"},  # No forced JSON, want raw YAML
+            timeout=30,
+        )
+        content = response.choices[0].message.content
+        yaml_str = content
+        if "---" in yaml_str: yaml_str = yaml_str[yaml_str.find("---") + 3:]
+        data = yaml.safe_load(yaml_str)
+        return json.dumps(data)
+
+    def get_hour_information(self, hour: int) -> dict:
+        hour_dir = self.tmp_dir / f"hour_{hour}"
+        json_files = [f for f in os.listdir(hour_dir) if f.lower().endswith(".json") and not f.lower().startswith(".")]
+        total_people = 0
+        description_of_people = []
+        list_of_items_people_are_carrying = []
+        for json_file in json_files:
+            with open(hour_dir / json_file, "r") as f:
+                data = json.loads(json.load(f).strip())
+            total_people += int(data["number_of_people"])
+            description_of_people.extend(data["description_of_people"])
+            list_of_items_people_are_carrying.extend(data["list_of_items_people_are_carrying"])
+        with open(hour_dir / "hour_information.json", "w") as f:
+            json.dump({"total_people": total_people, "description_of_people": description_of_people, "list_of_items_people_are_carrying": list_of_items_people_are_carrying}, f)
+
+    def full_analyze_hours(self, hours: list[int]) -> None:
+        for hour in tqdm(hours, desc="Analyzing hours"):
+            self.analyze_hour_files(hour)
+            self.get_hour_information(hour)
 
 if __name__ == "__main__":
-    downloader = Downloader(device_id=SupabaseLocations.Argo.Roskilde01, bucket=SupabaseLocations.Argo.bucket)
-    downloader._init_model()
-
+    date = datetime.datetime(2025, 10, 26)
+    tmp_dir = Locations.SD128.LINUX / "tmpddtx4_r6"
+    location = Locations.SD128.LINUX
+    downloader = Downloader(device_id=SupabaseLocations.Argo.Roskilde01, bucket=SupabaseLocations.Argo.bucket, 
+                    location=location, tmp_dir=Path(tmp_dir), date=date)
+    downloader.download_hour_files(12)
+    downloader.download_hour_files(13)
+    downloader.download_hour_files(14)
+    downloader.download_hour_files(15)
+    downloader.download_hour_files(16)
+    downloader.download_hour_files(17)
+    downloader.download_hour_files(18)
+    downloader.download_hour_files(19)
+    downloader.download_hour_files(20)
+    downloader.download_hour_files(21)
+    downloader.download_hour_files(22)
+    downloader.download_hour_files(23)

@@ -6,7 +6,7 @@ load_dotenv()
 
 
 @dataclass
-class Environment:
+class Env:
     # Generel:
     DEBUG: int = int(os.getenv("DEBUG", "0"))
 
@@ -20,6 +20,9 @@ class Environment:
     ORGANIZATION_TABLE_NAME: str = "organizations"
     SEQUENCE_ARTIFACTS_FOLDER: str = "sequence-artifacts"
     SUPABASE_TRACKING_BUCKET: str = "tracking"
+
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
 
     # Gantry:
     GANTRY_PORT: str = os.getenv("GANTRY_PORT", "")
