@@ -233,6 +233,6 @@ if __name__ == "__main__":
     location = Locations.SD128.LINUX
     downloader = Downloader(device_id=SupabaseLocations.Argo.Roskilde01, bucket=SupabaseLocations.Argo.bucket, 
                     location=location, tmp_dir=Path(tmp_dir), date=date)
-    downloader.cleanup()
-    downloader.download_all_hours()
+    # downloader.cleanup()
+    # downloader.download_all_hours()
     downloader.full_analyze_hours([12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23])
