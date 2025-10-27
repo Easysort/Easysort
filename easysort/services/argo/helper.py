@@ -14,7 +14,7 @@ import mimetypes
 import json
 import base64
 from concurrent.futures import ThreadPoolExecutor
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 import io
 import yaml
 
@@ -110,7 +110,7 @@ class Downloader:
                 else: groups.append([seconds[seconds_sorted[i]]])
         return groups
 
-    def analyze_hour_files(self, hour: int, max_workers: int = 12) -> None:
+    def analyze_hour_files(self, hour: int, max_workers: int = 30) -> None:
         hour_dir = self.tmp_dir / f"hour_{hour}"
         files = [f for f in os.listdir(hour_dir) 
         if f.lower().endswith((".jpg", ".jpeg", ".png")) and not f.lower().startswith(".") and not os.path.exists(hour_dir / Path(f.rsplit(".", 1)[0] + ".json"))]
@@ -190,6 +190,42 @@ class Downloader:
             self.analyze_hour_files(hour)
             self.get_hour_information(hour)
 
+    def is_image_valid(self, path: str, min_bytes: int = 1024) -> bool:
+        try:
+            if not os.path.exists(path): return False
+            if os.path.getsize(path) < min_bytes: return False
+            with Image.open(path) as im:
+                im.verify()
+            with Image.open(path) as im:
+                im.load()
+            return True
+        except (UnidentifiedImageError, OSError, ValueError):
+            return False
+
+    def clean_broken_images(self, hour: int, min_bytes: int = 1024) -> int:
+        hour_dir = self.tmp_dir / f"hour_{hour}"
+        if not os.path.exists(hour_dir): return 0
+        deleted = 0
+        for f in os.listdir(hour_dir):
+            if f.lower().startswith("."): continue
+            if not f.lower().endswith((".jpg", ".jpeg", ".png")): continue
+            p = hour_dir / f
+            if not self.is_image_valid(str(p), min_bytes=min_bytes):
+                try:
+                    os.remove(p)
+                    # also remove any stale sidecar json for this image
+                    sidecar = hour_dir / (Path(f).stem + ".json")
+                    if os.path.exists(sidecar): os.remove(sidecar)
+                    deleted += 1
+                except Exception:
+                    pass
+        return deleted
+
+    def cleanup(self) -> None:
+        for hour in tqdm(range(24), desc="Cleaning up"):
+            self.clean_broken_images(hour)
+
+
 
 if __name__ == "__main__":
     date = datetime.datetime(2025, 10, 26)
@@ -197,4 +233,6 @@ if __name__ == "__main__":
     location = Locations.SD128.LINUX
     downloader = Downloader(device_id=SupabaseLocations.Argo.Roskilde01, bucket=SupabaseLocations.Argo.bucket, 
                     location=location, tmp_dir=Path(tmp_dir), date=date)
+    downloader.cleanup()
+    downloader.download_all_hours()
     downloader.full_analyze_hours([12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23])
