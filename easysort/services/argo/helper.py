@@ -178,7 +178,8 @@ class Downloader:
         list_of_items_people_are_carrying = []
         for json_file in json_files:
             with open(hour_dir / json_file, "r") as f:
-                data = json.loads(json.load(f).strip())
+                data = json.load(f)
+                if isinstance(data, str): data = json.loads(data)
             total_people += int(data["number_of_people"])
             description_of_people.extend(data["description_of_people"])
             list_of_items_people_are_carrying.extend(data["list_of_items_people_are_carrying"])
