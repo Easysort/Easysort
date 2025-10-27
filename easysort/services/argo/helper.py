@@ -1,4 +1,5 @@
 
+from stringprep import in_table_c9
 from typing import Optional, List, Union
 import datetime
 import tempfile
@@ -180,6 +181,7 @@ class Downloader:
             with open(hour_dir / json_file, "r") as f:
                 data = json.load(f)
                 if isinstance(data, str): data = json.loads(data)
+            assert ["number_of_people", "description_of_people", "list_of_items_people_are_carrying"] == list(data.keys()), f"Invalid data in {json_file}: {data}"
             total_people += int(data["number_of_people"])
             description_of_people.extend(data["description_of_people"])
             list_of_items_people_are_carrying.extend(data["list_of_items_people_are_carrying"])
@@ -226,6 +228,11 @@ class Downloader:
         for hour in tqdm(range(24), desc="Cleaning up"):
             self.clean_broken_images(hour)
 
+    def concat_information_all_day(self) -> None:
+        for i in range(24):
+            self.get_hour_information(i)
+        
+
 
 
 if __name__ == "__main__":
@@ -236,4 +243,4 @@ if __name__ == "__main__":
                     location=location, tmp_dir=Path(tmp_dir), date=date)
     # downloader.cleanup()
     # downloader.download_all_hours()
-    downloader.full_analyze_hours([12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23])
+    # downloader.full_analyze_hours([12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23])
