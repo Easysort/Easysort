@@ -17,6 +17,8 @@ from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 import io
 import yaml
+import httpx
+from httpx import Limits
 
 
 @dataclass
@@ -55,7 +57,8 @@ class Downloader:
         self.tmp_dir = tmp_dir if tmp_dir is not None else Path(tempfile.mkdtemp(dir=self.location))
         assert os.path.exists(self.tmp_dir)
         assert self.date_time is not None and isinstance(self.date_time, (datetime.date))
-        self.supabase_client: Client = create_client(Env.SUPABASE_URL, Env.SUPABASE_KEY)
+        http_client = httpx.Client(http2=False, limits=Limits(max_keepalive_connections=10, max_connections=20),timeout=60.0)
+        self.supabase_client: Client = create_client(Env.SUPABASE_URL, Env.SUPABASE_KEY, http_client=http_client)
         # self.openai_client: OpenAI = OpenAI(base_url="https://openrouter.ai/api/v1", api_key = Env.OPENROUTER_API_KEY)
         self.openai_client: OpenAI = OpenAI(api_key = Env.OPENAI_API_KEY)
 
@@ -82,7 +85,7 @@ class Downloader:
         for hour in tqdm(self.files_per_hour.keys(), desc="Downloading all hours"):
             self.download_hour_files(hour, max_workers)
 
-    def download_hour_files(self, hour: int, max_workers: int = 16) -> None:
+    def download_hour_files(self, hour: int, max_workers: int = 10) -> None:
         self.list_hour_files()
         assert self.files_per_hour is not None
         if not os.path.exists(self.tmp_dir / f"hour_{hour}"): os.makedirs(self.tmp_dir / f"hour_{hour}")
