@@ -76,13 +76,13 @@ class Downloader:
                 if len(entries) < limit: break
                 offset += len(entries)
 
-    def download_all_hours(self, max_workers: int = 16) -> None:
+    def download_all_hours(self, max_workers: int = 1) -> None:
         self.list_hour_files()
         assert self.files_per_hour is not None
         for hour in tqdm(self.files_per_hour.keys(), desc="Downloading all hours"):
             self.download_hour_files(hour, max_workers)
 
-    def download_hour_files(self, hour: int, max_workers: int = 4) -> None:
+    def download_hour_files(self, hour: int, max_workers: int = 1) -> None:
         self.list_hour_files()
         assert self.files_per_hour is not None
         if not os.path.exists(self.tmp_dir / f"hour_{hour}"): os.makedirs(self.tmp_dir / f"hour_{hour}")
@@ -197,15 +197,4 @@ if __name__ == "__main__":
     location = Locations.SD128.LINUX
     downloader = Downloader(device_id=SupabaseLocations.Argo.Roskilde01, bucket=SupabaseLocations.Argo.bucket, 
                     location=location, tmp_dir=Path(tmp_dir), date=date)
-    downloader.download_hour_files(12)
-    downloader.download_hour_files(13)
-    downloader.download_hour_files(14)
-    downloader.download_hour_files(15)
-    downloader.download_hour_files(16)
-    downloader.download_hour_files(17)
-    downloader.download_hour_files(18)
-    downloader.download_hour_files(19)
-    downloader.download_hour_files(20)
-    downloader.download_hour_files(21)
-    downloader.download_hour_files(22)
-    downloader.download_hour_files(23)
+    downloader.full_analyze_hours([12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23])
