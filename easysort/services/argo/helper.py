@@ -181,8 +181,8 @@ class Downloader:
             with open(hour_dir / json_file, "r") as f:
                 data = json.load(f)
                 if isinstance(data, str): data = json.loads(data)
-            assert ["number_of_people", "description_of_people", "list_of_items_people_are_carrying"] == list(data.keys()), f"Invalid data in {json_file}: {data}"
-            total_people += int(data["number_of_people"])
+            assert ["description_of_people", "list_of_items_people_are_carrying"] == list(data.keys()), f"Invalid data in {json_file}: {data}"
+            total_people += int(data["number_of_people"] or data["total_people"])
             description_of_people.extend(data["description_of_people"])
             list_of_items_people_are_carrying.extend(data["list_of_items_people_are_carrying"])
         with open(hour_dir / "hour_information.json", "w") as f:
