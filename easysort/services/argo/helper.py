@@ -87,6 +87,7 @@ class Downloader:
         assert self.files_per_hour is not None
         if not os.path.exists(self.tmp_dir / f"hour_{hour}"): os.makedirs(self.tmp_dir / f"hour_{hour}")
         keys = [k for k in tqdm(self.files_per_hour.get(hour, []), desc=f"Filtering hour {hour} files") if not os.path.exists(self.tmp_dir / f"hour_{hour}" / Path(k).name)]
+        print("Missing files: ", len(keys), "out of", len(self.files_per_hour.get(hour, [])))
         
         def _download(key: str): 
             with open(self.tmp_dir / f"hour_{hour}" / Path(key).name, "wb") as f: f.write(self.supabase_client.storage.from_(self.bucket).download(key))
@@ -188,6 +189,7 @@ class Downloader:
         for hour in tqdm(hours, desc="Analyzing hours"):
             self.analyze_hour_files(hour)
             self.get_hour_information(hour)
+
 
 if __name__ == "__main__":
     date = datetime.datetime(2025, 10, 26)
