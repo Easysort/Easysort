@@ -110,7 +110,7 @@ class Downloader:
                 else: groups.append([seconds[seconds_sorted[i]]])
         return groups
 
-    def analyze_hour_files(self, hour: int, max_workers: int = 30) -> None:
+    def analyze_hour_files(self, hour: int, max_workers: int = 16) -> None:
         hour_dir = self.tmp_dir / f"hour_{hour}"
         files = [f for f in os.listdir(hour_dir) 
         if f.lower().endswith((".jpg", ".jpeg", ".png")) and not f.lower().startswith(".") and not os.path.exists(hour_dir / Path(f.rsplit(".", 1)[0] + ".json"))]
@@ -206,7 +206,7 @@ class Downloader:
         hour_dir = self.tmp_dir / f"hour_{hour}"
         if not os.path.exists(hour_dir): return 0
         deleted = 0
-        for f in os.listdir(hour_dir):
+        for f in tqdm(os.listdir(hour_dir), desc=f"Cleaning hour {hour} images"):
             if f.lower().startswith("."): continue
             if not f.lower().endswith((".jpg", ".jpeg", ".png")): continue
             p = hour_dir / f
