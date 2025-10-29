@@ -17,12 +17,10 @@ DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
 
 
 ALLOWED_CATEGORIES = [
-    "not running",
-    "running empty",
-    "running plastics (PCB tubes)",
-    "running cardboard",
-    "running other fraction (looks like residual waste, plastic mix)",
-    "not running but belt is mostly full",
+    "cardboard/paper",
+    "plastics (tubes, buckets, mixed plastics)",
+    "residual fraction (very mixed waste, looks white, but not paper though)",
+    "empty",
 ]
 
 
@@ -71,19 +69,18 @@ def ollama_chat(model: str, prompt: str, images_b64: List[str], timeout: int = 6
 def build_prompt_group(group_id: str, filenames: List[str]) -> str:
     cats = " | ".join(ALLOWED_CATEGORIES)
     return (
-        "You are classifying a short conveyor-belt clip using 3 still frames (representative from start/middle/end).\n"
-        "Task: Decide if motion is present overall, and classify the entire clip into EXACTLY one category from: \n"
+        "You are classifying what is on a conveyor belt from a single still image.\n"
+        "Choose EXACTLY one category from: \n"
         f"{cats}.\n"
-        "Return STRICT JSON ONLY with this schema (no extra text):\n"
+        "Rule: If any material covers over 5% of the belt area, it is NOT 'empty'.\n"
+        "Return STRICT JSON ONLY (no extra text):\n"
         "{\n"
         "  \"group_id\": string,\n"
         "  \"category\": string,\n"
-        "  \"motion_detected\": boolean,\n"
-        "  \"confidence\": number,\n"
-        "  \"used_images\": string[]\n"
+        "  \"confidence\": number\n"
         "}\n"
-        "Rules: category must be one of the provided list; confidence between 0 and 1.\n"
-        f"Analyze these filenames (ordered): {filenames}.\n"
+        "Category must be from the provided list; confidence is 0..1.\n"
+        f"Image filename: {filenames}.\n"
         "Return only JSON."
     )
 
@@ -104,22 +101,24 @@ def group_images(images_dir: Path) -> Dict[str, List[Path]]:
     return groups
 
 
-def _select_three(paths: List[Path]) -> List[Path]:
-    if len(paths) <= 3:
-        return paths
-    # select first, middle, last
+def _select_one(paths: List[Path]) -> List[Path]:
+    if not paths:
+        return []
     mid = len(paths) // 2
-    return [paths[0], paths[mid], paths[-1]]
+    return [paths[mid]]
 
 
 def analyze(clips_dir: Path, model: str = DEFAULT_MODEL, force: bool = False, max_px: int = 1024) -> None:
     """
     For a clips folder created by VerdisRunner.analyze (containing an images/ dir),
-    analyze each 6-image group via Ollama and save a JSON alongside the images.
+    analyze each image group via Ollama using a single representative image and
+    save a JSON under an ai_pred/ folder next to images/.
     """
     images_dir = clips_dir / "images"
     if not images_dir.exists() or not images_dir.is_dir():
         raise SystemExit(f"images directory not found under {clips_dir}")
+    out_dir = clips_dir / "ai_pred"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     groups = group_images(images_dir)
     if len(groups) == 0:
@@ -130,12 +129,12 @@ def analyze(clips_dir: Path, model: str = DEFAULT_MODEL, force: bool = False, ma
     for key in tqdm(sorted(groups.keys()), desc="Analyzing groups", unit="group"):
         imgs = groups[key]
         # output file per group (one JSON per video/clip)
-        out_path = images_dir / f"{key}.json"
+        out_path = out_dir / f"{key}.json"
         if out_path.exists() and not force:
             continue
 
-        # pick 3 representative images per group
-        rep_imgs = _select_three(imgs)
+        # pick 1 representative image per group
+        rep_imgs = _select_one(imgs)
         images_b64: List[str] = []
         filenames: List[str] = []
         for img_path in rep_imgs:
