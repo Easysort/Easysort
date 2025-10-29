@@ -23,6 +23,12 @@ ALLOWED_CATEGORIES = [
     "empty",
 ]
 
+# Optional predefined crops by context
+# Coordinates are for full-size images in pixels
+CONTEXT_CROPS = {
+    "belt": {"x": 862, "y": 45, "w": 332, "h": 1076},
+}
+
 
 def encode_image_b64(path: Path, max_px: int = 1024, quality: int = 85) -> Tuple[str, str]:
     """
@@ -37,6 +43,14 @@ def encode_image_b64(path: Path, max_px: int = 1024, quality: int = 85) -> Tuple
         buf = io.BytesIO()
         im.save(buf, format="JPEG", quality=quality, optimize=True)
         return "image/jpeg", base64.b64encode(buf.getvalue()).decode("utf-8")
+
+
+def encode_pil_image_b64(image: Image.Image, fmt: str = "JPEG", quality: int = 90) -> Tuple[str, str]:
+    im = image.convert("RGB")
+    buf = io.BytesIO()
+    im.save(buf, format=fmt, quality=quality, optimize=(fmt == "JPEG"))
+    media_type = "image/jpeg" if fmt == "JPEG" else "image/png"
+    return media_type, base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
 def ollama_chat(model: str, prompt: str, images_b64: List[str], timeout: int = 60) -> str:
@@ -66,10 +80,14 @@ def ollama_chat(model: str, prompt: str, images_b64: List[str], timeout: int = 6
     return msg
 
 
-def build_prompt_group(group_id: str, filenames: List[str]) -> str:
+def build_prompt_group(group_id: str, filenames: List[str], context: Optional[str] = None) -> str:
     cats = " | ".join(ALLOWED_CATEGORIES)
+    context_line = ""
+    if context:
+        context_line = f"Context: The image has been cropped to show only the {context}.\\n"
     return (
         "You are classifying what is on a conveyor belt from a single still image.\n"
+        f"{context_line}"
         "Choose EXACTLY one category from: \n"
         f"{cats}.\n"
         "Rule: If any material covers over 5% of the belt area, it is NOT 'empty'.\n"
@@ -108,7 +126,7 @@ def _select_one(paths: List[Path]) -> List[Path]:
     return [paths[mid]]
 
 
-def analyze(clips_dir: Path, model: str = DEFAULT_MODEL, force: bool = False, max_px: int = 1024) -> None:
+def analyze(clips_dir: Path, model: str = DEFAULT_MODEL, force: bool = False, max_px: int = 1024, context: Optional[str] = None) -> None:
     """
     For a clips folder created by VerdisRunner.analyze (containing an images/ dir),
     analyze each image group via Ollama using a single representative image and
@@ -138,11 +156,26 @@ def analyze(clips_dir: Path, model: str = DEFAULT_MODEL, force: bool = False, ma
         images_b64: List[str] = []
         filenames: List[str] = []
         for img_path in rep_imgs:
-            _, b64 = encode_image_b64(img_path, max_px=max_px)
-            images_b64.append(b64)
-            filenames.append(img_path.name)
+            if context and context in CONTEXT_CROPS:
+                # Crop without downscaling for maximum fidelity
+                crop = CONTEXT_CROPS[context]
+                with Image.open(img_path) as im:
+                    im = im.convert("RGB")
+                    W, H = im.size
+                    x = max(0, min(crop["x"], max(0, W - 1)))
+                    y = max(0, min(crop["y"], max(0, H - 1)))
+                    w = max(1, min(crop["w"], max(1, W - x)))
+                    h = max(1, min(crop["h"], max(1, H - y)))
+                    cropped = im.crop((x, y, x + w, y + h))
+                    _, b64 = encode_pil_image_b64(cropped, fmt="JPEG", quality=90)
+                images_b64.append(b64)
+                filenames.append(img_path.name)
+            else:
+                _, b64 = encode_image_b64(img_path, max_px=max_px)
+                images_b64.append(b64)
+                filenames.append(img_path.name)
 
-        prompt = build_prompt_group(key, filenames)
+        prompt = build_prompt_group(key, filenames, context=context)
         try:
             content = ollama_chat(model, prompt, images_b64)
         except Exception as e:
@@ -164,12 +197,13 @@ def main() -> None:
     parser.add_argument("--model", type=str, default=DEFAULT_MODEL, help="Ollama model name (default from OLLAMA_MODEL or gemma3:4b)")
     parser.add_argument("--force", action="store_true", help="Recompute even if output JSON exists")
     parser.add_argument("--max_px", type=int, default=1024, help="Resize max dimension for encoding")
+    parser.add_argument("--context", type=str, default=None, help="Optional context (e.g., 'belt') to apply a predefined crop without downscaling")
     args = parser.parse_args()
 
     clips_dir = Path(args.clips_dir)
     if not clips_dir.exists() or not clips_dir.is_dir():
         raise SystemExit(f"clips_dir not found or not a directory: {clips_dir}")
-    analyze(clips_dir, model=args.model, force=args.force, max_px=args.max_px)
+    analyze(clips_dir, model=args.model, force=args.force, max_px=args.max_px, context=args.context)
 
 
 if __name__ == "__main__":

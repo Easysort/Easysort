@@ -350,9 +350,20 @@ def evaluate_and_review(clips_dir: Path, images_dir: Optional[Path] = None) -> N
 
     root_dir = clips_dir.resolve()
     if images_dir is None:
-        images_dir = root_dir / "images"
+        # Prefer ai_pred/ first, then fall back to images/
+        ai_dir = root_dir / "ai_pred"
+        img_dir = root_dir / "images"
+        if ai_dir.exists() and ai_dir.is_dir():
+            images_dir = ai_dir
+        elif img_dir.exists() and img_dir.is_dir():
+            images_dir = img_dir
+        else:
+            print("No predictions directory found. Expected one of:")
+            print("  ", ai_dir)
+            print("  ", img_dir)
+            return
     if not images_dir.exists() or not images_dir.is_dir():
-        print("images directory not found for analyzer outputs:", images_dir)
+        print("Predictions directory not found or not a directory:", images_dir)
         return
 
     if VERBOSE:
@@ -511,7 +522,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Human labeling and evaluation tool for 2s clips.")
     parser.add_argument("--clips_dir", type=str, required=True, help="Directory containing 2s .mp4 clips")
     parser.add_argument("--eval", action="store_true", help="Evaluation mode: compare with analyzer outputs and review")
-    parser.add_argument("--images_dir", type=str, default=None, help="Path to images dir containing analyzer JSONs (defaults to <clips_dir>/images)")
+    parser.add_argument("--images_dir", type=str, default=None, help="Path to predictions dir (defaults to <clips_dir>/ai_pred, then <clips_dir>/images)")
     parser.add_argument("--verbose", action="store_true", help="Verbose debug output for file matching and evaluation")
     args = parser.parse_args()
 
