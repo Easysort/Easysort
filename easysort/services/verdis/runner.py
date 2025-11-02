@@ -8,10 +8,11 @@ from datetime import datetime, timedelta
 from tqdm import tqdm
 
 class VerdisRunner:
-    def __init__(self, folder: Union[str, Path]):
+    def __init__(self, folder: Optional[Union[str, Path]] = None, find_latest: bool = True):
         """
         Load the latest created video file in the given folder.
         """
+        if not find_latest: self.video_path = None; return
         self.folder = Path(folder)
         if not self.folder.exists() or not self.folder.is_dir():
             raise ValueError(f"{self.folder} is not a valid directory.")
@@ -25,16 +26,35 @@ class VerdisRunner:
         self.video_path = video_files[0]
         self.id = self.video_path.stem
 
-    def analyze(self, name: Optional[str] = None) -> None:
+    def analyze(self, video_path: Optional[Path] = None):
         """
         For every 2 minutes of video, save a 2 second clip to an output directory in the same place as the video.
         Additionally, extract 6 evenly-spaced images (JPEG) from each video.
         Handles large video files efficiently by not loading the entire video into memory.
+        Returns: list of image groups, each group is a list of image Paths from one clip.
         """
-        out_dir = self.video_path.parent / (name or (self.id + "_clips"))
+        self.video_path = video_path if video_path is not None else self.video_path
+        out_dir = Path(str(self.video_path.with_suffix("")) + "_clips") # add _clips 
         out_dir.mkdir(parents=True, exist_ok=True)
         images_dir = out_dir / "images"
         images_dir.mkdir(parents=True, exist_ok=True)
+
+        # Fast path: if images already exist, just return grouped paths without regenerating
+        existing = sorted(images_dir.glob("*.jpg"))
+        if existing:
+            print(f"Found {len(existing)} existing images in {images_dir}")
+            groups = []
+            # group by stem before last underscore, e.g., HH_MM_SS_00.jpg -> HH_MM_SS
+            tmp = {}
+            for p in existing:
+                stem = p.stem
+                key = stem.rsplit("_", 1)[0] if "_" in stem else stem
+                tmp.setdefault(key, []).append(p)
+            for key in sorted(tmp.keys()):
+                groups.append(sorted(tmp[key]))
+            return groups
+
+        assert self.video_path.exists() and self.video_path.is_file(), f"Video path {self.video_path} does not exist or is not a file."
 
         cap = cv2.VideoCapture(str(self.video_path))
         if not cap.isOpened():
@@ -51,12 +71,9 @@ class VerdisRunner:
         two_sec = 2               # 2 seconds in seconds
         two_sec_frames = int(two_sec * fps)
 
-        # Calculate the number of clips to extract
-        # If curr_time=0, next is 120, next is 240... so num_clips = ceil(duration_sec / two_min)
         import math
         num_clips = math.ceil(duration_sec / two_min)
 
-        # derive start datetime from filename if present (YYYYMMDDHHMMSS)
         start_dt: Optional[datetime] = None
         try:
             digits = re.findall(r"(\d{14})", self.video_path.stem)
@@ -65,7 +82,8 @@ class VerdisRunner:
         except Exception:
             start_dt = None
 
-        # For each 2-second clip window, optionally write the clip and extract 6 images inside that window
+        # Collect groups of image paths per clip
+        groups = []
         num_images_per_clip = 6
         with tqdm(total=num_clips, desc="Processing clips & images", unit="clip") as pbar:
             for idx in range(num_clips):
@@ -84,11 +102,14 @@ class VerdisRunner:
                 need_images = not all(p.exists() for p in img_paths)
                 if not need_clip and not need_images:
                     pbar.update(1)
+                    # Still append the group, but only existing files
+                    groups.append(list(img_paths))
                     continue
 
-                # Compute start frame for this 2s window and set capture
                 if curr_time >= duration_sec:
                     pbar.update(1)
+                    # Still append empty/partial group if past end of video?
+                    groups.append([p for p in img_paths if p.exists()])
                     continue
                 start_frame = int(curr_time * fps)
                 cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
@@ -112,7 +133,6 @@ class VerdisRunner:
                             cv2.imwrite(str(img_paths[i]), frame)
                             wrote_images[i] = True
 
-                # write clip if we captured full 2s worth of frames
                 if need_clip and len(frames) == two_sec_frames:
                     height, width = frames[0].shape[:2]
                     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -121,9 +141,13 @@ class VerdisRunner:
                         writer.write(fr)
                     writer.release()
 
+                # After (possibly) writing images, append the group paths
+                groups.append(list(img_paths))
+
                 pbar.update(1)
 
         cap.release()
+        return groups
 
 if __name__ == "__main__":
     runner = VerdisRunner("/Volumes/Easysort128/verdis")

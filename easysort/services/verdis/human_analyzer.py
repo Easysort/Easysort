@@ -116,8 +116,10 @@ def _derive_group_key_from_clip(clip_path: Path) -> Tuple[str, str]:
     return key, stem
 
 
-def _load_ai_category(images_dir: Path, clip_path: Path) -> Optional[str]:
+def _load_ai_category(images_dir: Optional[Path], clip_path: Path) -> Optional[str]:
     """Load AI category string for a clip by looking up <key>.json under images_dir."""
+    if images_dir is None:
+        return None
     key, stem = _derive_group_key_from_clip(clip_path)
     # Try the exact stem first (e.g., HH_MM_SS.json), then the group key fallback.
     candidates = [images_dir / f"{stem}.json", images_dir / f"{key}.json"]
@@ -349,27 +351,43 @@ def evaluate_and_review(clips_dir: Path, images_dir: Optional[Path] = None) -> N
         return
 
     root_dir = clips_dir.resolve()
-    if images_dir is None:
-        # Prefer ai_pred/ first, then fall back to images/
+    # Determine prediction directories
+    pred_dir_ollama: Optional[Path] = None
+    pred_dir_nano: Optional[Path] = None
+    if images_dir is not None:
+        # Explicit override applies to ollama only (for backward compat)
+        pred_dir_ollama = images_dir if images_dir.exists() and images_dir.is_dir() else None
+    else:
+        # Prefer ai_pred/ for Ollama, fallback to images/
         ai_dir = root_dir / "ai_pred"
         img_dir = root_dir / "images"
         if ai_dir.exists() and ai_dir.is_dir():
-            images_dir = ai_dir
+            pred_dir_ollama = ai_dir
         elif img_dir.exists() and img_dir.is_dir():
-            images_dir = img_dir
-        else:
-            print("No predictions directory found. Expected one of:")
-            print("  ", ai_dir)
-            print("  ", img_dir)
-            return
-    if not images_dir.exists() or not images_dir.is_dir():
-        print("Predictions directory not found or not a directory:", images_dir)
+            pred_dir_ollama = img_dir
+        # OpenAI nano predictions (if present)
+    nano_dir = root_dir / "open_ai_pred"
+    if nano_dir.exists() and nano_dir.is_dir():
+        pred_dir_nano = nano_dir
+    
+    if pred_dir_ollama is None and pred_dir_nano is None:
+        print("No predictions directory found. Expected one of:")
+        print("  ", root_dir / "ai_pred")
+        print("  ", root_dir / "images")
+        print("  ", root_dir / "open_ai_pred")
         return
 
     if VERBOSE:
-        json_files = sorted([p for p in images_dir.glob("*.json")])
-        jpg_files = sorted([p for p in images_dir.glob("*.jpg")])
-        print(f"[evaluate] found JSONs={len(json_files)} JPGs={len(jpg_files)} in {images_dir}")
+        if pred_dir_ollama is not None:
+            json_files = sorted([p for p in pred_dir_ollama.glob("*.json")])
+            print(f"[evaluate] OLLAMA dir: {pred_dir_ollama} JSONs={len(json_files)}")
+        else:
+            print("[evaluate] OLLAMA dir: none")
+        if pred_dir_nano is not None:
+            json_files = sorted([p for p in pred_dir_nano.glob("*.json")])
+            print(f"[evaluate] NANO dir:    {pred_dir_nano} JSONs={len(json_files)}")
+        else:
+            print("[evaluate] NANO dir:    none")
 
     label_store = LabelStore(root_dir)
     labeled_clips = [p for p in clips if label_store.is_labeled(str(p.relative_to(root_dir).as_posix()))]
@@ -380,17 +398,25 @@ def evaluate_and_review(clips_dir: Path, images_dir: Optional[Path] = None) -> N
     # Initial stats
     if VERBOSE:
         print(f"[evaluate] clips_dir={root_dir}")
-        print(f"[evaluate] images_dir={images_dir}")
         print(f"[evaluate] total_clips={len(clips)} labeled={len(labeled_clips)}")
-    acc, per_cat, compared = _compute_initial_stats(clips_dir, images_dir, label_store)
-    print(f"Initial accuracy (AI vs human exact match): {acc:.3f} on {compared} pairs")
-    print("Per-category (human label) true/false counts:")
-    for cat in sorted(per_cat.keys()):
-        tf = per_cat[cat]
-        print(f"  {cat}: true={tf.get('true',0)} false={tf.get('false',0)}")
-    if compared == 0:
-        print("Note: 0 comparable pairs. Likely no matching AI JSONs were found for labeled clips.")
-        print("Run with --verbose to see exact candidate JSON paths that are checked.")
+    # Stats for Ollama
+    if pred_dir_ollama is not None:
+        acc_o, per_cat_o, compared_o = _compute_initial_stats(clips_dir, pred_dir_ollama, label_store)
+        print(f"Initial accuracy (Ollama vs human): {acc_o:.3f} on {compared_o} pairs")
+        if compared_o > 0:
+            print("Per-category (human) true/false for Ollama:")
+            for cat in sorted(per_cat_o.keys()):
+                tf = per_cat_o[cat]
+                print(f"  {cat}: true={tf.get('true',0)} false={tf.get('false',0)}")
+    # Stats for Nano
+    if pred_dir_nano is not None:
+        acc_n, per_cat_n, compared_n = _compute_initial_stats(clips_dir, pred_dir_nano, label_store)
+        print(f"Initial accuracy (Nano vs human):   {acc_n:.3f} on {compared_n} pairs")
+        if compared_n > 0:
+            print("Per-category (human) true/false for Nano:")
+            for cat in sorted(per_cat_n.keys()):
+                tf = per_cat_n[cat]
+                print(f"  {cat}: true={tf.get('true',0)} false={tf.get('false',0)}")
 
     # Prepare UI
     window = "Eval Review"
@@ -398,7 +424,7 @@ def evaluate_and_review(clips_dir: Path, images_dir: Optional[Path] = None) -> N
     cv2.resizeWindow(window, 1800, 1100)
     side_w = 520
 
-    # Prepare eval.csv
+    # Prepare eval.csv (kept schema for compatibility; UI shows both models)
     eval_csv = root_dir / "eval.csv"
     write_header = not eval_csv.exists()
     eval_f = open(eval_csv, "a", newline="")
@@ -416,12 +442,18 @@ def evaluate_and_review(clips_dir: Path, images_dir: Optional[Path] = None) -> N
     for idx, clip_path in enumerate(labeled_clips, start=1):
         rel = str(clip_path.relative_to(root_dir).as_posix())
         human_raw = label_store._labels.get(rel, "")
-        ai_raw = _load_ai_category(images_dir, clip_path) or "(missing)"
-        if VERBOSE and ai_raw == "(missing)":
-            print(f"[evaluate] AI prediction missing for {clip_path.name}")
+        ai_raw_ollama = _load_ai_category(pred_dir_ollama, clip_path) or "(missing)"
+        ai_raw_nano = _load_ai_category(pred_dir_nano, clip_path) or "(missing)"
+        if VERBOSE:
+            if ai_raw_ollama == "(missing)":
+                print(f"[evaluate] OLLAMA missing for {clip_path.name}")
+            if ai_raw_nano == "(missing)":
+                print(f"[evaluate] NANO   missing for {clip_path.name}")
         h = _normalize_label(human_raw)
-        a = _normalize_label(ai_raw)
-        eq = (h == a) and ai_raw != "(missing)"
+        a_o = _normalize_label(ai_raw_ollama)
+        a_n = _normalize_label(ai_raw_nano)
+        eq_o = (h == a_o) and ai_raw_ollama != "(missing)"
+        eq_n = (h == a_n) and ai_raw_nano != "(missing)"
 
         cap = cv2.VideoCapture(str(clip_path))
         if not cap.isOpened():
@@ -449,8 +481,9 @@ def evaluate_and_review(clips_dir: Path, images_dir: Optional[Path] = None) -> N
                 f"Clip: {idx}/{total}",
                 f"File: {clip_path.name}",
                 f"Human: {human_raw}",
-                f"AI: {ai_raw}",
-                f"Match: {'YES' if eq else 'NO'}",
+                f"AI (Ollama): {ai_raw_ollama}",
+                f"AI (Nano):   {ai_raw_nano}",
+                f"Match O/N: {'Y' if eq_o else 'N'} / {'Y' if eq_n else 'N'}",
                 "",
                 f"Reviewed: {reviewed}  Good: {good_count}  Bad: {bad_count}",
                 "",
@@ -463,9 +496,13 @@ def evaluate_and_review(clips_dir: Path, images_dir: Optional[Path] = None) -> N
 
             composite = compose_frame(frame, side_w, lines)
 
-            # Draw a colored marker for match state (green/red) on the left panel area
-            marker_color = (0, 200, 0) if eq else (0, 0, 200)
-            cv2.circle(composite, (side_w - 30, 30), 14, marker_color, thickness=-1)
+            # Draw two colored markers: Ollama (O) and Nano (N)
+            marker_o = (0, 200, 0) if eq_o else ((80, 80, 80) if ai_raw_ollama == "(missing)" else (0, 0, 200))
+            marker_n = (0, 200, 0) if eq_n else ((80, 80, 80) if ai_raw_nano == "(missing)" else (0, 0, 200))
+            cv2.circle(composite, (side_w - 30, 30), 14, marker_o, thickness=-1)
+            cv2.putText(composite, "O", (side_w - 45, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (240, 240, 240), 2, cv2.LINE_AA)
+            cv2.circle(composite, (side_w - 30, 60), 14, marker_n, thickness=-1)
+            cv2.putText(composite, "N", (side_w - 45, 66), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (240, 240, 240), 2, cv2.LINE_AA)
 
             cv2.imshow(window, composite)
             key = cv2.waitKey(delay) & 0xFF
@@ -485,8 +522,8 @@ def evaluate_and_review(clips_dir: Path, images_dir: Optional[Path] = None) -> N
                 eval_writer.writerow({
                     "clip": rel,
                     "human_label": human_raw,
-                    "ai_label": ai_raw,
-                    "match": str(eq).lower(),
+                    "ai_label": ai_raw_ollama,
+                    "match": str(eq_o).lower(),
                     "user_mark": user_mark or "",
                     "timestamp": ts,
                 })
@@ -507,7 +544,7 @@ def evaluate_and_review(clips_dir: Path, images_dir: Optional[Path] = None) -> N
     # Finished review
     final_img = (np.zeros((600, 1000, 3), dtype=np.uint8))
     post_score = (good_count / reviewed) if reviewed > 0 else 0.0
-    msg1 = f"Initial exact-match acc: {acc:.3f} on {compared} pairs"
+    msg1 = "Review complete"
     msg2 = f"Reviewed {reviewed} • Good: {good_count} • Bad: {bad_count}"
     msg3 = f"User good-rate: {post_score:.3f}"
     cv2.putText(final_img, msg1, (40, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (200, 255, 200), 2, cv2.LINE_AA)

@@ -224,3 +224,4 @@ weights/
 *.pt
 rendered_videos/
 image_registry/
+easysort/services/argo/models/u2net_human_seg.pth
