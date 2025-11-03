@@ -38,3 +38,11 @@ Dermed sparer genbrugspladsen omkostninger ved eftersorteringer og betydeligt fo
 3. Pilot & Drift (uge 3-6): Baseline, feedback og finjustering. Oprettelse af rapporter og dashboard.
 
 Derfra kan der tages stilling til, om der skal udrulles til flere pladser og/eller containere, hvor det er relevant. 
+
+## Pris
+
+Systemet koster 10.000 kr. pr. camera i opsætning og derefter 2.000 kr. pr. camera pr. måned i drift (ekskl. moms).
+
+Der skal typisk bruge 1 camera pr. container.
+
+Drift inkluderer også support, opdateringer til AI-modeller og hosting.

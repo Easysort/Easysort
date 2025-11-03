@@ -36,3 +36,11 @@ Systemet bliver i dag brugt på ARGO's genbrugspladser til at overvåge genbrugs
 3. Pilot & Drift (uge 3-6): Baseline, feedback og finjustering. Oprettelse af rapporter og dashboard.
 
 Derfra kan der tages stilling til, om der skal udrulles til flere pladser og/eller containere, hvor det er relevant. 
+
+## Pris
+
+Systemet koster 10.000 kr. pr. camera i opsætning og derefter 2.000-8.000 kr. pr. camera pr. måned i drift (ekskl. moms).
+
+Der skal typisk bruge 1 camera pr. indgang til genbrugstelte. Den månedlige pris er afhængig af, hvor mange dagligt besøgende, der er på pladsen.
+
+Drift inkluderer også support, opdateringer til AI-modeller og hosting.
