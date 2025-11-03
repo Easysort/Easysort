@@ -4,111 +4,121 @@ import json
 
 import cv2
 import numpy as np
-from tqdm import tqdm
-
-from easysort.services.verdis.runner import VerdisRunner
 
 
-def group_id(paths: List[Path]) -> str:
-    if not paths:
-        return "unknown"
-    stem = paths[0].stem
-    return stem.rsplit("_", 1)[0] if "_" in stem else stem
+# Fixed crop for motion detection
+CROP = {"x": 737, "y": 1043, "w": 681, "h": 473}
 
 
-def motion_score_for_group(img_paths: List[Path], pix_delta: int = 10, max_w: int = 768) -> float:
+def sample_frames_every_second(video_path: Path, step_sec: int = 1) -> Tuple[List[np.ndarray], List[float]]:
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise SystemExit(f"Failed to open video: {video_path}")
+    fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+    if fps <= 0:
+        fps = 30.0
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    duration = total_frames / fps if fps > 0 else 0
+
+    times: List[float] = []
     frames: List[np.ndarray] = []
-    for p in img_paths:
-        im = cv2.imread(str(p))
-        if im is None:
-            continue
-        g = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-        h, w = g.shape[:2]
-        if w > max_w:
-            scale = max_w / float(w)
-            g = cv2.resize(g, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-        frames.append(g.astype(np.int16))
-    if len(frames) < 2:
-        return 0.0
-    min_h = min(f.shape[0] for f in frames)
-    min_w = min(f.shape[1] for f in frames)
-    frames = [f[:min_h, :min_w] for f in frames]
-    fracs: List[float] = []
-    for a, b in zip(frames[:-1], frames[1:]):
-        diff = np.abs(a - b)
-        fracs.append(float((diff > pix_delta).sum()) / float(diff.size))
-    return float(np.mean(fracs)) if fracs else 0.0
+    t = 0.0
+    while t <= duration:
+        cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
+        ok, frame = cap.read()
+        if not ok or frame is None:
+            break
+        frames.append(frame)
+        times.append(t)
+        t += step_sec
+    cap.release()
+    return frames, times
 
 
-def play_viewer(groups: List[List[Path]], scores: List[float], fps: int = 10, thresh: float = 0.20) -> None:
-    window = "Motion Viewer"
+def compute_motion_flags(frames: List[np.ndarray], pix_delta: int = 10, thresh: float = 0.10) -> Tuple[List[float], List[bool]]:
+    if len(frames) == 0:
+        return [], []
+    x, y, w, h = CROP["x"], CROP["y"], CROP["w"], CROP["h"]
+    grays: List[np.ndarray] = []
+    for fr in frames:
+        H, W = fr.shape[:2]
+        xx = max(0, min(W - 1, x)); yy = max(0, min(H - 1, y))
+        ww = max(1, min(W - xx, w)); hh = max(1, min(H - yy, h))
+        roi = fr[yy:yy+hh, xx:xx+ww]
+        g = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY).astype(np.int16)
+        grays.append(g)
+    scores: List[float] = []
+    flags: List[bool] = []
+    prev: np.ndarray = grays[0]
+    scores.append(0.0); flags.append(False)
+    for g in grays[1:]:
+        diff = np.abs(g - prev)
+        frac = float((diff > pix_delta).sum()) / float(diff.size)
+        scores.append(frac)
+        flags.append(frac >= thresh)
+        prev = g
+    return scores, flags
+
+
+def play_viewer(frames: List[np.ndarray], scores: List[float], flags: List[bool], fps: int = 15) -> None:
+    window = "Bales Motion Player"
     delay = max(1, int(1000 / max(1, fps)))
     paused = False
-    cv2.namedWindow(window, cv2.WINDOW_NORMAL)
     i = 0
-    total = len(groups)
-    while 0 <= i < total:
-        gid = group_id(groups[i])
-        score = scores[i] if i < len(scores) else 0.0
-        color = (0, 200, 0) if score >= thresh else (0, 0, 200)
-        for p in groups[i]:
-            im = cv2.imread(str(p))
-            if im is None:
-                continue
-            y = 28
-            for line in [
-                f"Group {i+1}/{total}  id={gid}",
-                f"Motion score: {score:.4f}  ({'Moving' if score >= thresh else 'Still'})",
-                "Space = pause/play • n = next • b = back • ESC = quit",
-            ]:
-                cv2.putText(im, line, (12, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (240, 240, 240), 2, cv2.LINE_AA)
-                y += 26
-            cv2.circle(im, (32, y + 10), 12, color, thickness=-1)
-            cv2.imshow(window, im)
-            key = cv2.waitKey(0 if paused else delay) & 0xFF
-            if key == 27:  # ESC
-                cv2.destroyWindow(window)
-                return
-            if key in (ord(' '),):
-                paused = not paused
-                continue
-            if key in (ord('b'), ord('B')):
-                i = max(0, i - 1)
-                break
-            if key in (ord('n'), ord('N')):
-                i = min(total - 1, i + 1)
-                break
+    n = len(frames)
+    cv2.namedWindow(window, cv2.WINDOW_NORMAL)
+    while 0 <= i < n:
+        fr = frames[i].copy()
+        H, W = fr.shape[:2]
+        band_h = max(8, H // 60)
+        color = (0, 200, 0) if flags[i] else (0, 0, 200)
+        fr[0:band_h, 0:W] = color
+        # draw crop rectangle for reference
+        x, y, w, h = CROP["x"], CROP["y"], CROP["w"], CROP["h"]
+        x = max(0, min(W - 1, x)); y = max(0, min(H - 1, y))
+        w = max(1, min(W - x, w)); h = max(1, min(H - y, h))
+        cv2.rectangle(fr, (x, y), (x + w, y + h), (0, 255, 255), 2)
+        txt = f"{i+1}/{n}  motion={scores[i]:.4f} ({'YES' if flags[i] else 'NO'})  Space=pause  n=next  b=back  ESC=quit"
+        cv2.putText(fr, txt, (12, band_h + 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (240, 240, 240), 2, cv2.LINE_AA)
+        cv2.imshow(window, fr)
+        key = cv2.waitKey(0 if paused else delay) & 0xFF
+        if key == 27:  # ESC
+            break
+        if key in (ord(' '),):
+            paused = not paused
+            continue
+        if key in (ord('b'), ord('B')):
+            i = max(0, i - 1)
+        elif key in (ord('n'), ord('N')):
+            i = min(n - 1, i + 1)
         else:
-            i += 1
+            i = i + (0 if paused else 1)
     cv2.destroyAllWindows()
 
 
 def main() -> None:
     import argparse
-    parser = argparse.ArgumentParser(description="Detect significant motion over time and review via OpenCV")
+    parser = argparse.ArgumentParser(description="Sample frames each second, detect motion on fixed crop, and review")
     parser.add_argument("--video", type=str, required=True, help="Path to input video")
-    parser.add_argument("--thresh", type=float, default=0.10, help="Motion threshold for moving/still (default: 0.20)")
-    parser.add_argument("--fps", type=int, default=10, help="Playback FPS in viewer (default: 10)")
+    parser.add_argument("--step", type=int, default=1, help="Sampling step in seconds (default: 1)")
+    parser.add_argument("--thresh", type=float, default=0.10, help="Motion threshold (fraction of changed pixels)")
+    parser.add_argument("--pix_delta", type=int, default=10, help="Pixel intensity change threshold (0..255)")
     args = parser.parse_args()
 
     video_path = Path(args.video)
-    groups = VerdisRunner(find_latest=False).analyze(video_path)
-    print(f"Found {len(groups)} groups in {video_path}")
-
-    scores: List[float] = []
-    for grp in tqdm(groups, desc="Computing motion scores", unit="group"):
-        scores.append(motion_score_for_group(grp))
-
-    out_path = video_path.with_suffix(".motion.json")
+    frames, times = sample_frames_every_second(video_path, step_sec=int(args.step))
+    print(f"Sampled {len(frames)} frames from {video_path}")
+    scores, flags = compute_motion_flags(frames, pix_delta=int(args.pix_delta), thresh=float(args.thresh))
+    # Optionally save
+    out_path = video_path.with_suffix(".motion_seq.json")
     try:
-        payload = [{"group_id": group_id(g), "motion": s} for g, s in zip(groups, scores)]
+        payload = [{"t": float(t), "score": float(s), "moving": bool(f)} for t, s, f in zip(times, scores, flags)]
         with open(out_path, "w") as f:
             json.dump(payload, f)
-        print(f"Saved motion scores to {out_path}")
+        print(f"Saved motion sequence to {out_path}")
     except Exception:
         pass
-
-    play_viewer(groups, scores, fps=int(args.fps), thresh=float(args.thresh))
+    play_viewer(frames, scores, flags)
 
 
 if __name__ == "__main__":

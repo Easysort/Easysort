@@ -71,7 +71,6 @@ def main() -> None:
             roi = cv2.selectROI(win, rotated, showCrosshair=True, fromCenter=False)
             x, y0, w, h = map(int, roi)
             crop = (x, y0, w, h) if w > 0 and h > 0 else None
-            cv2.destroyWindow("ROI selector") if cv2.getWindowProperty("ROI selector", 0) >= 0 else None
         elif k in (ord('s'), ord('S')):
             h, w = image.shape[:2]
             M, H = build_rotation_matrix(w, h, angle)
@@ -86,11 +85,11 @@ def main() -> None:
                 "crop": None if crop is None else {"x": crop[0], "y": crop[1], "w": crop[2], "h": crop[3]},
             }
             print(json.dumps(out))
-            try:
-                with open(img_path.with_suffix(".rectify.json"), "w") as f:
-                    json.dump(out, f)
-            except Exception:
-                pass
+            # try:
+            #     with open(img_path.with_suffix(".rectify.json"), "w") as f:
+            #         json.dump(out, f)
+            # except Exception:
+            #     pass
 
     cv2.destroyAllWindows()
 
