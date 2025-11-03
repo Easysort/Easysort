@@ -6,7 +6,8 @@ Easysort kan bruges til overvågning af omlasteplads for udvidet modtagekontrol,
 ## Nuværende udfordringer ved genbrugstelte
 - **Manuelt arbejde** med at overvåge aktiviteten på omlastepladsen.
 - **Aflæsninger** af meget dårligt kvalitet eller forkerte aflæsninger ødelægger kvalitet.
-- **** og direkte følge resultaterne. 
+- **Svært at drive forandringer** og følge historiske data.
+- **Manglende ind- og afvejning af biler** kan medføre store omkostninger for omlastepladsen.
 
 ## Løsning med Easysort
 
@@ -56,7 +57,7 @@ Derfra kan der tages stilling til, om der skal udrulles til flere pladser og/ell
 
 ## Testfase
 
-Det er muligt at få prøvet systemet af med én af de 3 moduler. Hvis relevante kamera allerede er opsat, kan systemet komme op og køre på mindre end 72 timer fra adgang til pladsen er givet og indlæsning af data er startet.
+Det er muligt at få prøvet systemet af med et af de 3 moduler. Hvis relevante kamera allerede er opsat, kan systemet komme op og køre på mindre end 72 timer fra adgang til pladsen er givet og indlæsning af data er startet.
 
 ## Pris
 
