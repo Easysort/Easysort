@@ -5,6 +5,9 @@ import json
 import cv2
 import numpy as np
 from tqdm import tqdm
+import tempfile
+import shutil
+import subprocess
 
 
 # Fixed crop for motion detection
@@ -12,6 +15,34 @@ CROP = {"x": 737, "y": 1043, "w": 681, "h": 473}
 
 
 def sample_frames_every_second(video_path: Path, step_sec: int = 1) -> Tuple[List[np.ndarray], List[float]]:
+    # Fast path: use ffmpeg if available to extract fps=1 frames (much faster than Python decode)
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is not None and step_sec >= 1:
+        fps = 1.0 / float(step_sec)
+        with tempfile.TemporaryDirectory() as td:
+            out_dir = Path(td)
+            pattern = str(out_dir / "%06d.jpg")
+            vf = f"fps={fps},crop={CROP['w']}:{CROP['h']}:{CROP['x']}:{CROP['y']}"
+            cmd = [
+                ffmpeg,
+                "-hide_banner", "-loglevel", "error",
+                "-y",
+                # hardware accel on macOS if available; harmless if not supported
+                "-hwaccel", "videotoolbox",
+                "-i", str(video_path),
+                "-vf", vf,
+                "-q:v", "3",
+                pattern,
+            ]
+            print(f"[bales] using ffmpeg to extract frames: {' '.join(cmd)}")
+            subprocess.run(cmd, check=False)
+            imgs = sorted(out_dir.glob("*.jpg"))
+            frames = [cv2.imread(str(p)) for p in imgs if p.is_file()]
+            frames = [f for f in frames if f is not None]
+            times = [i * step_sec for i in range(len(frames))]
+            print(f"[bales] ffmpeg extracted {len(frames)} frames")
+            return frames, times
+
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise SystemExit(f"Failed to open video: {video_path}")
