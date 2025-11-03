@@ -7,6 +7,7 @@ Easysort overvåger containere og genbrugstelte med kamera og AI for løbende at
 Systemet kan advare personalet ved kritiske hændelser (fx tydelig fejlsortering eller uønskede genstande), og leverer datagrundlag til rapportering – herunder mængder, fraktioner og estimerede CO2‑besparelser. Opsætning kan gennemføres hurtigt via pladstjek, installation/kalibrering og en kort pilotfase, hvorefter løsningen kan skaleres efter behov.
 
 ## Nuværende udfordringer ved affaldscontainere
+
 - **Fejlsortering og forurening** driver omkostninger op og forringer materialekvaliteten ved genbrug.
 - **Manglende transparens** i fyldningsgrad, reelle indhold og forurening.
 - **Svært at drive forandringer** og direkte følge resultaterne. 
@@ -35,6 +36,7 @@ Systemet kan overvåge containere med større fraktioner som f.eks. træ, metal,
 Ud over containere kan Easysort også bruges ved borger-til-borger genbrug. Her fokuserer systemet på aktivitet og indhold i teltet: hvad der afleveres/tages, og om der forekommer uønskede genstande (fx affald). Løsningen kan give ugentlige rapporter om aktivitet samt et estimat af CO2‑besparelser ved øget genbrug.
 
 Easysort ved genbrugstelte kan bl.a. svare på:
+
 - **Overordnet aktivitet**: Hvilke typer genstande/materialer håndteres – og hvor mange? Hvornår er der mest aktivitet?
 - **Kvalitet og uønskede ting**: Forekommer der affald/uhensigtsmæssige genstande i teltet – og hvor ofte?
 - **Effekt af tiltag**: Ser vi forbedringer efter ændringer (skiltning, bemanding, indretning)?
@@ -46,6 +48,7 @@ Easysort ved genbrugstelte kan bl.a. svare på:
 - Udvidet sikkerhed afhængig af behov.
 
 ## Implementeringsplan
+
 1. Pladstjek (uge 0-1): Layout, strøm/PoE, netværk, montage
 2. Installation & kalibrering (uge 1-2): Hardware, fraktionsmodeller, alarmtærskler. Løbende kommunikation for at sikre, at systemet finder det, der skal findes.
 3. Pilot & Drift (uge 3-6): Baseline, feedback og finjustering. Oprettelse af rapporter og dashboard.
