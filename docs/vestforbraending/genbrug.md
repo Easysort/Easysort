@@ -15,6 +15,7 @@ Personalet får ugentlige rapporter om aktiviteten på genbrugstelterne, hvor me
 Easysort kombinerer kamera og AI til at overvåge genbrugstelte og give et samlet overblik over aktivitet og indhold. Systemet kan opgraderes til at give advarsler, hvis der optræder uønskede genstande (fx affald i teltet) eller hændelser, som personalet ønsker at følge op på.
 
 Easysort hjælper med at svare på følgende spørgsmål:
+
 - **Overordnet aktivitet**: Hvad bliver afleveret/tages i genbrugsteltet? Hvilke typer genstande/materialer er der?
 - **Effekt af tiltag**: Hvordan påvirker ændringer (skiltning, bemanding, indretning) adfærd og resultater? Kan vi se forbedringer i kvalitet og aktivitet over tid?
 - **Kapacitetsudnyttelse**: Hvornår er der mest aktivitet?
