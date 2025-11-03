@@ -15,6 +15,7 @@ Personalet kan få advarsler ved kritiske fejlsorteringer, og ledelsen får grun
 Easysort kombinerer kamera og AI til at overvåge affaldscontainere og give en omfattende visning af indholdet. Derudover kan systemet give advarsler og alarmere, hvis der er fejlsortering eller forurening, som personalet ønsker at handle på.
 
 Easysort hjælper med at svære på følgende spørgsmål:
+
 - **Overordnet indhold**: Hvad er der i containeren? Hvilke fraktioner er der? Hvor mange af hver fraktion er der?
 - **Effekt af ændringer**: Hvordan påvirker ændringer i systemet resultaterne? Kan vi se effekten af ændringer i renhed og forurening?
 - **Renhed og forurening**: Hvad er der reelt i containeren? Hvad er de typiske urenheder? Hvor mange urenheder er der?
