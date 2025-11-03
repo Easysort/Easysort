@@ -4,6 +4,7 @@ import json
 
 import cv2
 import numpy as np
+from tqdm import tqdm
 
 
 # Fixed crop for motion detection
@@ -19,19 +20,21 @@ def sample_frames_every_second(video_path: Path, step_sec: int = 1) -> Tuple[Lis
         fps = 30.0
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
     duration = total_frames / fps if fps > 0 else 0
+    print(f"[bales] fps={fps:.3f} total_frames={total_frames} duration={duration:.2f}s step={step_sec}s")
 
     times: List[float] = []
     frames: List[np.ndarray] = []
-    t = 0.0
-    while t <= duration:
+    num_steps = int(duration // step_sec) + 1
+    for i in tqdm(range(num_steps), desc="Sampling frames", unit="frame"):
+        t = i * step_sec
         cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
         ok, frame = cap.read()
         if not ok or frame is None:
             break
         frames.append(frame)
         times.append(t)
-        t += step_sec
     cap.release()
+    print(f"[bales] sampled {len(frames)} frames at times={list(map(lambda x: round(x,2), times[:5]))}{'...' if len(times)>5 else ''}")
     return frames, times
 
 
@@ -39,6 +42,7 @@ def compute_motion_flags(frames: List[np.ndarray], pix_delta: int = 10, thresh: 
     if len(frames) == 0:
         return [], []
     x, y, w, h = CROP["x"], CROP["y"], CROP["w"], CROP["h"]
+    print(f"[bales] crop=(x={x}, y={y}, w={w}, h={h}) pix_delta={pix_delta} thresh={thresh}")
     grays: List[np.ndarray] = []
     for fr in frames:
         H, W = fr.shape[:2]
@@ -51,12 +55,15 @@ def compute_motion_flags(frames: List[np.ndarray], pix_delta: int = 10, thresh: 
     flags: List[bool] = []
     prev: np.ndarray = grays[0]
     scores.append(0.0); flags.append(False)
-    for g in grays[1:]:
+    for g in tqdm(grays[1:], desc="Computing motion", unit="frame"):
         diff = np.abs(g - prev)
         frac = float((diff > pix_delta).sum()) / float(diff.size)
         scores.append(frac)
         flags.append(frac >= thresh)
         prev = g
+    if len(scores) > 1:
+        import statistics as _stats
+        print(f"[bales] motion scores: min={min(scores):.4f} med={_stats.median(scores):.4f} mean={_stats.mean(scores):.4f} max={max(scores):.4f}")
     return scores, flags
 
 
@@ -107,7 +114,7 @@ def main() -> None:
 
     video_path = Path(args.video)
     frames, times = sample_frames_every_second(video_path, step_sec=int(args.step))
-    print(f"Sampled {len(frames)} frames from {video_path}")
+    print(f"[bales] loaded video and extracted {len(frames)} frames for analysis")
     scores, flags = compute_motion_flags(frames, pix_delta=int(args.pix_delta), thresh=float(args.thresh))
     # Optionally save
     out_path = video_path.with_suffix(".motion_seq.json")
@@ -115,7 +122,7 @@ def main() -> None:
         payload = [{"t": float(t), "score": float(s), "moving": bool(f)} for t, s, f in zip(times, scores, flags)]
         with open(out_path, "w") as f:
             json.dump(payload, f)
-        print(f"Saved motion sequence to {out_path}")
+        print(f"[bales] saved motion sequence to {out_path}")
     except Exception:
         pass
     play_viewer(frames, scores, flags)
