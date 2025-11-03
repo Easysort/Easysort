@@ -8,6 +8,7 @@ import cv2
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
+import argparse
 import base64
 
 from easysort.services.dev.trainer.openai import OpenAITrainer, TrainerConfig
@@ -288,4 +289,8 @@ class VerdisBeltHandler:
         
 
 if __name__ == "__main__":
-    VerdisBeltHandler(Path("/Volumes/Easysort128/verdis/ARGO_ch5_20251028065738_20251028190253.mp4")).run()
+    parser = argparse.ArgumentParser(description="Run Verdis Belt Handler on a video file")
+    parser.add_argument("video_path", type=str, help="Path to the video file")
+    args = parser.parse_args()
+    video_path = Path(args.video_path)
+    VerdisBeltHandler(video_path).run()

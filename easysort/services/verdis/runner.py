@@ -150,5 +150,5 @@ class VerdisRunner:
         return groups
 
 if __name__ == "__main__":
-    runner = VerdisRunner("/Volumes/Easysort128/verdis")
-    runner.analyze()
+    runner = VerdisRunner()
+    runner.analyze("/mnt/c/Users/lucas/Desktop/Verdis")
