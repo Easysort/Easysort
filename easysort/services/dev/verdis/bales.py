@@ -22,17 +22,22 @@ def sample_frames_every_second(video_path: Path, step_sec: int = 1) -> Tuple[Lis
     duration = total_frames / fps if fps > 0 else 0
     print(f"[bales] fps={fps:.3f} total_frames={total_frames} duration={duration:.2f}s step={step_sec}s")
 
+    # Sequential scan: grab every frame, retrieve only at stride indices
+    stride = max(1, int(round(fps * step_sec)))
+    print(f"[bales] using stride={stride} frames (~{step_sec}s)")
     times: List[float] = []
     frames: List[np.ndarray] = []
-    num_steps = int(duration // step_sec) + 1
-    for i in tqdm(range(num_steps), desc="Sampling frames", unit="frame"):
-        t = i * step_sec
-        cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
-        ok, frame = cap.read()
+    for i in tqdm(range(total_frames), desc="Sampling frames", unit="frame"):
+        ok = cap.grab()
+        if not ok:
+            break
+        if i % stride != 0:
+            continue
+        ok, frame = cap.retrieve()
         if not ok or frame is None:
             break
         frames.append(frame)
-        times.append(t)
+        times.append(i / fps)
     cap.release()
     print(f"[bales] sampled {len(frames)} frames at times={list(map(lambda x: round(x,2), times[:5]))}{'...' if len(times)>5 else ''}")
     return frames, times
