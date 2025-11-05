@@ -48,10 +48,11 @@ def upload_json(bucket: str, object_key: str, payload: Any) -> None:
     client = create_client(Env.SUPABASE_URL, Env.SUPABASE_KEY)
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     # Prefer upsert to overwrite existing for the day
+    # storage3 expects header-like strings for options; pass strings not bools
     client.storage.from_(bucket).upload(
         object_key,
         body,
-        file_options={"content-type": "application/json", "upsert": True},
+        file_options={"contentType": "application/json", "upsert": "true"},
     )
 
 
