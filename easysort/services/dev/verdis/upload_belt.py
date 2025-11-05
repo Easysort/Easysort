@@ -56,6 +56,32 @@ def upload_json(bucket: str, object_key: str, payload: Any) -> None:
     )
 
 
+def compute_info(items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Compute high-level decimal percentages from uploaded items.
+    This is a working default; adjust freely to your own desired keys/logic.
+    """
+    KEYS = [
+        "empty_not_running",
+        "empty_running",
+        "cardboard_not_running",
+        "cardboard_running",
+        "paper_not_running",
+        "paper_running",
+        "residual_not_running",
+        "residual_running",
+        "plastics_not_running",
+        "plastics_running",
+    ]
+    info: Dict[str, Any] = {k: 0 for k in KEYS}
+    for item in items:
+        running = bool(item["motion"])
+        category = str(item["ai_category"]).lower()
+        key = f"{category}_{'running' if running else 'not_running'}"
+        info[key] += 1
+    info = {k: round(info[k] / len(items), 4) for k in KEYS}
+    return info
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Upload belt motion results to Supabase easytrack bucket")
     ap.add_argument("--json", type=str, required=True, help="Path to input JSON list of {group_id, motion, ai_category}")
@@ -69,13 +95,23 @@ def main() -> None:
 
     bucket = "easytrack"
     object_key = f"verdis/belt/{date_key}.json"
+    object_key_info = f"verdis/belt/{date_key}_info.json"
+    info_payload = compute_info(out)
 
     if args.dry:
-        print(json.dumps({"bucket": bucket, "key": object_key, "items": out}, ensure_ascii=False, indent=2))
+        print(json.dumps({
+            "bucket": bucket,
+            "key": object_key,
+            "items": out,
+            "info_key": object_key_info,
+            "info": info_payload,
+        }, ensure_ascii=False, indent=2))
         return
 
     upload_json(bucket, object_key, out)
+    upload_json(bucket, object_key_info, info_payload)
     print(f"Uploaded {len(out)} items to {bucket}/{object_key}")
+    print(f"Uploaded info summary to {bucket}/{object_key_info}")
 
 
 if __name__ == "__main__":
