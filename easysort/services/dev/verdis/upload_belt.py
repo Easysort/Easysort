@@ -84,34 +84,45 @@ def compute_info(items: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Upload belt motion results to Supabase easytrack bucket")
-    ap.add_argument("--json", type=str, required=True, help="Path to input JSON list of {group_id, motion, ai_category}")
+    ap.add_argument("--path", type=str, required=True, help="Path to JSON file or directory containing ARGO_ch5*.json files")
     ap.add_argument("--threshold", type=float, default=0.2, help="Motion threshold (default 0.2)")
-    ap.add_argument("--dry", action="store_true", help="Print result and key instead of uploading")
+    ap.add_argument("--dry", action="store_true", help="Print results and keys instead of uploading")
     args = ap.parse_args()
 
-    src = Path(args.json)
-    date_key = parse_date_from_filename(src)
-    out = load_and_transform(src, threshold=float(args.threshold))
+    def process_one(src: Path) -> None:
+        date_key = parse_date_from_filename(src)
+        out = load_and_transform(src, threshold=float(args.threshold))
+        bucket = "easytrack"
+        object_key = f"verdis/belt/{date_key}.json"
+        object_key_info = f"verdis/belt/{date_key}_info.json"
+        info_payload = compute_info(out)
 
-    bucket = "easytrack"
-    object_key = f"verdis/belt/{date_key}.json"
-    object_key_info = f"verdis/belt/{date_key}_info.json"
-    info_payload = compute_info(out)
+        if args.dry:
+            print(json.dumps({
+                "file": str(src),
+                "bucket": bucket,
+                "key": object_key,
+                "items_count": len(out),
+                "info_key": object_key_info,
+                "info": info_payload,
+            }, ensure_ascii=False, indent=2))
+            return
 
-    if args.dry:
-        print(json.dumps({
-            "bucket": bucket,
-            "key": object_key,
-            "items": out,
-            "info_key": object_key_info,
-            "info": info_payload,
-        }, ensure_ascii=False, indent=2))
-        return
+        upload_json(bucket, object_key, out)
+        upload_json(bucket, object_key_info, info_payload)
+        print(f"Uploaded {len(out)} items to {bucket}/{object_key} from {src.name}")
+        print(f"Uploaded info summary to {bucket}/{object_key_info}")
 
-    upload_json(bucket, object_key, out)
-    upload_json(bucket, object_key_info, info_payload)
-    print(f"Uploaded {len(out)} items to {bucket}/{object_key}")
-    print(f"Uploaded info summary to {bucket}/{object_key_info}")
+    p = Path(args.path)
+    if p.is_dir():
+        files = sorted([f for f in p.iterdir() if f.is_file() and f.name.startswith("ARGO_ch5") and f.suffix.lower() == ".json"])
+        if not files:
+            print(f"No ARGO_ch5*.json files found in {p}")
+            return
+        for f in files:
+            process_one(f)
+    else:
+        process_one(p)
 
 
 if __name__ == "__main__":
