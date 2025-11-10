@@ -1,0 +1,115 @@
+site_name: Easysort Documentation
+repo_url: https://github.com/EasySort/easysort
+site_url: https://docs.easysort.org
+site_description: Documentation for Easysort - An open-source waste sorting system
+site_author: Easysort Team
+
+nav:
+  - GETTING STARTED:
+    - index.md
+    - Quick-start: getting-started/quick-start.md
+  - ABOUT EASYSORT:
+    - why/index.md
+    - Our Mission: why/mission.md
+    - Industry Problems: why/issues.md
+    - Current State: why/current-state.md
+    - Stakeholders: why/stakeholders.md
+    - Waste Landscape: why/landscape.md
+    - Market Players: why/competitors.md
+    - Industry Funding: why/funding.md
+
+  - THE SOLUTION:
+    - products/index.md
+    - What we offer: products/products.md
+  - CONTRIBUTING:
+    - How to contribute: contributing/index.md
+    - Our projects: contributing/projects.md
+    - Our current priorities: contributing/plan-for-victory.md
+    - What we still don't know: contributing/open-questions.md
+  - LINKS:
+    - Website: https://easysort.org
+    - Github: https://github.com/easysort
+    - Pitch Deck: https://pitch.com/v/easysort-pitch-deck-m6gpkp
+    - 2 Page Summary: https://easysort.org/2-page-summary.pdf
+
+extra_css:
+  - stylesheets/extra.css
+
+validation:
+  links:
+    anchors: warn
+
+markdown_extensions:
+- attr_list
+- admonition
+- footnotes
+- pymdownx.details
+- pymdownx.emoji:
+    emoji_index: !!python/name:material.extensions.emoji.twemoji
+    emoji_generator: !!python/name:material.extensions.emoji.to_svg
+- pymdownx.highlight:
+    pygments_lang_class: true
+- pymdownx.inlinehilite:
+    style_plain_text: python
+- pymdownx.magiclink
+- pymdownx.snippets:
+    base_path: [!relative $config_dir]
+    check_paths: true
+- pymdownx.superfences
+- pymdownx.tabbed:
+    alternate_style: true
+    slugify: !!python/object/apply:pymdownx.slugs.slugify
+      kwds:
+        case: lower
+- pymdownx.tasklist:
+    custom_checkbox: true
+- pymdownx.tilde
+- toc:
+    permalink: "¤"
+
+theme:
+  name: material
+  logo: assets/easysort-small-logo-white.png
+  favicon: assets/easysort-logo.png
+  features:
+  - announce.dismiss
+  - content.action.edit
+  - content.action.view
+  - content.code.annotate
+  - content.code.copy
+  - content.tooltips
+  - navigation.footer
+  - navigation.indexes
+  - navigation.sections
+  - navigation.expand
+  - navigation.top
+  - navigation.path
+  - search.highlight
+  - search.suggest
+  - toc.follow
+  - toc.integrate
+  palette:
+    scheme: slate
+    primary: black
+    accent: lime
+  palette:
+    - media: "(prefers-color-scheme)"
+      accent: lime
+      primary: black
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      accent: lime
+      primary: black
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      accent: lime
+      primary: black
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
