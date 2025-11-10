@@ -1,12 +1,11 @@
 from easysort.sampler import Sampler, Crop
 from easysort.gpt_trainer import GPTTrainer, YoloTrainer
 from easysort.registry import DataRegistry
-from pathlib import Path
 from typing import Dict, List
 import json
-import cv2
 import numpy as np
 from tqdm import tqdm
+import os
 
 # def create_montage(images: list[np.ndarray], cols: int = 10) -> np.ndarray:
 #     """Create a grid montage of images."""
@@ -75,9 +74,10 @@ from tqdm import tqdm
 
 def run():
     DataRegistry.SYNC()
-    path_counts: Dict[str, List[int]] = {}
+    path_counts: Dict[str, List[int]] = json.load(open("counts.json")) if os.path.exists("counts.json") else {}
     all_counts = []
-    for path in DataRegistry.LIST("argo/Argo-Jyllinge-Entrance-01/2025/11/10/10"):
+    for path in DataRegistry.LIST("argo/Argo-Jyllinge-Entrance-01"):
+        if path in path_counts: continue
         path_counts[path] = []
         frames = Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))
         print(f"Loaded {len(frames)} frames")
