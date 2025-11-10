@@ -13,6 +13,7 @@ from pathlib import Path
 from tqdm import tqdm
 from typing import Optional
 import json
+import numpy as np
 
 class Registry:
     def __init__(self, registry_path: str): self.registry_path = registry_path
@@ -45,9 +46,10 @@ class Registry:
     def LIST(self, prefix: Optional[str] = "") -> list[str]:
         return [str(x) for x in (Path(self.registry_path) / prefix).glob("**/*") if x.is_file() and not x.name.startswith("._")]
 
-    def POST(self, key: str, data: bytes, type: str) -> None: {"json": self._post_json, "bytes": self._post_bytes}[type](key, data)
+    def POST(self, key: str, data: dict|bytes|np.ndarray) -> None: {dict: self._post_json, bytes: self._post_bytes, np.ndarray: self._post_numpy}[type(data)](key, data)
     def _post_json(self, key: str, data: dict) -> None: json.dump(data, open(os.path.join(self.registry_path, key), "w"))
     def _post_bytes(self, key: str, data: bytes) -> None: open(os.path.join(self.registry_path, key), "wb").write(data)
+    def _post_numpy(self, key: str, data: np.ndarray) -> None: np.save(os.path.join(self.registry_path, key), data)
 
     # DELETE methods
 

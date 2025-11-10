@@ -1,6 +1,6 @@
 from easysort.sampler import Sampler, Crop
 from easysort.gpt_trainer import GPTTrainer, YoloTrainer
-from easysort.registry import DataRegistry
+from easysort.registry import DataRegistry, ResultRegistry
 from typing import Dict, List
 import json
 import numpy as np
@@ -112,30 +112,25 @@ def run():
         json.dump(path_counts, f)
 
     gpt_trainer = GPTTrainer()
-    images_with_people = {}
-    for path in tqdm(DataRegistry.LIST("argo"), desc="Processing paths"):
-        if path not in path_counts: continue
-        for i, (frame, count) in enumerate(zip(Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480)), path_counts[path])):
-            if count > 0: images_with_people[path + "_" + str(i) + ".jpg"] = frame
+    prompt = """You need to analyze the image and determine if there is a person, if they are walking left or right, what item they are carrying, how many of each item they are carrying, and the estimated weight of the item."""
 
     @dataclass
     class GPTResult:
         person: bool
         person_carrying_item: bool
         person_walking_direction: str #left or right
-        item_description: str
-        estimated_weight_of_item: float
+        item_description: [str]
+        item_count: [int]
+        estimated_weight_of_item: [float]
 
-    prompt = """You need to analyze the image and determine if there is a person, if they are walking left or right, what item they are carrying, and the estimated weight of the item."""
-    images = [[image] for image in images_with_people.values()[:3]]
-    print(f"Calling OpenAI with {len(images)} images")
-    gpt_results = gpt_trainer._openai_call(model=gpt_trainer.default_model, prompt=prompt, image_paths=images, output_schema=GPTResult)
-    saved_responses = []
-    for name, result in zip(images_with_people.keys()[:3], gpt_results):
-        saved_responses.append({"image": name, "response": result.__dict__})
-    with open("gpt_results.json", "w") as f:
-        json.dump(saved_responses, f)
 
+    for path in tqdm(DataRegistry.LIST("argo")[:2], desc="Processing paths"):
+        if path not in path_counts: continue
+        frames = [[f] for f in Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))]
+        gpt_results = gpt_trainer._openai_call(model=gpt_trainer.default_model, prompt=prompt, image_paths=frames, output_schema=GPTResult)
+        for i, (frame, result) in enumerate(zip(frames, gpt_results)):
+            ResultRegistry.POST(path + "_" + str(i) + ".json", result.__dict__)
+            ResultRegistry.POST(path + "_" + str(i) + ".jpg", frame)
 
 
 if __name__ == "__main__":
