@@ -76,6 +76,8 @@ def run():
     DataRegistry.SYNC()
     path_counts: Dict[str, List[int]] = json.load(open("counts.json")) if os.path.exists("counts.json") else {}
     all_counts = []
+    errors = []
+    yolo_trainer = YoloTrainer()
     for j,path in enumerate(tqdm(DataRegistry.LIST("argo"), desc="Processing paths")):
         if path in path_counts: continue
         path_counts[path] = []
@@ -83,10 +85,15 @@ def run():
         print(f"Loaded {len(frames)} frames")
         batch_size = 32
         for i in tqdm(range(0, len(frames), batch_size), desc="Processing batches"):
-            batch = frames[i:i+batch_size]
-            counts = YoloTrainer()._is_person_in_image(batch)
-            all_counts.extend(counts)
-            path_counts[path].extend(counts)
+            try:
+                batch = frames[i:i+batch_size]
+                counts = yolo_trainer._is_person_in_image(batch)
+                all_counts.extend(counts)
+                path_counts[path].extend(counts)
+            except Exception as e:
+                print(f"Error processing batch {i}: {e}")
+                errors.append(path)
+                continue
         if j % 20 == 0:
             print(f"Saving counts...")
             with open("counts.json", "w") as f:
@@ -94,7 +101,9 @@ def run():
     
     # Print summary
     print(f"\nSummary:")
+    print(f"  Total paths: {len(DataRegistry.LIST('argo'))}")
     print(f"  Total frames: {len(frames)}")
+    print(f"  Errors: {len(errors)}")
     print(f"  Frames with people: {sum(1 for c in all_counts if c > 0)}")
     print(f"  Frames without people: {sum(1 for c in all_counts if c == 0)}")
     print(f"  Average people per frame (when detected): {np.mean([c for c in all_counts if c > 0]) if any(c > 0 for c in all_counts) else 0:.2f}")
@@ -102,6 +111,9 @@ def run():
     # Save json with path: counts
     with open("counts.json", "w") as f:
         json.dump(path_counts, f)
+
+    # gpt_trainer = GPTTrainer()
+    # images = [Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480)) for path in DataRegistry.LIST("argo")]
 
 if __name__ == "__main__":
     run()
