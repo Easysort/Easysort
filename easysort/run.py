@@ -79,25 +79,24 @@ def run():
     errors = []
     yolo_trainer = YoloTrainer()
     for j,path in enumerate(tqdm(DataRegistry.LIST("argo"), desc="Processing paths")):
-        if path in path_counts: continue
-        path_counts[path] = []
-        frames = Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))
-        print(f"Loaded {len(frames)} frames")
-        batch_size = 32
-        for i in tqdm(range(0, len(frames), batch_size), desc="Processing batches"):
-            try:
+        try:
+            if path in path_counts: continue
+            path_counts[path] = []
+            frames = Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))
+            print(f"Loaded {len(frames)} frames")
+            batch_size = 32
+            for i in tqdm(range(0, len(frames), batch_size), desc="Processing batches"):
                 batch = frames[i:i+batch_size]
                 counts = yolo_trainer._is_person_in_image(batch)
                 all_counts.extend(counts)
                 path_counts[path].extend(counts)
-            except Exception as e:
-                print(f"Error processing batch {i}: {e}")
-                errors.append(path)
-                continue
-        if j % 20 == 0:
-            print(f"Saving counts...")
-            with open("counts.json", "w") as f:
-                json.dump(path_counts, f)
+            if j % 20 == 0:
+                print(f"Saving counts...")
+                with open("counts.json", "w") as f:
+                    json.dump(path_counts, f)
+        except Exception as e:
+            errors.append(path)
+            print(f"Error processing {path}: {e}")
     
     # Print summary
     print(f"\nSummary:")
