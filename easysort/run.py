@@ -101,7 +101,6 @@ def run():
     # Print summary
     print(f"\nSummary:")
     print(f"  Total paths: {len(DataRegistry.LIST('argo'))}")
-    print(f"  Total frames: {len(frames)}")
     print(f"  Errors: {len(errors)}")
     print(f"  Frames with people: {sum(1 for c in all_counts if c > 0)}")
     print(f"  Frames without people: {sum(1 for c in all_counts if c == 0)}")
