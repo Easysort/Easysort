@@ -102,9 +102,8 @@ def run():
     print(f"\nSummary:")
     print(f"  Total paths: {len(DataRegistry.LIST('argo'))}")
     print(f"  Errors: {len(errors)}")
-    print(f"  Frames with people: {sum(1 for c in all_counts if c > 0)}")
-    print(f"  Frames without people: {sum(1 for c in all_counts if c == 0)}")
-    print(f"  Average people per frame (when detected): {np.mean([c for c in all_counts if c > 0]) if any(c > 0 for c in all_counts) else 0:.2f}")
+    print(f"  Frames with people: {sum(1 for path in path_counts for c in path_counts[path] if c > 0)}")
+    print(f"  Frames without people: {sum(1 for path in path_counts for c in path_counts[path] if c == 0)}")
 
     # Save json with path: counts
     with open("counts.json", "w") as f:
@@ -125,7 +124,8 @@ def run():
 
     for path in tqdm(DataRegistry.LIST("argo")[:2], desc="Processing paths"):
         if path not in path_counts: continue
-        frames = [[f] for f in Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))]
+        frames = [[f] for i, f in enumerate(Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))) if path_counts[path][i] > 0]
+        print(f"Calling OpenAI with {len(frames)} people frames out of {len(path_counts[path])} total frames")
         gpt_results = gpt_trainer._openai_call(model=gpt_trainer.default_model, prompt=prompt, image_paths=frames, output_schema=GPTResult)
         for i, (frame, result) in enumerate(zip(frames, gpt_results)):
             ResultRegistry.POST(path + "_" + str(i) + ".json", result.__dict__)
