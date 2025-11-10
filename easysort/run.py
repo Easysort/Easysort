@@ -124,12 +124,12 @@ def run():
 
     for path in tqdm(DataRegistry.LIST("argo")[:1], desc="Processing paths"):
         if path not in path_counts: continue
-        frames = [[f] for i, f in enumerate(Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))) if path_counts[path][i] > 0]
+        frames = [[f] for i, f in enumerate(Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))) if path_counts[path][i] > 0][:10]
         print(f"Calling OpenAI with {len(frames)} people frames out of {len(path_counts[path])} total frames")
         gpt_results = gpt_trainer._openai_call(model=gpt_trainer.default_model, prompt=prompt, image_paths=frames, output_schema=GPTResult)
         for i, (frame, result) in enumerate(zip(frames, gpt_results)):
             ResultRegistry.POST(path + "_" + str(i) + ".json", result.__dict__)
-            ResultRegistry.POST(path + "_" + str(i) + ".jpg", frame)
+            ResultRegistry.POST(path + "_" + str(i) + ".jpg", frame[0])
 
 
 if __name__ == "__main__":
