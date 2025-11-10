@@ -122,7 +122,7 @@ def run():
         estimated_weight_of_item: [float]
 
 
-    for path in tqdm(DataRegistry.LIST("argo")[:2], desc="Processing paths"):
+    for path in tqdm(DataRegistry.LIST("argo")[:1], desc="Processing paths"):
         if path not in path_counts: continue
         frames = [[f] for i, f in enumerate(Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))) if path_counts[path][i] > 0]
         print(f"Calling OpenAI with {len(frames)} people frames out of {len(path_counts[path])} total frames")
