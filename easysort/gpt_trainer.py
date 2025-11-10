@@ -9,11 +9,13 @@ import base64
 from ultralytics import YOLO
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
 
 class GPTTrainer:
     def __init__(self):
         self.openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
         self.openai_client.models.list() # validate api key
+        self.default_model = "gpt-5-2025-08-07"
 
     def _openai_call(self, model: str, prompt: str, image_paths: List[List[str]], output_schema: dataclass, max_workers: int = 10) -> List[dataclass]:
         def process_single(image_paths_single):
@@ -24,7 +26,7 @@ class GPTTrainer:
             return output_schema(**json.loads(response.choices[0].message.content))
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            results = list(executor.map(process_single, image_paths))
+            results = list(tqdm(executor.map(process_single, image_paths), total=len(image_paths), desc="OpenAI calls"))
         return results
     
 class YoloTrainer:
