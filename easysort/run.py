@@ -128,8 +128,8 @@ def run():
         print(f"Calling OpenAI with {len(frames)} people frames out of {len(path_counts[path])} total frames")
         gpt_results = gpt_trainer._openai_call(model=gpt_trainer.default_model, prompt=prompt, image_paths=frames, output_schema=GPTResult)
         for i, (frame, result) in enumerate(zip(frames, gpt_results)):
-            ResultRegistry.POST(path + "_" + str(i) + ".json", result.__dict__)
-            ResultRegistry.POST(path + "_" + str(i) + ".jpg", frame[0])
+            ResultRegistry.POST(path.replace(".mp4", "") + "_" + str(i) + ".json", result.__dict__)
+            ResultRegistry.POST(path.replace(".mp4", "") + "_" + str(i) + ".jpg", frame[0])
 
 
 if __name__ == "__main__":
