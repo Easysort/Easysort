@@ -75,12 +75,14 @@ import os
 def run():
     DataRegistry.SYNC()
     path_counts: Dict[str, List[int]] = json.load(open("counts.json")) if os.path.exists("counts.json") else {}
+    skip_paths = open("skip.txt").read().splitlines()
     all_counts = []
     errors = []
     yolo_trainer = YoloTrainer()
     for j,path in enumerate(tqdm(DataRegistry.LIST("argo"), desc="Processing paths")):
-        print(f"Processing {path}")
+        print(f"Processing {path}; Skipping {path in skip_paths}")
         if path in path_counts: continue
+        if path in skip_paths: continue
         path_counts[path] = []
         frames = Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))
         print(f"Loaded {len(frames)} frames")
