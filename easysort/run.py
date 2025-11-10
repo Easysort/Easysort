@@ -76,7 +76,7 @@ def run():
     DataRegistry.SYNC()
     path_counts: Dict[str, List[int]] = json.load(open("counts.json")) if os.path.exists("counts.json") else {}
     all_counts = []
-    for path in DataRegistry.LIST("argo/Argo-Jyllinge-Entrance-01"):
+    for j,path in enumerate(tqdm(DataRegistry.LIST("argo"), desc="Processing paths")):
         if path in path_counts: continue
         path_counts[path] = []
         frames = Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))
@@ -87,6 +87,10 @@ def run():
             counts = YoloTrainer()._is_person_in_image(batch)
             all_counts.extend(counts)
             path_counts[path].extend(counts)
+        if j % 20 == 0:
+            print(f"Saving counts...")
+            with open("counts.json", "w") as f:
+                json.dump(path_counts, f)
     
     # Print summary
     print(f"\nSummary:")
