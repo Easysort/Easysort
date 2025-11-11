@@ -44,7 +44,7 @@ class Registry:
         return os.path.join(self.registry_path, key)
 
     def LIST(self, prefix: Optional[str] = "") -> list[str]:
-        return [str(x) for x in (Path(self.registry_path) / prefix).glob("**/*") if x.is_file() and not x.name.startswith("._")]
+        return [str(x) for x in (Path(self.registry_path) / prefix).glob("**/*.mp4") if x.is_file() and not x.name.startswith("._")]
 
     def POST(self, key: str, data: dict|bytes|np.ndarray) -> None: {dict: self._post_json, bytes: self._post_bytes, np.ndarray: self._post_numpy}[type(data)](key, data)
     def _post_json(self, key: str, data: dict) -> None: json.dump(data, open(os.path.join(self.registry_path, key), "w"))
