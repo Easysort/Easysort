@@ -52,8 +52,9 @@ class Registry:
     def _post_numpy(self, key: str, data: np.ndarray) -> None: np.save(Path(os.path.join(self.registry_path, key)).with_suffix(".npy"), data)
 
 class ResultRegistryClass(Registry):
-    def POST(self, path: str, model: str, project: str, data: dict|bytes|np.ndarray) -> None:
-        super().POST(os.path.join(Path(path).with_suffix(""), model, project), data)
+    def POST(self, path: str, model: str, project: str, identifier: str, data: dict|bytes|np.ndarray) -> None:
+        os.makedirs(os.path.join(self.registry_path, path, model, project, identifier), exist_ok=True)
+        super().POST(os.path.join(Path(path).with_suffix(""), model, project, identifier), data)
 
     # DELETE methods
 
