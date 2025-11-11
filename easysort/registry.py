@@ -60,6 +60,8 @@ class ResultRegistryClass(Registry):
 
 DataRegistry = Registry(DATA_REGISTRY_PATH)
 ResultRegistry = ResultRegistryClass(RESULTS_REGISTRY_PATH)
+print(DataRegistry.registry_path)
+print(ResultRegistry.registry_path)
 
 if __name__ == "__main__":
     DataRegistry.SYNC()
