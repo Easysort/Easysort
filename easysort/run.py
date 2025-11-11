@@ -77,7 +77,7 @@ import cv2
 def run():
     # DataRegistry.SYNC()
     path_counts: Dict[str, List[int]] = json.load(open("counts.json")) if os.path.exists("counts.json") else {}
-    if os.getenv("VIEW", "0") > 0:
+    if int(os.getenv("VIEW", "0")) > 0:
         path_counts = {path.replace("/mnt/c/Users/lucas/Desktop/data/", "/Volumes/Easysort128/data/"): path_counts[path] for path in path_counts}
     
     # Load bboxes if they exist
