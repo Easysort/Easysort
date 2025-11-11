@@ -77,28 +77,56 @@ import cv2
 def run():
     # DataRegistry.SYNC()
     path_counts: Dict[str, List[int]] = json.load(open("counts.json")) if os.path.exists("counts.json") else {}
-    # path_counts = {path.replace("/mnt/c/Users/lucas/Desktop/data/", "/Volumes/Easysort128/data/"): path_counts[path] for path in path_counts}
+    if os.getenv("VIEW", "0") > 0:
+        path_counts = {path.replace("/mnt/c/Users/lucas/Desktop/data/", "/Volumes/Easysort128/data/"): path_counts[path] for path in path_counts}
+    
+    # Load bboxes if they exist
+    path_bboxes: Dict[str, List[List]] = {}
+    if os.path.exists("bboxes.json"):
+        path_bboxes = json.load(open("bboxes.json"))
+        path_bboxes = {path.replace("/mnt/c/Users/lucas/Desktop/data/", "/Volumes/Easysort128/data/"): path_bboxes[path] for path in path_bboxes}
+    
     skip_paths = open("skip.txt").read().splitlines()
     all_counts = []
     errors = []
     yolo_trainer = YoloTrainer()
+    
     for j,path in enumerate(tqdm(DataRegistry.LIST("argo")[:10], desc="Processing paths")):
         print(f"Processing {path}; Skipping {path in skip_paths}")
         if path in path_counts: continue
         if path in skip_paths: continue
         path_counts[path] = []
-        frames = Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))
+        path_bboxes[path] = []  # Store bboxes per frame
+        frames = Sampler.unpack(path, crop="auto")
         print(f"Loaded {len(frames)} frames")
         batch_size = 32
         for i in tqdm(range(0, len(frames), batch_size), desc="Processing batches"):
             batch = frames[i:i+batch_size]
-            counts = yolo_trainer._is_person_in_image(batch)
-            all_counts.extend(counts)
-            path_counts[path].extend(counts)
+            # Get full YOLO results to extract bboxes
+            results = yolo_trainer.model(batch, verbose=False)
+            for result in results:
+                count = 0
+                bboxes = []
+                if result.boxes is not None:
+                    boxes = result.boxes.xyxy.cpu().numpy()
+                    classes = result.boxes.cls.cpu().numpy()
+                    confidences = result.boxes.conf.cpu().numpy()
+                    # Filter for person class (class 0)
+                    for box, cls, conf in zip(boxes, classes, confidences):
+                        if int(cls) == 0:  # Person
+                            count += 1
+                            # Save bbox as [x1, y1, x2, y2, confidence]
+                            bboxes.append([float(box[0]), float(box[1]), float(box[2]), float(box[3]), float(conf)])
+                
+                path_counts[path].append(count)
+                path_bboxes[path].append(bboxes)  # List of bboxes for this frame
+        
         if j % 20 == 0:
-            print(f"Saving counts...")
+            print(f"Saving counts and bboxes...")
             with open("counts.json", "w") as f:
                 json.dump(path_counts, f)
+            with open("bboxes.json", "w") as f:
+                json.dump(path_bboxes, f)
     
     # Print summary
     print(f"\nSummary:")
@@ -109,79 +137,95 @@ def run():
 
     with open("counts.json", "w") as f:
         json.dump(path_counts, f)
+    with open("bboxes.json", "w") as f:
+        json.dump(path_bboxes, f)
 
-    # # Show all frames with people
-    # all_frames_with_people = []
-    # for path in tqdm(DataRegistry.LIST("argo")[:10], desc="Collecting frames"):
-    #     if path not in path_counts: 
-    #         continue
-    #     frames = Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))
-    #     for i, frame in enumerate(frames):
-    #         if i < len(path_counts[path]):
-    #             all_frames_with_people.append({
-    #                 'frame': frame,
-    #                 'path': path,
-    #                 'frame_idx': i,
-    #                 'has_person': path_counts[path][i] > 0,
-    #                 'person_count': path_counts[path][i]
-    #             })
+
+    if os.getenv("VIEW", "0") == "0": return
+    # Show all frames with people
+    all_frames_with_people = []
+    for path in tqdm(DataRegistry.LIST("argo")[:10], desc="Collecting frames"):
+        if path not in path_counts: 
+            continue
+        frames = Sampler.unpack(path, crop="auto")
+        for i, frame in enumerate(frames):
+            if i < len(path_counts[path]):
+                all_frames_with_people.append({
+                    'frame': frame,
+                    'path': path,
+                    'frame_idx': i,
+                    'has_person': path_counts[path][i] > 0,
+                    'person_count': path_counts[path][i],
+                    'bboxes': path_bboxes.get(path, [[]] * len(path_counts[path]))[i] if path in path_bboxes else []
+                })
     
-    # if not all_frames_with_people:
-    #     print("No frames with people found")
-    #     return
+    if not all_frames_with_people:
+        print("No frames with people found")
+        return
     
-    # print(f"\nTotal frames: {len(all_frames_with_people)}")
-    # print(f"Frames with people: {sum(1 for f in all_frames_with_people if f['has_person'])}")
-    # print("\nControls: 'n' = next, 'b' = previous, 'q' = quit")
+    print(f"\nTotal frames: {len(all_frames_with_people)}")
+    print(f"Frames with people: {sum(1 for f in all_frames_with_people if f['has_person'])}")
+    print("\nControls: 'n' = next, 'b' = previous, 'q' = quit")
     
-    # cur_idx = 0
-    # window_name = "Human Detection Viewer"
-    # cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cur_idx = 0
+    window_name = "Human Detection Viewer"
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     
-    # while 0 <= cur_idx < len(all_frames_with_people):
-    #     item = all_frames_with_people[cur_idx]
-    #     img = item['frame'].copy()
-    #     h, w = img.shape[:2]
+    while 0 <= cur_idx < len(all_frames_with_people):
+        item = all_frames_with_people[cur_idx]
+        img = item['frame'].copy()
+        h, w = img.shape[:2]
         
-    #     # Display frame info
-    #     frame_num = f"Frame {cur_idx + 1}/{len(all_frames_with_people)}"
-    #     path_text = f"Path: {item['path'].split('/')[-1]}"
-    #     frame_idx_text = f"Frame index: {item['frame_idx']}"
+        # Draw bounding boxes
+        for bbox in item['bboxes']:
+            if len(bbox) >= 4:
+                x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+                conf = bbox[4] if len(bbox) > 4 else 1.0
+                # Draw rectangle
+                cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                # Draw confidence score
+                cv2.putText(img, f"{conf:.2f}", (x1, y1 - 5), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
         
-    #     # Human detection status - large and prominent
-    #     if item['has_person']:
-    #         status_text = f"HUMAN DETECTED: {item['person_count']} person(s)"
-    #         color = (0, 255, 0)  # Green
-    #     else:
-    #         status_text = "NO HUMAN"
-    #         color = (0, 0, 255)  # Red
+        # Display frame info
+        frame_num = f"Frame {cur_idx + 1}/{len(all_frames_with_people)}"
+        path_text = f"Path: {item['path'].split('/')[-1]}"
+        frame_idx_text = f"Frame index: {item['frame_idx']}"
         
-    #     # Draw status - large text
-    #     cv2.putText(img, status_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3, cv2.LINE_AA)
-    #     cv2.putText(img, status_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 5, cv2.LINE_AA)  # Black outline
+        # Human detection status - large and prominent
+        if item['has_person']:
+            status_text = f"HUMAN DETECTED: {item['person_count']} person(s)"
+            color = (0, 255, 0)  # Green
+        else:
+            status_text = "NO HUMAN"
+            color = (0, 0, 255)  # Red
         
-    #     # Frame info
-    #     cv2.putText(img, frame_num, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
-    #     cv2.putText(img, path_text, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA)
-    #     cv2.putText(img, frame_idx_text, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA)
+        # Draw status - large text
+        cv2.putText(img, status_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3, cv2.LINE_AA)
+        cv2.putText(img, status_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 5, cv2.LINE_AA)  # Black outline
         
-    #     # Instructions
-    #     instructions = "Press 'n' for next | 'b' for previous | 'q' to quit"
-    #     cv2.putText(img, instructions, (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1, cv2.LINE_AA)
+        # Frame info
+        cv2.putText(img, frame_num, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(img, path_text, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA)
+        cv2.putText(img, frame_idx_text, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA)
         
-    #     cv2.imshow(window_name, img)
+        # Instructions
+        instructions = "Press 'n' for next | 'b' for previous | 'q' to quit"
+        cv2.putText(img, instructions, (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1, cv2.LINE_AA)
         
-    #     # Wait for key press
-    #     key = cv2.waitKey(0) & 0xFF
+        cv2.imshow(window_name, img)
         
-    #     if key in (ord('n'), ord('N')):  # next
-    #         cur_idx += 1
-    #     elif key in (ord('b'), ord('B')):  # previous
-    #         cur_idx = max(0, cur_idx - 1)
-    #     elif key in (ord('q'), 27):  # quit
-    #         break
+        # Wait for key press
+        key = cv2.waitKey(0) & 0xFF
+        
+        if key in (ord('n'), ord('N')):  # next
+            cur_idx += 1
+        elif key in (ord('b'), ord('B')):  # previous
+            cur_idx = max(0, cur_idx - 1)
+        elif key in (ord('q'), 27):  # quit
+            break
     
-    # cv2.destroyAllWindows()
+    cv2.destroyAllWindows()
 
     # # Save json with path: counts
     # with open("counts.json", "w") as f:
