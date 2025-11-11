@@ -218,6 +218,180 @@ def run():
         
         return (inter_area / union_area) * 100.0
 
+    # Process all frames to determine colors (always runs)
+    print("\nProcessing all frames to determine red/blue/green status...")
+    all_frames_raw = []
+    for path in tqdm(path_counts.keys(), desc="Collecting frames"):
+        if path not in path_counts: 
+            continue
+        frames = Sampler.unpack(path, crop="auto")
+        for i, frame in enumerate(frames):
+            if i < len(path_counts[path]):
+                bboxes = path_bboxes.get(path, [[]] * len(path_counts[path]))[i] if path in path_bboxes else []
+                all_frames_raw.append({
+                    'frame': frame,
+                    'path': path,
+                    'frame_idx': i,
+                    'has_person': path_counts[path][i] > 0,
+                    'person_count': path_counts[path][i],
+                    'bboxes': bboxes
+                })
+    
+    if not all_frames_raw:
+        print("No frames with people found")
+        return
+    
+    # Process bboxes: calculate overlap, size check, and apply filtering
+    print("Processing bboxes...")
+    all_frames_processed = []
+    for frame_data in tqdm(all_frames_raw, desc="Processing bboxes"):
+        bbox_info_list = []
+        for bbox in frame_data['bboxes']:
+            if len(bbox) >= 4:
+                overlap_pct = bbox_inside_crop_percentage(bbox)
+                meets_size, area = bbox_size_check(bbox)
+                conf = bbox[4] if len(bbox) > 4 else 1.0
+                
+                bbox_info_list.append({
+                    'bbox': bbox,
+                    'overlap_pct': overlap_pct,
+                    'meets_size': meets_size,
+                    'area': area,
+                    'confidence': conf
+                })
+        
+        # If multiple detections in same frame, pick the one with highest overlap percentage
+        if len(bbox_info_list) > 1:
+            bbox_info_list.sort(key=lambda x: x['overlap_pct'], reverse=True)
+            # Keep only the best one
+            bbox_info_list = [bbox_info_list[0]]
+        
+        frame_data['bboxes'] = bbox_info_list
+        all_frames_processed.append(frame_data)
+    
+    # Temporal grouping: group consecutive detections (2-4 frames in a row)
+    def process_temporal_group(group):
+        """Process a temporal group: mark 98%+ as green, otherwise pick best."""
+        if len(group) < 2:
+            # Single frame, no grouping needed
+            if group[0]['bboxes']:
+                group[0]['bboxes'][0]['temporal_group_best'] = True
+            return
+        
+        # Check for 98%+ detections - these are always kept (green)
+        high_overlap_indices = []
+        for idx, frame in enumerate(group):
+            if frame['bboxes']:
+                bbox_info = frame['bboxes'][0]
+                if bbox_info['overlap_pct'] >= 98.0 and bbox_info['meets_size']:
+                    high_overlap_indices.append(idx)
+                    bbox_info['temporal_group_best'] = True  # Always keep 98%+
+        
+        # If we have 98%+ detections, mark others as filtered
+        if high_overlap_indices:
+            for idx, frame in enumerate(group):
+                if frame['bboxes'] and idx not in high_overlap_indices:
+                    frame['bboxes'][0]['temporal_group_best'] = False
+        else:
+            # No 98%+ detections, pick the best one
+            best_idx = max(range(len(group)), 
+                          key=lambda idx: group[idx]['bboxes'][0]['overlap_pct'] 
+                          if group[idx]['bboxes'] else 0)
+            for idx, frame in enumerate(group):
+                if frame['bboxes']:
+                    frame['bboxes'][0]['temporal_group_best'] = (idx == best_idx)
+    
+    print("Applying temporal grouping...")
+    all_frames_grouped = []
+    current_group = []
+    
+    for i, frame_data in enumerate(all_frames_processed):
+        if not frame_data['bboxes']:
+            # No detections, end current group if exists
+            if current_group:
+                process_temporal_group(current_group)
+                all_frames_grouped.extend(current_group)
+                current_group = []
+            all_frames_grouped.append(frame_data)
+            continue
+        
+        # Has detection - add to current group
+        if not current_group:
+            # Start new group
+            current_group.append(frame_data)
+        else:
+            # Check if group is getting too large (max 4)
+            if len(current_group) >= 4:
+                # Process current group and start new one
+                process_temporal_group(current_group)
+                all_frames_grouped.extend(current_group)
+                current_group = [frame_data]
+            else:
+                # Continue group (consecutive detection)
+                current_group.append(frame_data)
+    
+    # Handle remaining group
+    if current_group:
+        process_temporal_group(current_group)
+        all_frames_grouped.extend(current_group)
+    
+    # Determine final color for each bbox
+    print("Determining final colors...")
+    all_frames_with_people = []
+    for frame_data in all_frames_grouped:
+        if not frame_data['bboxes']:
+            all_frames_with_people.append(frame_data)
+            continue
+        
+        bbox_info = frame_data['bboxes'][0]
+        overlap_pct = bbox_info['overlap_pct']
+        meets_size = bbox_info['meets_size']
+        is_temporal_best = bbox_info.get('temporal_group_best', True)  # Default True if not in a group
+        
+        # Determine color and reason
+        # 98%+ detections are always green regardless of temporal grouping
+        if overlap_pct >= 98.0 and meets_size:
+            color = 'green'  # Always green if 98%+ and meets size
+            reason = 'high_overlap'
+        elif not is_temporal_best:
+            # Not the best in temporal group - mark as blue
+            color = 'blue'
+            reason = 'temporal_filtered'
+        elif not meets_size:
+            color = 'blue'  # Too small
+            reason = 'size_filtered'
+        elif overlap_pct >= 80.0:
+            color = 'green'  # 80%+ inside crop
+            reason = 'inside_crop'
+        else:
+            color = 'red'  # <80% inside crop
+            reason = 'outside_crop'
+        
+        bbox_info['color'] = color
+        bbox_info['reason'] = reason
+        all_frames_with_people.append(frame_data)
+    
+    # Calculate and print statistics
+    total_bboxes = sum(1 for item in all_frames_with_people if item['bboxes'])
+    green_bboxes = sum(1 for item in all_frames_with_people 
+                      for bbox_info in item['bboxes'] 
+                      if bbox_info.get('color') == 'green')
+    red_bboxes = sum(1 for item in all_frames_with_people 
+                    for bbox_info in item['bboxes'] 
+                    if bbox_info.get('color') == 'red')
+    blue_bboxes = sum(1 for item in all_frames_with_people 
+                     for bbox_info in item['bboxes'] 
+                     if bbox_info.get('color') == 'blue')
+    
+    print(f"\n{'='*60}")
+    print(f"Bbox Statistics (Crop: x={crop.x}, y={crop.y}, w={crop.w}, h={crop.h}):")
+    print(f"  Total bboxes: {total_bboxes}")
+    print(f"  Green (80%+ inside crop or 98%+ with size): {green_bboxes} ({green_bboxes/total_bboxes*100:.1f}%)" if total_bboxes > 0 else "  Green: 0")
+    print(f"  Red (<80% inside crop): {red_bboxes} ({red_bboxes/total_bboxes*100:.1f}%)" if total_bboxes > 0 else "  Red: 0")
+    print(f"  Blue (filtered by size or temporal): {blue_bboxes} ({blue_bboxes/total_bboxes*100:.1f}%)" if total_bboxes > 0 else "  Blue: 0")
+    print(f"  Size filter: min_area={min_bbox_area}, min_width={min_bbox_width}, min_height={min_bbox_height}")
+    print(f"{'='*60}\n")
+
     # Only show viewer if VIEW is enabled
     if os.getenv("VIEW", "0") != "0":
         # Collect all frames with bbox info
@@ -485,8 +659,7 @@ def run():
         cv2.destroyAllWindows()
 
     # Process green frames and call OpenAI (always runs)
-    silent = os.getenv("SILENT", "0") == "1"
-    
+    print("Processing green frames with OpenAI...")
     gpt_trainer = GPTTrainer()
     prompt = """
     You need to analyze the image and determine if there is a person, if they are walking left or right, what item they are carrying, how many of each item they are carrying, the estimated weight and co2 emission from the item production.
@@ -505,90 +678,69 @@ def run():
 
     # Collect all green frames
     green_frames = []
-    iterator = path_counts.keys() if silent else tqdm(path_counts.keys(), desc="Collecting green frames")
-    for path in iterator:
-        if path not in path_bboxes:
-            continue
-        
-        frames = Sampler.unpack(path, crop="auto")
-        for i, frame in enumerate(frames):
-            if i >= len(path_bboxes[path]):
-                continue
-            
-            bboxes = path_bboxes[path][i]
-            if not bboxes:
-                continue
-            
-            # Check if any bbox is green
-            for bbox in bboxes:
-                if len(bbox) >= 4:
-                    overlap_pct = bbox_inside_crop_percentage(bbox)
-                    meets_size, _ = bbox_size_check(bbox)
-                    
-                    # Determine if green
-                    is_green = False
-                    if overlap_pct >= 98.0 and meets_size:
-                        is_green = True
-                    elif overlap_pct >= 80.0 and meets_size:
-                        is_green = True
-                    
-                    if is_green:
-                        green_frames.append({
-                            'path': path,
-                            'frame': frame,
-                            'frame_idx': i,
-                            'bbox': bbox
-                        })
-                        break  # Only one frame per detection
+    for item in all_frames_with_people:
+        if item['bboxes']:
+            bbox_info = item['bboxes'][0]
+            if bbox_info.get('color') == 'green':
+                green_frames.append({
+                    'path': item['path'],
+                    'frame': item['frame'],
+                    'frame_idx': item['frame_idx'],
+                    'bbox': bbox_info['bbox']
+                })
     
-    if not silent:
-        print(f"\nTotal green frames: {len(green_frames)}")
+    print(f"Total green frames to process: {len(green_frames)}")
     
     if not green_frames:
-        if not silent:
-            print("No green frames to process")
+        print("No green frames to process")
         return
     
     # Process in batches of 50
     batch_size = 50
-    batch = green_frames[:batch_size]  # Only first batch
+    total_batches = (len(green_frames) + batch_size - 1) // batch_size
     
-    if not silent:
-        print(f"\nProcessing first batch of {len(batch)} frames...")
+    print(f"Processing {total_batches} batches of up to {batch_size} frames each...")
+    
+    for batch_num in range(total_batches):
+        start_idx = batch_num * batch_size
+        end_idx = min(start_idx + batch_size, len(green_frames))
+        batch = green_frames[start_idx:end_idx]
+        
+        print(f"\nProcessing batch {batch_num + 1}/{total_batches} ({len(batch)} frames)...")
+        
+        # Prepare images for OpenAI (each as a list with single image)
+        image_batches = [[item['frame']] for item in batch]
+        
+        # Call OpenAI
         print("Calling OpenAI...")
-    
-    # Prepare images for OpenAI (each as a list with single image)
-    image_batches = [[item['frame']] for item in batch]
-    
-    # Call OpenAI
-    gpt_results = gpt_trainer._openai_call(
-        model=gpt_trainer.default_model,
-        prompt=prompt,
-        image_paths=image_batches,
-        output_schema=GPTResult
-    )
-    
-    # Save results
-    if not silent:
-        print("Saving results...")
-    for item, result in zip(batch, gpt_results):
-        path = item['path']
-        frame_idx = item['frame_idx']
-        
-        # Create identifier: path_name_frame_number
-        path_name = Path(path).stem  # Get filename without extension
-        identifier = f"{path_name}_frame_{frame_idx}"
-        
-        # Save JSON result
-        ResultRegistry.POST(
-            identifier,
-            gpt_trainer.default_model,
-            "person-analysis",
-            result.__dict__
+        gpt_results = gpt_trainer._openai_call(
+            model=gpt_trainer.default_model,
+            prompt=prompt,
+            image_paths=image_batches,
+            output_schema=GPTResult
         )
-    
-    if not silent:
+        
+        # Save results
+        print("Saving results...")
+        for item, result in zip(batch, gpt_results):
+            path = item['path']
+            frame_idx = item['frame_idx']
+            
+            # Create identifier: path_name_frame_number
+            path_name = Path(path).stem  # Get filename without extension
+            identifier = f"{path_name}_frame_{frame_idx}"
+            
+            # Save JSON result
+            ResultRegistry.POST(
+                identifier,
+                gpt_trainer.default_model,
+                "person-analysis",
+                result.__dict__
+            )
+        
         print(f"Saved {len(batch)} results to ResultRegistry")
+    
+    print(f"\nCompleted! Processed {len(green_frames)} green frames total.")
 
 
 if __name__ == "__main__":
