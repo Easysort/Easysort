@@ -53,7 +53,7 @@ class Registry:
 
 class ResultRegistryClass(Registry):
     def POST(self, path: str, model: str, project: str, identifier: str, data: dict|bytes|np.ndarray) -> None:
-        if "/mnt/" in path: path = path.replace(DATA_REGISTRY_PATH, "") # This should never happen if GET is used
+        if "/mnt/" in path: path = path.replace(DATA_REGISTRY_PATH, RESULTS_REGISTRY_PATH) # This should never happen if GET is used
         print(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project, identifier))
         os.makedirs(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project, identifier), exist_ok=True)
         super().POST(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project, identifier), data)
@@ -62,8 +62,6 @@ class ResultRegistryClass(Registry):
 
 DataRegistry = Registry(DATA_REGISTRY_PATH)
 ResultRegistry = ResultRegistryClass(RESULTS_REGISTRY_PATH)
-print(DataRegistry.registry_path)
-print(ResultRegistry.registry_path)
 
 if __name__ == "__main__":
     DataRegistry.SYNC()
