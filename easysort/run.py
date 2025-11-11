@@ -7,6 +7,7 @@ import numpy as np
 from tqdm import tqdm
 import os
 from dataclasses import dataclass
+import cv2
 
 # def create_montage(images: list[np.ndarray], cols: int = 10) -> np.ndarray:
 #     """Create a grid montage of images."""
@@ -74,13 +75,14 @@ from dataclasses import dataclass
 #         cv2.imwrite(str(examples_dir / f"without_people_{i}.jpg"), frame)
 
 def run():
-    DataRegistry.SYNC()
+    # DataRegistry.SYNC()
     path_counts: Dict[str, List[int]] = json.load(open("counts.json")) if os.path.exists("counts.json") else {}
+    # path_counts = {path.replace("/mnt/c/Users/lucas/Desktop/data/", "/Volumes/Easysort128/data/"): path_counts[path] for path in path_counts}
     skip_paths = open("skip.txt").read().splitlines()
     all_counts = []
     errors = []
     yolo_trainer = YoloTrainer()
-    for j,path in enumerate(tqdm(DataRegistry.LIST("argo"), desc="Processing paths")):
+    for j,path in enumerate(tqdm(DataRegistry.LIST("argo")[:10], desc="Processing paths")):
         print(f"Processing {path}; Skipping {path in skip_paths}")
         if path in path_counts: continue
         if path in skip_paths: continue
@@ -105,31 +107,107 @@ def run():
     print(f"  Frames with people: {sum(1 for path in path_counts for c in path_counts[path] if c > 0)}")
     print(f"  Frames without people: {sum(1 for path in path_counts for c in path_counts[path] if c == 0)}")
 
-    # Save json with path: counts
     with open("counts.json", "w") as f:
         json.dump(path_counts, f)
 
-    gpt_trainer = GPTTrainer()
-    prompt = """You need to analyze the image and determine if there is a person, if they are walking left or right, what item they are carrying, how many of each item they are carrying, and the estimated weight of the item."""
+    # # Show all frames with people
+    # all_frames_with_people = []
+    # for path in tqdm(DataRegistry.LIST("argo")[:10], desc="Collecting frames"):
+    #     if path not in path_counts: 
+    #         continue
+    #     frames = Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))
+    #     for i, frame in enumerate(frames):
+    #         if i < len(path_counts[path]):
+    #             all_frames_with_people.append({
+    #                 'frame': frame,
+    #                 'path': path,
+    #                 'frame_idx': i,
+    #                 'has_person': path_counts[path][i] > 0,
+    #                 'person_count': path_counts[path][i]
+    #             })
+    
+    # if not all_frames_with_people:
+    #     print("No frames with people found")
+    #     return
+    
+    # print(f"\nTotal frames: {len(all_frames_with_people)}")
+    # print(f"Frames with people: {sum(1 for f in all_frames_with_people if f['has_person'])}")
+    # print("\nControls: 'n' = next, 'b' = previous, 'q' = quit")
+    
+    # cur_idx = 0
+    # window_name = "Human Detection Viewer"
+    # cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    
+    # while 0 <= cur_idx < len(all_frames_with_people):
+    #     item = all_frames_with_people[cur_idx]
+    #     img = item['frame'].copy()
+    #     h, w = img.shape[:2]
+        
+    #     # Display frame info
+    #     frame_num = f"Frame {cur_idx + 1}/{len(all_frames_with_people)}"
+    #     path_text = f"Path: {item['path'].split('/')[-1]}"
+    #     frame_idx_text = f"Frame index: {item['frame_idx']}"
+        
+    #     # Human detection status - large and prominent
+    #     if item['has_person']:
+    #         status_text = f"HUMAN DETECTED: {item['person_count']} person(s)"
+    #         color = (0, 255, 0)  # Green
+    #     else:
+    #         status_text = "NO HUMAN"
+    #         color = (0, 0, 255)  # Red
+        
+    #     # Draw status - large text
+    #     cv2.putText(img, status_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3, cv2.LINE_AA)
+    #     cv2.putText(img, status_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 5, cv2.LINE_AA)  # Black outline
+        
+    #     # Frame info
+    #     cv2.putText(img, frame_num, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
+    #     cv2.putText(img, path_text, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA)
+    #     cv2.putText(img, frame_idx_text, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA)
+        
+    #     # Instructions
+    #     instructions = "Press 'n' for next | 'b' for previous | 'q' to quit"
+    #     cv2.putText(img, instructions, (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1, cv2.LINE_AA)
+        
+    #     cv2.imshow(window_name, img)
+        
+    #     # Wait for key press
+    #     key = cv2.waitKey(0) & 0xFF
+        
+    #     if key in (ord('n'), ord('N')):  # next
+    #         cur_idx += 1
+    #     elif key in (ord('b'), ord('B')):  # previous
+    #         cur_idx = max(0, cur_idx - 1)
+    #     elif key in (ord('q'), 27):  # quit
+    #         break
+    
+    # cv2.destroyAllWindows()
 
-    @dataclass
-    class GPTResult:
-        person: bool
-        person_carrying_item: bool
-        person_walking_direction: str #left or right
-        item_description: [str]
-        item_count: [int]
-        estimated_weight_of_item: [float]
+    # # Save json with path: counts
+    # with open("counts.json", "w") as f:
+    #     json.dump(path_counts, f)
+
+    # gpt_trainer = GPTTrainer()
+    # prompt = """You need to analyze the image and determine if there is a person, if they are walking left or right, what item they are carrying, how many of each item they are carrying, and the estimated weight of the item."""
+
+    # @dataclass
+    # class GPTResult:
+    #     person: bool
+    #     person_carrying_item: bool
+    #     person_walking_direction: str #left or right
+    #     item_description: [str]
+    #     item_count: [int]
+    #     estimated_weight_of_item: [float]
 
 
-    for path in tqdm(DataRegistry.LIST("argo")[:1], desc="Processing paths"):
-        if path not in path_counts: continue
-        frames = [[f] for i, f in enumerate(Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))) if path_counts[path][i] > 0][:10]
-        print(f"Calling OpenAI with {len(frames)} people frames out of {len(path_counts[path])} total frames")
-        gpt_results = gpt_trainer._openai_call(model=gpt_trainer.default_model, prompt=prompt, image_paths=frames, output_schema=GPTResult)
-        for i, (frame, result) in enumerate(zip(frames, gpt_results)):
-            ResultRegistry.POST(path.replace(".mp4", "") + "_" + str(i) + ".json", result.__dict__)
-            ResultRegistry.POST(path.replace(".mp4", "") + "_" + str(i) + ".jpg", frame[0])
+    # for path in tqdm(DataRegistry.LIST("argo")[:1], desc="Processing paths"):
+    #     if path not in path_counts: continue
+    #     frames = [[f] for i, f in enumerate(Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))) if path_counts[path][i] > 0][:10]
+    #     print(f"Calling OpenAI with {len(frames)} people frames out of {len(path_counts[path])} total frames")
+    #     gpt_results = gpt_trainer._openai_call(model=gpt_trainer.default_model, prompt=prompt, image_paths=frames, output_schema=GPTResult)
+    #     for i, (frame, result) in enumerate(zip(frames, gpt_results)):
+    #         ResultRegistry.POST(path.replace(".mp4", "") + "_" + str(i) + ".json", result.__dict__)
+    #         ResultRegistry.POST(path.replace(".mp4", "") + "_" + str(i) + ".jpg", frame[0])
 
 
 if __name__ == "__main__":

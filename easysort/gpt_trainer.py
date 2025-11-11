@@ -32,7 +32,7 @@ class GPTTrainer:
     
 class YoloTrainer:
     def __init__(self):
-        self.model = YOLO("yolov8s.pt")
+        self.model = YOLO("yolov8m.pt")
 
     def _is_person_in_image(self, image_paths: List[np.ndarray]) -> List[str]:
         results = self.model(image_paths)

@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 from dataclasses import dataclass
+from easysort.helpers import DATA_REGISTRY_PATH
 
 @dataclass
 class Crop:
@@ -14,9 +15,15 @@ class Crop:
     w: int
     h: int
 
+ROSKILDE_CROP = Crop(x=0, y=0, w=2000, h=2000)
+JYLLINGE_CROP = Crop(x=640, y=0, w=260, h=480)
+DEVICE_TO_CROP = {"Argo-Jyllinge-Entrance-01": JYLLINGE_CROP, "Argo-roskilde-03-01": ROSKILDE_CROP}
+
 class Sampler:
     @staticmethod
-    def unpack(video_path: Path, crop: Crop = None) -> list[np.ndarray]:
+    def unpack(video_path: Path|str, crop: Crop|str = None) -> list[np.ndarray]:
+        if isinstance(video_path, str): video_path = Path(video_path)
+        if crop is "auto": crop = DEVICE_TO_CROP[video_path.parts[len(Path(DATA_REGISTRY_PATH).parts)+1]]
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened(): raise RuntimeError(f"Failed to open video: {video_path}")
         fps = cap.get(cv2.CAP_PROP_FPS)
