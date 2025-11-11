@@ -53,8 +53,10 @@ class Registry:
 
 class ResultRegistryClass(Registry):
     def POST(self, path: str, model: str, project: str, identifier: str, data: dict|bytes|np.ndarray) -> None:
+        if "/mnt/" in path: path = path.replace(DATA_REGISTRY_PATH, "") # This should never happen if GET is used
+        print(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project, identifier))
         os.makedirs(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project, identifier), exist_ok=True)
-        super().POST(os.path.join(Path(path).with_suffix(""), model, project, identifier), data)
+        super().POST(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project, identifier), data)
 
     # DELETE methods
 
