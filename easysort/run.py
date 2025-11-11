@@ -8,6 +8,7 @@ from tqdm import tqdm
 import os
 from dataclasses import dataclass
 import cv2
+from pathlib import Path
 
 # def create_montage(images: list[np.ndarray], cols: int = 10) -> np.ndarray:
 #     """Create a grid montage of images."""
@@ -140,118 +141,454 @@ def run():
     with open("bboxes.json", "w") as f:
         json.dump(path_bboxes, f)
 
+    # Define crop region and size limits (needed for both viewing and processing)
+    crop = Crop(x=400, y=70, w=500, h=600)
+    crop_x1, crop_y1 = crop.x, crop.y
+    crop_x2, crop_y2 = crop.x + crop.w, crop.y + crop.h
+    
+    # Size filtering parameters
+    min_bbox_area = 5000  # Minimum area in pixels (adjust as needed)
+    min_bbox_width = 50   # Minimum width
+    min_bbox_height = 100 # Minimum height
+    
+    def bbox_inside_crop_percentage(bbox):
+        """Calculate what percentage of bbox is inside the crop region."""
+        if len(bbox) < 4:
+            return 0.0
+        
+        bbox_x1, bbox_y1, bbox_x2, bbox_y2 = bbox[0], bbox[1], bbox[2], bbox[3]
+        
+        # Calculate intersection
+        inter_x1 = max(bbox_x1, crop_x1)
+        inter_y1 = max(bbox_y1, crop_y1)
+        inter_x2 = min(bbox_x2, crop_x2)
+        inter_y2 = min(bbox_y2, crop_y2)
+        
+        if inter_x2 <= inter_x1 or inter_y2 <= inter_y1:
+            return 0.0
+        
+        # Intersection area
+        inter_area = (inter_x2 - inter_x1) * (inter_y2 - inter_y1)
+        
+        # Bbox area
+        bbox_area = (bbox_x2 - bbox_x1) * (bbox_y2 - bbox_y1)
+        
+        if bbox_area == 0:
+            return 0.0
+        
+        # Percentage of bbox inside crop
+        return (inter_area / bbox_area) * 100.0
+    
+    def bbox_size_check(bbox):
+        """Check if bbox meets size requirements."""
+        if len(bbox) < 4:
+            return False, 0
+        bbox_x1, bbox_y1, bbox_x2, bbox_y2 = bbox[0], bbox[1], bbox[2], bbox[3]
+        width = bbox_x2 - bbox_x1
+        height = bbox_y2 - bbox_y1
+        area = width * height
+        return (area >= min_bbox_area and width >= min_bbox_width and height >= min_bbox_height), area
+    
+    def bbox_overlap_percentage(bbox1, bbox2):
+        """Calculate IoU (Intersection over Union) between two bboxes."""
+        if len(bbox1) < 4 or len(bbox2) < 4:
+            return 0.0
+        
+        x1_1, y1_1, x2_1, y2_1 = bbox1[0], bbox1[1], bbox1[2], bbox1[3]
+        x1_2, y1_2, x2_2, y2_2 = bbox2[0], bbox2[1], bbox2[2], bbox2[3]
+        
+        # Intersection
+        inter_x1 = max(x1_1, x1_2)
+        inter_y1 = max(y1_1, y1_2)
+        inter_x2 = min(x2_1, x2_2)
+        inter_y2 = min(y2_1, y2_2)
+        
+        if inter_x2 <= inter_x1 or inter_y2 <= inter_y1:
+            return 0.0
+        
+        inter_area = (inter_x2 - inter_x1) * (inter_y2 - inter_y1)
+        
+        # Union
+        area1 = (x2_1 - x1_1) * (y2_1 - y1_1)
+        area2 = (x2_2 - x1_2) * (y2_2 - y1_2)
+        union_area = area1 + area2 - inter_area
+        
+        if union_area == 0:
+            return 0.0
+        
+        return (inter_area / union_area) * 100.0
 
-    if os.getenv("VIEW", "0") == "0": return
-    # Show all frames with people
-    all_frames_with_people = []
-    for path in tqdm(DataRegistry.LIST("argo")[:10], desc="Collecting frames"):
-        if path not in path_counts: 
+    # Only show viewer if VIEW is enabled
+    if os.getenv("VIEW", "0") != "0":
+        # Collect all frames with bbox info
+        all_frames_raw = []
+        for path in tqdm(list(path_counts.keys())[10:], desc="Collecting frames"):
+            print(path)
+            if path not in path_counts: 
+                continue
+            frames = Sampler.unpack(path, crop="auto")
+            for i, frame in enumerate(frames):
+                if i < len(path_counts[path]):
+                    bboxes = path_bboxes.get(path, [[]] * len(path_counts[path]))[i] if path in path_bboxes else []
+                    all_frames_raw.append({
+                        'frame': frame,
+                        'path': path,
+                        'frame_idx': i,
+                        'has_person': path_counts[path][i] > 0,
+                        'person_count': path_counts[path][i],
+                        'bboxes': bboxes
+                    })
+        
+        if not all_frames_raw:
+            print("No frames with people found")
+            return
+        
+        # Process bboxes: calculate overlap, size check, and apply filtering
+        all_frames_processed = []
+        for frame_data in all_frames_raw:
+            bbox_info_list = []
+            for bbox in frame_data['bboxes']:
+                if len(bbox) >= 4:
+                    overlap_pct = bbox_inside_crop_percentage(bbox)
+                    meets_size, area = bbox_size_check(bbox)
+                    conf = bbox[4] if len(bbox) > 4 else 1.0
+                    
+                    bbox_info_list.append({
+                        'bbox': bbox,
+                        'overlap_pct': overlap_pct,
+                        'meets_size': meets_size,
+                        'area': area,
+                        'confidence': conf
+                    })
+            
+            # If multiple detections in same frame, pick the one with highest overlap percentage
+            if len(bbox_info_list) > 1:
+                bbox_info_list.sort(key=lambda x: x['overlap_pct'], reverse=True)
+                # Keep only the best one
+                bbox_info_list = [bbox_info_list[0]]
+            
+            frame_data['bboxes'] = bbox_info_list
+            all_frames_processed.append(frame_data)
+        
+        # Temporal grouping: group consecutive detections (2-4 frames in a row)
+        
+        def process_temporal_group(group):
+            """Process a temporal group: mark 98%+ as green, otherwise pick best."""
+            if len(group) < 2:
+                # Single frame, no grouping needed
+                if group[0]['bboxes']:
+                    group[0]['bboxes'][0]['temporal_group_best'] = True
+                return
+            
+            # Check for 98%+ detections - these are always kept (green)
+            high_overlap_indices = []
+            for idx, frame in enumerate(group):
+                if frame['bboxes']:
+                    bbox_info = frame['bboxes'][0]
+                    if bbox_info['overlap_pct'] >= 98.0 and bbox_info['meets_size']:
+                        high_overlap_indices.append(idx)
+                        bbox_info['temporal_group_best'] = True  # Always keep 98%+
+            
+            # If we have 98%+ detections, mark others as filtered
+            if high_overlap_indices:
+                for idx, frame in enumerate(group):
+                    if frame['bboxes'] and idx not in high_overlap_indices:
+                        frame['bboxes'][0]['temporal_group_best'] = False
+            else:
+                # No 98%+ detections, pick the best one
+                best_idx = max(range(len(group)), 
+                              key=lambda idx: group[idx]['bboxes'][0]['overlap_pct'] 
+                              if group[idx]['bboxes'] else 0)
+                for idx, frame in enumerate(group):
+                    if frame['bboxes']:
+                        frame['bboxes'][0]['temporal_group_best'] = (idx == best_idx)
+        
+        all_frames_grouped = []
+        current_group = []
+        
+        for i, frame_data in enumerate(all_frames_processed):
+            if not frame_data['bboxes']:
+                # No detections, end current group if exists
+                if current_group:
+                    # Process group: mark 98%+ as green, otherwise pick best
+                    process_temporal_group(current_group)
+                    all_frames_grouped.extend(current_group)
+                    current_group = []
+                all_frames_grouped.append(frame_data)
+                continue
+            
+            # Has detection - add to current group
+            if not current_group:
+                # Start new group
+                current_group.append(frame_data)
+            else:
+                # Check if group is getting too large (max 4)
+                if len(current_group) >= 4:
+                    # Process current group and start new one
+                    process_temporal_group(current_group)
+                    all_frames_grouped.extend(current_group)
+                    current_group = [frame_data]
+                else:
+                    # Continue group (consecutive detection)
+                    current_group.append(frame_data)
+        
+        # Handle remaining group
+        if current_group:
+            process_temporal_group(current_group)
+            all_frames_grouped.extend(current_group)
+        
+        # Determine final color for each bbox
+        all_frames_with_people = []
+        for frame_data in all_frames_grouped:
+            if not frame_data['bboxes']:
+                all_frames_with_people.append(frame_data)
+                continue
+            
+            bbox_info = frame_data['bboxes'][0]
+            overlap_pct = bbox_info['overlap_pct']
+            meets_size = bbox_info['meets_size']
+            is_temporal_best = bbox_info.get('temporal_group_best', True)  # Default True if not in a group
+            
+            # Determine color and reason
+            # 98%+ detections are always green regardless of temporal grouping
+            if overlap_pct >= 98.0 and meets_size:
+                color = 'green'  # Always green if 98%+ and meets size
+                reason = 'high_overlap'
+            elif not is_temporal_best:
+                # Not the best in temporal group - mark as blue
+                color = 'blue'
+                reason = 'temporal_filtered'
+            elif not meets_size:
+                color = 'blue'  # Too small
+                reason = 'size_filtered'
+            elif overlap_pct >= 80.0:
+                color = 'green'  # 80%+ inside crop
+                reason = 'inside_crop'
+            else:
+                color = 'red'  # <80% inside crop
+                reason = 'outside_crop'
+            
+            bbox_info['color'] = color
+            bbox_info['reason'] = reason
+            all_frames_with_people.append(frame_data)
+        
+        # Calculate statistics
+        total_bboxes = sum(1 for item in all_frames_with_people if item['bboxes'])
+        green_bboxes = sum(1 for item in all_frames_with_people 
+                          for bbox_info in item['bboxes'] 
+                          if bbox_info.get('color') == 'green')
+        red_bboxes = sum(1 for item in all_frames_with_people 
+                        for bbox_info in item['bboxes'] 
+                        if bbox_info.get('color') == 'red')
+        blue_bboxes = sum(1 for item in all_frames_with_people 
+                         for bbox_info in item['bboxes'] 
+                         if bbox_info.get('color') == 'blue')
+        
+        print(f"\nTotal frames: {len(all_frames_with_people)}")
+        print(f"Frames with people: {sum(1 for f in all_frames_with_people if f['has_person'])}")
+        print(f"\nBbox Statistics (Crop: x={crop.x}, y={crop.y}, w={crop.w}, h={crop.h}):")
+        print(f"  Total bboxes: {total_bboxes}")
+        print(f"  Green (80%+ inside crop or 98%+ with size): {green_bboxes} ({green_bboxes/total_bboxes*100:.1f}%)" if total_bboxes > 0 else "  Green: 0")
+        print(f"  Red (<80% inside crop): {red_bboxes} ({red_bboxes/total_bboxes*100:.1f}%)" if total_bboxes > 0 else "  Red: 0")
+        print(f"  Blue (filtered by size): {blue_bboxes} ({blue_bboxes/total_bboxes*100:.1f}%)" if total_bboxes > 0 else "  Blue: 0")
+        print(f"\nSize filter: min_area={min_bbox_area}, min_width={min_bbox_width}, min_height={min_bbox_height}")
+        print("\nControls: 'n' = next, 'b' = previous, 'q' = quit")
+        
+        cur_idx = 0
+        window_name = "Human Detection Viewer"
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        
+        while 0 <= cur_idx < len(all_frames_with_people):
+            item = all_frames_with_people[cur_idx]
+            img = item['frame'].copy()
+            h, w = img.shape[:2]
+            
+            # Draw crop region
+            cv2.rectangle(img, (crop_x1, crop_y1), (crop_x2, crop_y2), (255, 255, 0), 2)  # Yellow crop outline
+            cv2.putText(img, "Crop Region", (crop_x1, crop_y1 - 10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2, cv2.LINE_AA)
+            
+            # Draw bounding boxes with color based on filtering
+            for bbox_info in item['bboxes']:
+                bbox = bbox_info['bbox']
+                if len(bbox) >= 4:
+                    x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+                    conf = bbox_info['confidence']
+                    overlap_pct = bbox_info['overlap_pct']
+                    color_name = bbox_info.get('color', 'green')
+                    
+                    # Map color names to BGR
+                    if color_name == 'green':
+                        color = (0, 255, 0)
+                    elif color_name == 'red':
+                        color = (0, 0, 255)
+                    elif color_name == 'blue':
+                        color = (255, 0, 0)
+                    else:
+                        color = (255, 255, 255)
+                    
+                    # Draw rectangle
+                    cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+                    # Draw confidence and overlap percentage
+                    label = f"{conf:.2f} ({overlap_pct:.1f}%)"
+                    cv2.putText(img, label, (x1, y1 - 5), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2, cv2.LINE_AA)
+            
+            # Display frame info
+            frame_num = f"Frame {cur_idx + 1}/{len(all_frames_with_people)}"
+            path_text = f"Path: {item['path'].split('/')[-1]}"
+            frame_idx_text = f"Frame index: {item['frame_idx']}"
+            
+            # Human detection status - large and prominent
+            if item['has_person']:
+                status_text = f"HUMAN DETECTED: {item['person_count']} person(s)"
+                color = (0, 255, 0)  # Green
+            else:
+                status_text = "NO HUMAN"
+                color = (0, 0, 255)  # Red
+            
+            # Draw status - large text
+            cv2.putText(img, status_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3, cv2.LINE_AA)
+            cv2.putText(img, status_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 5, cv2.LINE_AA)  # Black outline
+            
+            # Frame info
+            cv2.putText(img, frame_num, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
+            cv2.putText(img, path_text, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA)
+            cv2.putText(img, frame_idx_text, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA)
+            
+            # Instructions
+            instructions = "Press 'n' for next | 'b' for previous | 'L' for next human | 'q' to quit"
+            cv2.putText(img, instructions, (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1, cv2.LINE_AA)
+            
+            cv2.imshow(window_name, img)
+            
+            # Wait for key press
+            key = cv2.waitKey(0) & 0xFF
+            
+            if key in (ord('n'), ord('N')):  # next
+                cur_idx += 1
+            elif key in (ord('b'), ord('B')):  # previous
+                cur_idx = max(0, cur_idx - 1)
+            elif key in (ord('l'), ord('L')):  # next frame with human
+                # Find next frame with human detected
+                found = False
+                for next_idx in range(cur_idx + 1, len(all_frames_with_people)):
+                    if all_frames_with_people[next_idx]['has_person']:
+                        cur_idx = next_idx
+                        found = True
+                        break
+                if not found:
+                    print("No more frames with humans detected")
+            elif key in (ord('q'), 27):  # quit
+                break
+        
+        cv2.destroyAllWindows()
+
+    # Process green frames and call OpenAI (always runs)
+    silent = os.getenv("SILENT", "0") == "1"
+    
+    gpt_trainer = GPTTrainer()
+    prompt = """
+    You need to analyze the image and determine if there is a person, if they are walking left or right, what item they are carrying, how many of each item they are carrying, the estimated weight and co2 emission from the item production.
+    If there are multiple people in the image, focus on the person in the center of the image.
+    """
+
+    @dataclass
+    class GPTResult:
+        person: bool
+        person_carrying_item: bool
+        person_walking_direction: str #left or right
+        item_description: [str]
+        item_count: [int]
+        estimated_weight_of_item_kg: [float]
+        estimated_co2_emission_from_item_production_kg: [float] 
+
+    # Collect all green frames
+    green_frames = []
+    iterator = path_counts.keys() if silent else tqdm(path_counts.keys(), desc="Collecting green frames")
+    for path in iterator:
+        if path not in path_bboxes:
             continue
+        
         frames = Sampler.unpack(path, crop="auto")
         for i, frame in enumerate(frames):
-            if i < len(path_counts[path]):
-                all_frames_with_people.append({
-                    'frame': frame,
-                    'path': path,
-                    'frame_idx': i,
-                    'has_person': path_counts[path][i] > 0,
-                    'person_count': path_counts[path][i],
-                    'bboxes': path_bboxes.get(path, [[]] * len(path_counts[path]))[i] if path in path_bboxes else []
-                })
+            if i >= len(path_bboxes[path]):
+                continue
+            
+            bboxes = path_bboxes[path][i]
+            if not bboxes:
+                continue
+            
+            # Check if any bbox is green
+            for bbox in bboxes:
+                if len(bbox) >= 4:
+                    overlap_pct = bbox_inside_crop_percentage(bbox)
+                    meets_size, _ = bbox_size_check(bbox)
+                    
+                    # Determine if green
+                    is_green = False
+                    if overlap_pct >= 98.0 and meets_size:
+                        is_green = True
+                    elif overlap_pct >= 80.0 and meets_size:
+                        is_green = True
+                    
+                    if is_green:
+                        green_frames.append({
+                            'path': path,
+                            'frame': frame,
+                            'frame_idx': i,
+                            'bbox': bbox
+                        })
+                        break  # Only one frame per detection
     
-    if not all_frames_with_people:
-        print("No frames with people found")
+    if not silent:
+        print(f"\nTotal green frames: {len(green_frames)}")
+    
+    if not green_frames:
+        if not silent:
+            print("No green frames to process")
         return
     
-    print(f"\nTotal frames: {len(all_frames_with_people)}")
-    print(f"Frames with people: {sum(1 for f in all_frames_with_people if f['has_person'])}")
-    print("\nControls: 'n' = next, 'b' = previous, 'q' = quit")
+    # Process in batches of 50
+    batch_size = 50
+    batch = green_frames[:batch_size]  # Only first batch
     
-    cur_idx = 0
-    window_name = "Human Detection Viewer"
-    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    if not silent:
+        print(f"\nProcessing first batch of {len(batch)} frames...")
+        print("Calling OpenAI...")
     
-    while 0 <= cur_idx < len(all_frames_with_people):
-        item = all_frames_with_people[cur_idx]
-        img = item['frame'].copy()
-        h, w = img.shape[:2]
-        
-        # Draw bounding boxes
-        for bbox in item['bboxes']:
-            if len(bbox) >= 4:
-                x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
-                conf = bbox[4] if len(bbox) > 4 else 1.0
-                # Draw rectangle
-                cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                # Draw confidence score
-                cv2.putText(img, f"{conf:.2f}", (x1, y1 - 5), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
-        
-        # Display frame info
-        frame_num = f"Frame {cur_idx + 1}/{len(all_frames_with_people)}"
-        path_text = f"Path: {item['path'].split('/')[-1]}"
-        frame_idx_text = f"Frame index: {item['frame_idx']}"
-        
-        # Human detection status - large and prominent
-        if item['has_person']:
-            status_text = f"HUMAN DETECTED: {item['person_count']} person(s)"
-            color = (0, 255, 0)  # Green
-        else:
-            status_text = "NO HUMAN"
-            color = (0, 0, 255)  # Red
-        
-        # Draw status - large text
-        cv2.putText(img, status_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, color, 3, cv2.LINE_AA)
-        cv2.putText(img, status_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 5, cv2.LINE_AA)  # Black outline
-        
-        # Frame info
-        cv2.putText(img, frame_num, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.putText(img, path_text, (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA)
-        cv2.putText(img, frame_idx_text, (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2, cv2.LINE_AA)
-        
-        # Instructions
-        instructions = "Press 'n' for next | 'b' for previous | 'q' to quit"
-        cv2.putText(img, instructions, (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1, cv2.LINE_AA)
-        
-        cv2.imshow(window_name, img)
-        
-        # Wait for key press
-        key = cv2.waitKey(0) & 0xFF
-        
-        if key in (ord('n'), ord('N')):  # next
-            cur_idx += 1
-        elif key in (ord('b'), ord('B')):  # previous
-            cur_idx = max(0, cur_idx - 1)
-        elif key in (ord('q'), 27):  # quit
-            break
+    # Prepare images for OpenAI (each as a list with single image)
+    image_batches = [[item['frame']] for item in batch]
     
-    cv2.destroyAllWindows()
-
-    # # Save json with path: counts
-    # with open("counts.json", "w") as f:
-    #     json.dump(path_counts, f)
-
-    # gpt_trainer = GPTTrainer()
-    # prompt = """You need to analyze the image and determine if there is a person, if they are walking left or right, what item they are carrying, how many of each item they are carrying, and the estimated weight of the item."""
-
-    # @dataclass
-    # class GPTResult:
-    #     person: bool
-    #     person_carrying_item: bool
-    #     person_walking_direction: str #left or right
-    #     item_description: [str]
-    #     item_count: [int]
-    #     estimated_weight_of_item: [float]
-
-
-    # for path in tqdm(DataRegistry.LIST("argo")[:1], desc="Processing paths"):
-    #     if path not in path_counts: continue
-    #     frames = [[f] for i, f in enumerate(Sampler.unpack(path, crop=Crop(x=640, y=0, w=260, h=480))) if path_counts[path][i] > 0][:10]
-    #     print(f"Calling OpenAI with {len(frames)} people frames out of {len(path_counts[path])} total frames")
-    #     gpt_results = gpt_trainer._openai_call(model=gpt_trainer.default_model, prompt=prompt, image_paths=frames, output_schema=GPTResult)
-    #     for i, (frame, result) in enumerate(zip(frames, gpt_results)):
-    #         ResultRegistry.POST(path.replace(".mp4", "") + "_" + str(i) + ".json", result.__dict__)
-    #         ResultRegistry.POST(path.replace(".mp4", "") + "_" + str(i) + ".jpg", frame[0])
+    # Call OpenAI
+    gpt_results = gpt_trainer._openai_call(
+        model=gpt_trainer.default_model,
+        prompt=prompt,
+        image_paths=image_batches,
+        output_schema=GPTResult
+    )
+    
+    # Save results
+    if not silent:
+        print("Saving results...")
+    for item, result in zip(batch, gpt_results):
+        path = item['path']
+        frame_idx = item['frame_idx']
+        
+        # Create identifier: path_name_frame_number
+        path_name = Path(path).stem  # Get filename without extension
+        identifier = f"{path_name}_frame_{frame_idx}"
+        
+        # Save JSON result
+        ResultRegistry.POST(
+            identifier,
+            gpt_trainer.default_model,
+            "person-analysis",
+            result.__dict__
+        )
+    
+    if not silent:
+        print(f"Saved {len(batch)} results to ResultRegistry")
 
 
 if __name__ == "__main__":
