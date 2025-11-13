@@ -149,6 +149,83 @@ class VerdisRunner:
         cap.release()
         return groups
 
+    def sample_images_every_minute(self, video_path: Optional[Path] = None):
+        """
+        Extract a single JPEG image for every minute of the video. No clips are generated.
+        Images are saved next to the source video under a "<video_stem>_images" directory.
+        Returns: list of image Paths.
+        """
+        self.video_path = video_path if video_path is not None else self.video_path
+        assert self.video_path is not None, "video_path must be provided or set during initialization."
+        assert self.video_path.exists() and self.video_path.is_file(), f"Video path {self.video_path} does not exist or is not a file."
+
+        # Output directory: <video_stem>_images
+        out_dir = Path(str(self.video_path.with_suffix("")) + "_images")
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # Fast path: if images already exist, just return paths without regenerating
+        existing = sorted(out_dir.glob("*.jpg"))
+        if existing:
+            print(f"Found {len(existing)} existing images in {out_dir}")
+            return existing
+
+        cap = cv2.VideoCapture(str(self.video_path))
+        if not cap.isOpened():
+            raise RuntimeError(f"Failed to open video: {self.video_path}")
+
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps == 0 or not fps:
+            raise RuntimeError("Could not determine FPS for video.")
+
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        duration_sec = total_frames / fps
+
+        one_min = 60  # seconds
+
+        import math
+        num_minutes = max(1, math.ceil(duration_sec / one_min))
+
+        # Try to infer a human-friendly timestamp base from the filename if present
+        start_dt: Optional[datetime] = None
+        try:
+            digits = re.findall(r"(\d{14})", self.video_path.stem)
+            if digits:
+                start_dt = datetime.strptime(digits[0], "%Y%m%d%H%M%S")
+        except Exception:
+            start_dt = None
+
+        saved_images = []
+        with tqdm(total=num_minutes, desc="Extracting minute images", unit="img") as pbar:
+            for idx in range(num_minutes):
+                curr_time = idx * one_min
+                if curr_time >= duration_sec:
+                    pbar.update(1)
+                    continue
+
+                # Label as HH_MM_SS if timestamp base exists, otherwise zero-padded index
+                if start_dt is not None:
+                    ts_label = (start_dt + timedelta(seconds=curr_time)).strftime("%H_%M_%S")
+                else:
+                    ts_label = f"{idx:04d}"
+
+                img_path = out_dir / f"{ts_label}.jpg"
+                if img_path.exists():
+                    saved_images.append(img_path)
+                    pbar.update(1)
+                    continue
+
+                # Seek to the beginning of the minute window and capture one frame
+                start_frame = int(curr_time * fps)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+                ret, frame = cap.read()
+                if ret:
+                    cv2.imwrite(str(img_path), frame)
+                    saved_images.append(img_path)
+                pbar.update(1)
+
+        cap.release()
+        return saved_images
+
 if __name__ == "__main__":
     runner = VerdisRunner()
     runner.analyze("/mnt/c/Users/lucas/Desktop/Verdis")
