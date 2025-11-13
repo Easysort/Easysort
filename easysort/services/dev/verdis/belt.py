@@ -29,6 +29,7 @@ class VerdisBeltHandler:
     def __init__(self, video_path: Path):
         self.video_path = video_path
         self.openai_trainer = OpenAITrainer()
+        self.reference_dir = Path(__file__).parent / "reference"
 
     # Hardcoded polygon (belt region) provided by user
     # Coordinates are (x, y)
@@ -58,6 +59,37 @@ class VerdisBeltHandler:
             return ""
         return base64.b64encode(buf.tobytes()).decode('utf-8')
 
+    @staticmethod
+    def _load_reference_images(reference_dir: Path) -> dict[str, str]:
+        """Load reference images from the reference directory and return as base64 strings.
+        Maps category names to their reference image base64 data.
+        """
+        reference_images = {}
+        if not reference_dir.exists():
+            return reference_images
+        
+        # Map category names to expected filenames (lowercase, hyphens instead of spaces)
+        category_to_filename = {
+            "Plastics": "plastics.png",
+            "Hard plastics": "hard-plastics.png",
+            "Tubes": "tubes.png",
+            "Cardboard": "cardboard.png",
+            "Paper": "paper.png",
+            "Folie": "folie.png",
+            "Empty": "empty.png",
+        }
+        
+        for category, filename in category_to_filename.items():
+            ref_path = reference_dir / filename
+            if ref_path.exists():
+                with open(ref_path, "rb") as f:
+                    img_data = f.read()
+                    # Convert to base64
+                    img_b64 = base64.b64encode(img_data).decode('utf-8')
+                    reference_images[category] = img_b64
+        
+        return reference_images
+
     def detect_waste_type(self, group: List[Path]) -> str:
         # Use a single representative image (middle frame) to reduce cost
         if not group:
@@ -65,10 +97,29 @@ class VerdisBeltHandler:
         idx = max(0, min(len(group) // 2, len(group) - 1))
         # Apply polygon crop before sending to OpenAI
         img_b64 = self._poly_crop_to_b64(group[idx], self.POLY_POINTS)
+        
+        # Load reference images
+        reference_images = self._load_reference_images(self.reference_dir)
+        
+        # Build prompt with reference image labels
+        reference_labels = []
+        images_to_send = [img_b64]  # Main image first
+        
+        for category, ref_b64 in reference_images.items():
+            reference_labels.append(f"- {category}: Reference image {len(images_to_send)}")
+            images_to_send.append(ref_b64)
+        
+        # Update prompt to include reference image information
+        reference_text = ""
+        if reference_labels:
+            reference_text = f"\n\nReference images (compare the main image with these):\n" + "\n".join(reference_labels)
+        
+        full_prompt = waste_type_belt_prompt + reference_text
+        
         response = self.openai_trainer._openai_call(
             model="gpt-5-2025-08-07",
-            prompt=waste_type_belt_prompt,
-            images=[img_b64]
+            prompt=full_prompt,
+            images=images_to_send
         )
         return WasteTypeBeltJsonSchema(**json.loads(response)).category
         
@@ -119,7 +170,7 @@ class VerdisBeltHandler:
 
         pass
 
-    def run(self, concurrency: int = 8) -> None:
+    def run(self, concurrency: int = 40) -> None:
         groups = VerdisRunner(find_latest=False).analyze(self.video_path)
         print(f"Found {len(groups)} groups to process for {self.video_path}")
         results_path = self.video_path.with_suffix(".json")
@@ -289,8 +340,24 @@ class VerdisBeltHandler:
         
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run Verdis Belt Handler on a video file")
-    parser.add_argument("video_path", type=str, help="Path to the video file")
+    parser = argparse.ArgumentParser(description="Run Verdis Belt Handler on video file(s)")
+    parser.add_argument("video_paths", nargs='+', type=str, help="Path(s) to the video file(s)")
     args = parser.parse_args()
-    video_path = Path(args.video_path)
-    VerdisBeltHandler(video_path).run()
+    video_paths = [Path(p) for p in args.video_paths]
+    
+    print(f"Processing {len(video_paths)} video(s)...")
+    for i, video_path in enumerate(video_paths, 1):
+        print(f"\n{'='*60}")
+        print(f"Processing video {i}/{len(video_paths)}: {video_path.name}")
+        print(f"{'='*60}")
+        try:
+            VerdisBeltHandler(video_path).run()
+        except KeyboardInterrupt:
+            print(f"\nInterrupted while processing {video_path.name}")
+            print("Exiting...")
+            break
+        except Exception as e:
+            print(f"Error processing {video_path.name}: {e}")
+            continue
+    
+    print(f"\nCompleted processing {len(video_paths)} video(s).")
