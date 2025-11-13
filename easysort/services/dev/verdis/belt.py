@@ -1,6 +1,6 @@
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 import json
 from PIL import Image
 import numpy as np
@@ -171,7 +171,7 @@ class VerdisBeltHandler:
         pass
 
     def run(self, concurrency: int = 40) -> None:
-        groups = VerdisRunner(find_latest=False).analyze(self.video_path)
+        groups = VerdisRunner(find_latest=False).analyze(self.video_path, extract_clips=False)
         print(f"Found {len(groups)} groups to process for {self.video_path}")
         results_path = self.video_path.with_suffix(".json")
         results_map = {}

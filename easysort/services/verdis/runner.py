@@ -26,12 +26,17 @@ class VerdisRunner:
         self.video_path = video_files[0]
         self.id = self.video_path.stem
 
-    def analyze(self, video_path: Optional[Path] = None):
+    def analyze(self, video_path: Optional[Path] = None, extract_clips: bool = False):
         """
-        For every 2 minutes of video, save a 2 second clip to an output directory in the same place as the video.
-        Additionally, extract 6 evenly-spaced images (JPEG) from each video.
+        For every 2 minutes of video, optionally save a 2 second clip to an output directory.
+        Additionally, extract 6 evenly-spaced images (JPEG) from each 2-minute window.
         Handles large video files efficiently by not loading the entire video into memory.
-        Returns: list of image groups, each group is a list of image Paths from one clip.
+        
+        Args:
+            video_path: Path to video file
+            extract_clips: If False, skip video clip extraction (faster, images only)
+        
+        Returns: list of image groups, each group is a list of image Paths from one window.
         """
         self.video_path = video_path if video_path is not None else self.video_path
         out_dir = Path(str(self.video_path.with_suffix("")) + "_clips") # add _clips 
@@ -85,7 +90,13 @@ class VerdisRunner:
         # Collect groups of image paths per clip
         groups = []
         num_images_per_clip = 6
-        with tqdm(total=num_clips, desc="Processing clips & images", unit="clip") as pbar:
+        
+        # Precompute image frame offsets within the 2-second window: 1/7..6/7 of two_sec_frames
+        img_offsets = [max(0, min(two_sec_frames - 1, int((i+1) * two_sec_frames / (num_images_per_clip + 1))))
+                       for i in range(num_images_per_clip)]
+        
+        desc = "Extracting images" if not extract_clips else "Processing clips & images"
+        with tqdm(total=num_clips, desc=desc, unit="window") as pbar:
             for idx in range(num_clips):
                 # compute timestamp label for this window
                 curr_time = idx * two_min
@@ -98,8 +109,9 @@ class VerdisRunner:
                 clip_path = out_dir / f"{ts_label}.mp4"
                 img_paths = [images_dir / f"{ts_label}_{i:02d}.jpg" for i in range(num_images_per_clip)]
 
-                need_clip = not clip_path.exists()
+                need_clip = extract_clips and not clip_path.exists()
                 need_images = not all(p.exists() for p in img_paths)
+                
                 if not need_clip and not need_images:
                     pbar.update(1)
                     # Still append the group, but only existing files
@@ -111,35 +123,43 @@ class VerdisRunner:
                     # Still append empty/partial group if past end of video?
                     groups.append([p for p in img_paths if p.exists()])
                     continue
+                
                 start_frame = int(curr_time * fps)
-                cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
-                # Precompute image frame offsets within the 2-second window: 1/7..6/7 of two_sec_frames
-                img_offsets = [max(0, min(two_sec_frames - 1, int((i+1) * two_sec_frames / (num_images_per_clip + 1))))
-                               for i in range(num_images_per_clip)]
-                img_offsets_set = set(img_offsets)
-
-                frames = []
-                wrote_images = [p.exists() for p in img_paths]
-                for fidx in range(two_sec_frames):
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
-                    if need_clip:
+                if extract_clips and need_clip:
+                    # Original method: read all frames sequentially for video extraction
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+                    frames = []
+                    for fidx in range(two_sec_frames):
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
                         frames.append(frame)
-                    if need_images and fidx in img_offsets_set:
-                        i = img_offsets.index(fidx)
-                        if not wrote_images[i]:
-                            cv2.imwrite(str(img_paths[i]), frame)
-                            wrote_images[i] = True
+                        # Also extract images while we're reading frames
+                        if need_images and fidx in img_offsets:
+                            i = img_offsets.index(fidx)
+                            if not img_paths[i].exists():
+                                cv2.imwrite(str(img_paths[i]), frame)
 
-                if need_clip and len(frames) == two_sec_frames:
-                    height, width = frames[0].shape[:2]
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    writer = cv2.VideoWriter(str(clip_path), fourcc, fps, (width, height))
-                    for fr in frames:
-                        writer.write(fr)
-                    writer.release()
+                    if len(frames) == two_sec_frames:
+                        height, width = frames[0].shape[:2]
+                        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                        writer = cv2.VideoWriter(str(clip_path), fourcc, fps, (width, height))
+                        for fr in frames:
+                            writer.write(fr)
+                        writer.release()
+                elif need_images:
+                    # Optimized path: only seek to and read the specific frames we need
+                    for i, offset in enumerate(img_offsets):
+                        if img_paths[i].exists():
+                            continue
+                        target_frame = start_frame + offset
+                        if target_frame >= total_frames:
+                            continue
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+                        ret, frame = cap.read()
+                        if ret:
+                            cv2.imwrite(str(img_paths[i]), frame)
 
                 # After (possibly) writing images, append the group paths
                 groups.append(list(img_paths))
