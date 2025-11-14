@@ -11,8 +11,7 @@ ALLOWED_CATEGORIES = [
 ]
 
 CATEGORIES_DESCRIPTION = (
-    "Plastics — Mixed plastic waste. Many small or medium plastic items and bags along the belt or floor, often slighty coloured and mostly white. Can look like general residual waste."
-    "Not dominated by only thin film, not dominated by big rigid items.\n"
+    "Plastics — Mixed plastic waste. Mostly white small bags. Can look like general residual waste.\n"
     "Hard plastics — Few but clearly visible large rigid plastic objects with strong edges and clear 3D shapes (crates, bins, boxes, containers, buckets, toys, hard shells). These objects stand out individually on or next to the belt.\n"
     "Tubes — Long cylindrical objects such as pipes, hoses, cables or similar. At least one clearly visible tube/pipe dominates the highlighted region.\n"
     "Cardboard — Belt mostly covered by brown corrugated sheets/boxes and flat brown paperboard. Large 2D brown pieces dominate the view.\n"
@@ -40,7 +39,7 @@ Rules:
 - There is always only one category present. If you think there are multiple categories present, choose the one that visually covers the largest area inside the highlighted region.
 - Use the reference images to understand what each category looks like in practice.
 - Be careful with the "Folie" category. Make sure it's large bags and wraps, not just smaller bags and plastics.
-- The Plastics category is mostly white, non coloured, while the hard plastics category is mostly dark grey, coloured and has strong edges and 3D shapes.
+- The Plastics category is mostly white, non coloured and looks like general residual waste/bags, while the hard plastics category is mostly dark grey, coloured and actually looks like plastic.
 
 Return STRICT JSON ONLY (no extra text):
 {{ "category": string }}
