@@ -27,6 +27,13 @@ def parse_date_from_filename(path: Path) -> str:
     return dt.strftime("%d_%m_%Y")
 
 
+def category_to_key(category: str) -> str:
+    """Convert category name to snake_case key format.
+    E.g., "Hard plastics" -> "hard_plastics"
+    """
+    return category.lower().replace(" ", "_")
+
+
 def load_and_transform(src: Path, threshold: float = 0.2) -> List[Dict[str, Any]]:
     text = src.read_text()
     # Allow files that are either a raw JSON array or newline/spacing variants
@@ -58,27 +65,55 @@ def upload_json(bucket: str, object_key: str, payload: Any) -> None:
 
 def compute_info(items: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Compute high-level decimal percentages from uploaded items.
-    This is a working default; adjust freely to your own desired keys/logic.
+    Generates keys for all categories from prompts.py: Plastics, Hard plastics, Tubes,
+    Cardboard, Paper, Folie, Empty - each with _running and _not_running variants.
     """
-    KEYS = [
-        "empty_not_running",
-        "empty_running",
-        "cardboard_not_running",
-        "cardboard_running",
-        "paper_not_running",
-        "paper_running",
-        "residual_not_running",
-        "residual_running",
-        "plastics_not_running",
-        "plastics_running",
+    # Categories from prompts.py
+    CATEGORIES = [
+        "Plastics",
+        "Hard plastics",
+        "Tubes",
+        "Cardboard",
+        "Paper",
+        "Folie",
+        "Empty",
     ]
+    
+    # Generate all possible keys
+    KEYS = []
+    for cat in CATEGORIES:
+        key_base = category_to_key(cat)
+        KEYS.append(f"{key_base}_not_running")
+        KEYS.append(f"{key_base}_running")
+    
     info: Dict[str, Any] = {k: 0 for k in KEYS}
+    
     for item in items:
         running = bool(item["motion"])
-        category = str(item["ai_category"]).lower()
-        key = f"{category}_{'running' if running else 'not_running'}"
-        info[key] += 1
-    info = {k: round(info[k] / len(items), 4) for k in KEYS}
+        category = str(item["ai_category"]).strip()
+        
+        # Normalize category name (handle variations)
+        category_normalized = category
+        # Try to match against known categories (case-insensitive)
+        for cat in CATEGORIES:
+            if category.lower() == cat.lower():
+                category_normalized = cat
+                break
+        
+        key_base = category_to_key(category_normalized)
+        key = f"{key_base}_{'running' if running else 'not_running'}"
+        
+        # Only increment if it's a known category key
+        if key in info:
+            info[key] += 1
+    
+    # Convert to percentages
+    total = len(items)
+    if total > 0:
+        info = {k: round(info[k] / total, 4) for k in KEYS}
+    else:
+        info = {k: 0.0 for k in KEYS}
+    
     return info
 
 
