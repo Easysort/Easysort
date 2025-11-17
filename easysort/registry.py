@@ -47,7 +47,6 @@ class Registry:
         # print last entry for each device, check last entry no longer that 1 hour away in the time between 22 and 6
         return True
 
-
     def GET(self, key: str) -> bytes:
         assert os.path.exists(os.path.join(self.registry_path, key)), f"File {key} not found"
         return os.path.join(self.registry_path, key)

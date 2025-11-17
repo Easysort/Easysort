@@ -31,15 +31,11 @@ class Sampler:
         
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         frames = []
-        pbar = tqdm(total=total_frames, desc="Unpacking video")
         while True:
             ret, frame = cap.read()
             if not ret: break
             frames.append(frame)  # (H, W, 3)
-            pbar.update(1)
         cap.release()
-        pbar.close()
         if len(frames) != total_frames: print(f"Warning: Expected {total_frames} frames, got {len(frames)}")
-        if crop is not None:
-            frames = [frame[crop.y:crop.y+crop.h, crop.x:crop.x+crop.w] for frame in frames]
+        if crop is not None: frames = [frame[crop.y:crop.y+crop.h, crop.x:crop.x+crop.w] for frame in frames]
         return frames
