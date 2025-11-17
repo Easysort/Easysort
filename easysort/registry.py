@@ -15,7 +15,7 @@ from typing import Optional
 import json
 import numpy as np
 import datetime
-from easysort.helpers import SORT
+from easysort.helpers import Sort
 
 class Registry:
     def __init__(self, registry_path: str): self.registry_path = registry_path
