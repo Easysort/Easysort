@@ -22,8 +22,9 @@ if __name__ == "__main__":
     gpt_model = gpt_trainer.model
     yolo_person_cls_idx = 0
     project = "argo-people"
-    data = DataRegistry.LIST("argo")
-    data = list(Sort.since(data, datetime.datetime(2025, 1, 1)))
+    all_paths = DataRegistry.LIST("argo")
+    data = list(Sort.since(all_paths, datetime.datetime(2025, 1, 1)))
+    print(f"Processing {len(data)} paths out of {len(all_paths)}")
 
     for j,path in enumerate(tqdm(data, desc="Processing paths")):
         if ResultRegistry.EXISTS(path, yolo_model, project): continue
