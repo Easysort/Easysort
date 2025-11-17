@@ -26,6 +26,7 @@ if __name__ == "__main__":
     data = list(Sort.since(all_paths, datetime.datetime(2025, 11, 10)))
     data = list(Sort.before(data, datetime.datetime(2025, 11, 17)))
     print(f"Processing {len(data)} paths out of {len(all_paths)}")
+    exists = 0
     for j,path in enumerate(tqdm(data, desc="Processing paths")):
         if ResultRegistry.EXISTS(path, yolo_model, project): exists += 1
     print(f"Exists: {exists} / {len(data)}")
