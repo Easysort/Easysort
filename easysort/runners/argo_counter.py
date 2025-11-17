@@ -25,7 +25,7 @@ if __name__ == "__main__":
     data = DataRegistry.LIST("argo")
     data = list(Sort.since(data, datetime.datetime(2025, 1, 1)))
 
-    for j,path in enumerate(tqdm(data[:10], desc="Processing paths")):
+    for j,path in enumerate(tqdm(data, desc="Processing paths")):
         if ResultRegistry.EXISTS(path, yolo_model, project): continue
         frames = Sampler.unpack(path, crop="auto")
         results = yolo_trainer.model(frames, verbose=False)
