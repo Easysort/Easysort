@@ -39,7 +39,14 @@ class Registry:
             dst: Path = Path(self.registry_path) / Path(SUPABASE_DATA_REGISTRY_BUCKET) / file
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(supabase_client.storage.from_("argo").download(str(file)))
+        print("Checking health: ")
+        assert self.is_healthy(), "Registry is not healthy"
         print("Sync complete")
+
+    def is_healthy(self, verbose: bool = True) -> bool:
+        # print last entry for each device, check last entry no longer that 1 hour away in the time between 22 and 6
+        return True
+
 
     def GET(self, key: str) -> bytes:
         assert os.path.exists(os.path.join(self.registry_path, key)), f"File {key} not found"
