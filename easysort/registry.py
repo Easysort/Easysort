@@ -79,7 +79,7 @@ class ResultRegistryClass(Registry):
     def cleanup(self) -> None: pass
 
     def EXISTS(self, path: str, model: str, project: str) -> bool:
-        return os.path.exists(os.path.join(self.registry_path, str(Path(path).with_suffix("")), model, project))
+        return Path(os.path.join(self.registry_path, str(Path(path).with_suffix("")), model, project)).is_dir()
 
 class DataRegistryClass(Registry):
     def devices(self) -> list[str]: return [os.path.join(dir, x) for dir in [dir for dir in os.listdir(self.registry_path) if os.path.isdir(os.path.join(self.registry_path, dir))] for x in os.listdir(os.path.join(self.registry_path, dir)) if os.path.isdir(os.path.join(self.registry_path, dir, x))]

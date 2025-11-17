@@ -14,26 +14,26 @@ def getenv(key:str, default:T) -> T: ...
 def getenv(key:str, default:Any=0): return type(default)(os.getenv(key, default))
 
 class ContextVar:
-  _cache: ClassVar[dict[str, "ContextVar"]] = {}
-  value: int
-  key: str
-  def __init__(self, key, default_value):
-    if key in ContextVar._cache: raise RuntimeError(f"attempt to recreate ContextVar {key}")
-    ContextVar._cache[key] = self
-    self.value, self.key = getenv(key, default_value), key
-  def __bool__(self): return bool(self.value)
-  def __ge__(self, x): return self.value >= x
-  def __gt__(self, x): return self.value > x
-  def __lt__(self, x): return self.value < x
+    _cache: ClassVar[dict[str, "ContextVar"]] = {}
+    value: int
+    key: str
+    def __init__(self, key, default_value):
+      if key in ContextVar._cache: raise RuntimeError(f"attempt to recreate ContextVar {key}")
+      ContextVar._cache[key] = self
+      self.value, self.key = getenv(key, default_value), key
+    def __bool__(self): return bool(self.value)
+    def __ge__(self, x): return self.value >= x
+    def __gt__(self, x): return self.value > x
+    def __lt__(self, x): return self.value < x
 
 class Sort:
-  @staticmethod
-  def since(data: list[str], date: datetime.datetime) -> list[str]:
-    for item in data:
-      elements = item.split("/")
-      year, month, day = elements[-5], elements[-4], elements[-3]
-      if datetime.datetime(int(year), int(month), int(day)) >= date:
-        yield item
+    @staticmethod
+    def since(data: list[str], date: datetime.datetime) -> list[str]:
+      for item in data:
+        elements = item.split("/")
+        year, month, day = elements[-5], elements[-4], elements[-3]
+        if datetime.datetime(int(year), int(month), int(day)) >= date:
+          yield item
 
     @staticmethod
     def before(data: list[str], date: datetime.datetime) -> list[str]:

@@ -24,6 +24,7 @@ if __name__ == "__main__":
     project = "argo-people"
     all_paths = DataRegistry.LIST("argo")
     data = list(Sort.since(all_paths, datetime.datetime(2025, 11, 10)))
+    data = list(Sort.before(data, datetime.datetime(2025, 11, 17)))
     print(f"Processing {len(data)} paths out of {len(all_paths)}")
 
     for j,path in enumerate(tqdm(data, desc="Processing paths")):
