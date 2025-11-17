@@ -23,7 +23,7 @@ class Sampler:
     @staticmethod
     def unpack(video_path: Path|str, crop: Crop|str = None) -> list[np.ndarray]:
         if isinstance(video_path, str): video_path = Path(video_path)
-        if crop is "auto": crop = DEVICE_TO_CROP[video_path.parts[len(Path(DATA_REGISTRY_PATH).parts)+1]]
+        if crop == "auto": crop = DEVICE_TO_CROP[video_path.parts[len(Path(DATA_REGISTRY_PATH).parts)+1]]
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened(): raise RuntimeError(f"Failed to open video: {video_path}")
         fps = cap.get(cv2.CAP_PROP_FPS)

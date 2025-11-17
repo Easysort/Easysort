@@ -62,8 +62,8 @@ class ResultRegistryClass(Registry):
     def POST(self, path: str, model: str, project: str, identifier: str, data: dict|bytes|np.ndarray) -> None:
         if "/mnt/" in path: path = path.replace(DATA_REGISTRY_PATH, RESULTS_REGISTRY_PATH) # This should never happen if GET is used
         self.add_project(model, project)
-        os.makedirs(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project, identifier), exist_ok=True)
-        super().POST(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project, identifier), data)
+        os.makedirs(os.path.join(self.registry_path, str(Path(path).with_suffix("")), model, project, identifier), exist_ok=True)
+        super().POST(os.path.join(self.registry_path, str(Path(path).with_suffix("")), model, project, identifier), data)
 
     def add_project(self, model: str, project: str) -> None: 
         if os.path.join(model, project) in self.projects: return
@@ -73,7 +73,7 @@ class ResultRegistryClass(Registry):
     def cleanup(self) -> None: pass
 
     def EXISTS(self, path: str, model: str, project: str) -> bool:
-        return os.path.exists(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project))
+        return os.path.exists(os.path.join(self.registry_path, str(Path(path).with_suffix("")), model, project))
 
 class DataRegistryClass(Registry):
     def devices(self) -> list[str]: return [os.path.join(dir, x) for dir in [dir for dir in os.listdir(self.registry_path) if os.path.isdir(os.path.join(self.registry_path, dir))] for x in os.listdir(os.path.join(self.registry_path, dir)) if os.path.isdir(os.path.join(self.registry_path, dir, x))]
