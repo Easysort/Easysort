@@ -16,14 +16,14 @@ from easysort.helpers import Sort
 
 if __name__ == "__main__":
     DataRegistry.SYNC()
-    yolo_model = "yolov8m.pt"
+    yolo_model = "yolov8s.pt"
     yolo_trainer = YoloTrainer(yolo_model)
     gpt_trainer = GPTTrainer()
     gpt_model = gpt_trainer.model
     yolo_person_cls_idx = 0
     project = "argo-people"
     all_paths = DataRegistry.LIST("argo")
-    data = list(Sort.since(all_paths, datetime.datetime(2025, 1, 1)))
+    data = list(Sort.since(all_paths, datetime.datetime(2025, 11, 10)))
     print(f"Processing {len(data)} paths out of {len(all_paths)}")
 
     for j,path in enumerate(tqdm(data, desc="Processing paths")):
