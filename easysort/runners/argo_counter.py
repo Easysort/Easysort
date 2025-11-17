@@ -35,4 +35,4 @@ if __name__ == "__main__":
             if result.boxes is None: continue
             elements = zip(result.boxes.xyxy.cpu().numpy(), result.boxes.cls.cpu().numpy(), result.boxes.conf.cpu().numpy())
             bboxes = [[float(box[0]), float(box[1]), float(box[2]), float(box[3]), float(conf)] for box, cls, conf in elements if cls == yolo_person_cls_idx]
-            ResultRegistry.POST(path, yolo_model, project, frames[i], bboxes)
+            ResultRegistry.POST(path, yolo_model, project, str(i), bboxes)
