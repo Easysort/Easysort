@@ -44,6 +44,13 @@ class Registry:
         print("Sync complete")
 
     def is_healthy(self, verbose: bool = True) -> bool:
+        devices = [dir for dir in os.listdir(self.registry_path, "argo") if os.path.isdir(os.path.join(self.registry_path, "argo", dir))]
+        all_entries = self.LIST("argo")
+        for entry in all_entries: pass
+            # year, month, day, hour
+        is_healthy = True
+        for device in devices: pass
+
         # print last entry for each device, check last entry no longer that 1 hour away in the time between 22 and 6
         return True
 
@@ -79,6 +86,7 @@ class ResultRegistryClass(Registry):
     def cleanup(self) -> None: pass
 
     def EXISTS(self, path: str, model: str, project: str) -> bool:
+        print(os.path.join(self.registry_path, str(Path(path).with_suffix("")), model, project))
         return Path(os.path.join(self.registry_path, str(Path(path).with_suffix("")), model, project)).is_dir()
 
 class DataRegistryClass(Registry):
