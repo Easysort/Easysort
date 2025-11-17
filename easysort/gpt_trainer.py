@@ -13,10 +13,10 @@ from tqdm import tqdm
 import cv2
 
 class GPTTrainer:
-    def __init__(self):
+    def __init__(self, model: str = "gpt-5-2025-08-07"):
         self.openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
         self.openai_client.models.list() # validate api key
-        self.default_model = "gpt-5-2025-08-07"
+        self.model = model
 
     def _openai_call(self, model: str, prompt: str, image_paths: List[List[np.ndarray]], output_schema: dataclass, max_workers: int = 10) -> List[dataclass]:
         def process_single(image_arrays):
@@ -31,13 +31,8 @@ class GPTTrainer:
         return results
     
 class YoloTrainer:
-    def __init__(self):
-        self.model = YOLO("yolov8m.pt")
-
-    def _is_person_in_image(self, image_paths: List[np.ndarray]) -> List[str]:
-        results = self.model(image_paths)
-        return [int((result.boxes.cls.cpu().numpy() == 0).sum()) for result in results if result.boxes is not None]
-
+    def __init__(self, model_path: str = "yolov8m.pt"):
+        self.model = YOLO(model_path)
 
 if __name__ == "__main__":
     pass

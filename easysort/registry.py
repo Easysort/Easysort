@@ -14,6 +14,8 @@ from tqdm import tqdm
 from typing import Optional
 import json
 import numpy as np
+import datetime
+from easysort.helpers import SORT
 
 class Registry:
     def __init__(self, registry_path: str): self.registry_path = registry_path
@@ -52,16 +54,38 @@ class Registry:
     def _post_numpy(self, key: str, data: np.ndarray) -> None: np.save(Path(os.path.join(self.registry_path, key)).with_suffix(".npy"), data)
 
 class ResultRegistryClass(Registry):
+    def __init__(self, registry_path: str):
+        super().__init__(registry_path)
+        os.makedirs(self.registry_path, exist_ok=True)
+        self.projects = open(os.path.join(self.registry_path, "projects.txt")).read().splitlines() if os.path.exists(os.path.join(self.registry_path, "projects.txt")) else []
+
     def POST(self, path: str, model: str, project: str, identifier: str, data: dict|bytes|np.ndarray) -> None:
         if "/mnt/" in path: path = path.replace(DATA_REGISTRY_PATH, RESULTS_REGISTRY_PATH) # This should never happen if GET is used
-        print(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project))
+        self.add_project(model, project)
         os.makedirs(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project, identifier), exist_ok=True)
         super().POST(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project, identifier), data)
 
+    def add_project(self, model: str, project: str) -> None: 
+        if os.path.join(model, project) in self.projects: return
+        self.projects = sorted(list(set(self.projects + [os.path.join(model, project)])))
+        open(os.path.join(self.registry_path, "projects.txt"), "w").write("\n".join(self.projects))
+
+    def cleanup(self) -> None: pass
+
+    def EXISTS(self, path: str, model: str, project: str) -> bool:
+        return os.path.exists(os.path.join(self.registry_path, Path(path).with_suffix(""), model, project))
+
+class DataRegistryClass(Registry):
+    def devices(self) -> list[str]: return [os.path.join(dir, x) for dir in [dir for dir in os.listdir(self.registry_path) if os.path.isdir(os.path.join(self.registry_path, dir))] for x in os.listdir(os.path.join(self.registry_path, dir)) if os.path.isdir(os.path.join(self.registry_path, dir, x))]
+
     # DELETE methods
 
-DataRegistry = Registry(DATA_REGISTRY_PATH)
+DataRegistry = DataRegistryClass(DATA_REGISTRY_PATH)
 ResultRegistry = ResultRegistryClass(RESULTS_REGISTRY_PATH)
 
 if __name__ == "__main__":
-    DataRegistry.SYNC()
+    # DataRegistry.SYNC()
+    data = DataRegistry.LIST("argo")
+    # print(DataRegistry.devices())
+    # ResultRegistry.add_project("test", "test")
+    # print(ResultRegistry.projects)

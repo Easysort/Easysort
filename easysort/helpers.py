@@ -1,6 +1,7 @@
 from typing import ClassVar, overload, TypeVar, Any
 import functools, os
 from dotenv import load_dotenv
+import datetime
 
 T = TypeVar("T")
 load_dotenv()
@@ -24,6 +25,27 @@ class ContextVar:
   def __ge__(self, x): return self.value >= x
   def __gt__(self, x): return self.value > x
   def __lt__(self, x): return self.value < x
+
+class Sort:
+  @staticmethod
+  def since(data: list[str], date: datetime.datetime) -> list[str]:
+    for item in data:
+      elements = item.split("/")
+      year, month, day = elements[-5], elements[-4], elements[-3]
+      if datetime.datetime(int(year), int(month), int(day)) >= date:
+        yield item
+
+    @staticmethod
+    def before(data: list[str], date: datetime.datetime) -> list[str]:
+      for item in data:
+        elements = item.split("/")
+        year, month, day = elements[-5], elements[-4], elements[-3]
+        if datetime.datetime(int(year), int(month), int(day)) < date:
+          yield item
+
+    @staticmethod
+    def unique_frames(frames): pass
+
 
 DEBUG = ContextVar("DEBUG", 0)
 DATA_REGISTRY_PATH, RESULTS_REGISTRY_PATH = getenv("DATA_REGISTRY_PATH", ""), getenv("RESULTS_REGISTRY_PATH", "")
