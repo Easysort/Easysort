@@ -15,7 +15,7 @@ import cv2
 class GPTTrainer:
     def __init__(self, model: str = "gpt-5-2025-08-07"):
         self.openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        self.openai_client.models.list() # validate api key
+        self.openai_client.models.list() # breaks if api key is invalid
         self.model = model
 
     def _openai_call(self, model: str, prompt: str, image_paths: List[List[np.ndarray]], output_schema: dataclass, max_workers: int = 10) -> List[dataclass]:
