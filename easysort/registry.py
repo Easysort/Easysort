@@ -5,19 +5,17 @@
 # - Remove supabase dependency
 # - Data registry and compute on same machine. Once that is no longer true, GET should return bytes, not path.
 
-from easysort.helpers import DATA_REGISTRY_PATH, SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET, \
-    RESULTS_REGISTRY_PATH
+from easysort.helpers import DATA_REGISTRY_PATH, SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET, RESULTS_REGISTRY_PATH, REGISTRY_PATH
 from supabase import create_client, Client
 import os
 from pathlib import Path
 from tqdm import tqdm
-from typing import Optional
+from typing import Optional, Callable, Any
 import json
 import numpy as np
-import datetime
-from easysort.helpers import Sort
 
-class Registry:
+
+class RegistryBase:
     def __init__(self, registry_path: str): 
         self.registry_path = registry_path
         os.makedirs(self.registry_path, exist_ok=True)
@@ -56,14 +54,18 @@ class Registry:
         # print last entry for each device, check last entry no longer that 1 hour away in the time between 22 and 6
         return True
 
-    def GET(self, key: str, ) -> bytes: # TODO
-        return
-        assert os.path.exists(os.path.join(self.registry_path, key)), f"File {key} not found"
-        return os.path.join(self.registry_path, key)
+    def GET(self, key: str, loader: Optional[Callable[[bytes], Any]] = None) -> bytes: # TODO
+        if loader is None: loader = {"json": json.load, "npy": np.load, "bytes": lambda x: x}[Path(key).suffix.lstrip(".")]
+        assert self.EXISTS(key), f"File {key} not found"
+        return loader(open(Path(self.registry_path, key), "rb").read())
 
-    def LIST(self, prefix: Optional[str] = "", suffix: Optional[str] = "mp4") -> list[str]:
-        return [self._unregistry_path(x) for x in (Path(self.registry_path) / prefix).glob(f"**/*.{suffix}") if x.is_file() and not x.name.startswith("._")]
-
+    def LIST(self, prefix: Optional[str] = "", suffix: Optional[str] = ".mp4") -> list[str]:
+        files = [os.path.join(root, file) for root, dirs, files in os.walk(Path(self.registry_path) / prefix) for file in files]
+        print(len(files))
+        files = [file for file in files if file.endswith(suffix) and not file.startswith("._")]
+        print(len(files))
+        return [self._unregistry_path(file) for file in files]
+    
     def add_project(self, model: str, project: str) -> None: 
         if os.path.join(model, project) in self.projects: return
         self.projects = sorted(list(set(self.projects + [os.path.join(model, project)])))
@@ -71,7 +73,7 @@ class Registry:
 
     def construct_path(self, path: str, model: str, project: str, identifier: str) -> str: 
         self.add_project(model, project)
-        return os.path.join(self.registry_path, str(Path(path).with_suffix("")), model, project, identifier)
+        return os.path.join(str(Path(path).with_suffix("")), model, project, identifier)
 
     def _registry_path(self, path: str) -> str: return os.path.join(self.registry_path, path)
     def _unregistry_path(self, path: str|Path) -> str: return str(path).replace(self.registry_path, "").lstrip("/")
@@ -84,29 +86,10 @@ class Registry:
     def _post_bytes(self, key: str, data: bytes) -> None: open(Path(os.path.join(self.registry_path, key)).with_suffix(".bytes"), "wb").write(data)
     def _post_numpy(self, key: str, data: np.ndarray) -> None: np.save(Path(os.path.join(self.registry_path, key)).with_suffix(".npy"), data)
 
-    def cleanup(self) -> None:
-        # Delete used Verdis videos
-        # Delete Supabase old videos
-        pass
+    def cleanup(self) -> None: pass # Delete used Verdis videos and old Supabase videos
+    def EXISTS(self, key: str) -> bool: return Path(self._registry_path(key)).is_file() or Path(self._registry_path(key)).is_dir()
 
-class ResultRegistryClass(Registry):
-
-    def cleanup(self) -> None: pass
-
-    def EXISTS(self, path: str, model: str, project: str) -> bool:
-        return Path(os.path.join(self.registry_path, str(Path(path.replace(DATA_REGISTRY_PATH, RESULTS_REGISTRY_PATH)).with_suffix("")), model, project)).is_dir()
-
-class DataRegistryClass(Registry):
-    def devices(self) -> list[str]: return [os.path.join(dir, x) for dir in [dir for dir in os.listdir(self.registry_path) if os.path.isdir(os.path.join(self.registry_path, dir))] for x in os.listdir(os.path.join(self.registry_path, dir)) if os.path.isdir(os.path.join(self.registry_path, dir, x))]
-
-    # DELETE methods
-
-DataRegistry = DataRegistryClass(DATA_REGISTRY_PATH)
-ResultRegistry = ResultRegistryClass(RESULTS_REGISTRY_PATH)
+Registry = RegistryBase(REGISTRY_PATH)
 
 if __name__ == "__main__":
-    # DataRegistry.SYNC()
-    data = DataRegistry.LIST("argo")
-    # print(DataRegistry.devices())
-    # ResultRegistry.add_project("test", "test")
-    # print(ResultRegistry.projects)
+    pass
