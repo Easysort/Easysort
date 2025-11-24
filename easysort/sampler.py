@@ -6,7 +6,8 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 from dataclasses import dataclass
-from easysort.helpers import DATA_REGISTRY_PATH
+from easysort.helpers import REGISTRY_PATH
+from easysort.registry import Registry
 
 @dataclass
 class Crop:
@@ -23,8 +24,8 @@ class Sampler:
     @staticmethod
     def unpack(video_path: Path|str, crop: Crop|str = None) -> list[np.ndarray]:
         if isinstance(video_path, str): video_path = Path(video_path)
-        if crop == "auto": crop = DEVICE_TO_CROP[video_path.parts[len(Path(DATA_REGISTRY_PATH).parts)+1]]
-        cap = cv2.VideoCapture(str(video_path))
+        if crop == "auto": crop = DEVICE_TO_CROP[video_path.parts[-6]]
+        cap = cv2.VideoCapture(Registry._registry_path(str(video_path)))
         if not cap.isOpened(): raise RuntimeError(f"Failed to open video: {video_path}")
         fps = cap.get(cv2.CAP_PROP_FPS)
         if fps == 0 or not fps: raise RuntimeError("Could not determine FPS for video.")

@@ -92,4 +92,4 @@ class RegistryBase:
 Registry = RegistryBase(REGISTRY_PATH)
 
 if __name__ == "__main__":
-    pass
+    Registry.SYNC()
