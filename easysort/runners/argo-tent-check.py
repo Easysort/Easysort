@@ -214,7 +214,7 @@ if __name__ == "__main__":
     files = list(Sort.before(files, datetime.datetime(2025, 11, 24)))
     print(f"Checking {len(files)} files, like: {files[0]}")
     checker = ArgoTentCheck(output_dir="output")
-    checker.run(files[:1])
+    checker.run(files[:20])
 
 
 
