@@ -17,6 +17,7 @@ from typing import List, Dict
 import os
 import datetime
 from tqdm import tqdm
+import shutil
 
 CROP_ROSKILDE = Crop(x=631, y=110, w=210, h=540) # Roskilde
 CROP_JYLLINGE = Crop(x=0, y=0, w=260, h=480) # Jyllinge
@@ -213,9 +214,12 @@ if __name__ == "__main__":
     files = Registry.LIST("argo")
     files = list(Sort.since(files, datetime.datetime(2025, 11, 17)))
     files = list(Sort.before(files, datetime.datetime(2025, 11, 24)))
-    print(f"Checking {len(files)} files, like: {files[0]}")
-    checker = ArgoTentCheck(output_dir="output")
-    checker.run(files)
+    for file in files[:20]:
+        shutil.copy(file, "tmp2/" + file.replace("/", "-"))
+    
+    # print(f"Checking {len(files)} files, like: {files[0]}")
+    # checker = ArgoTentCheck(output_dir="output")
+    # checker.run(files)
 
 
 
