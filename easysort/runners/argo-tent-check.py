@@ -25,6 +25,8 @@ MIN_WIDTH = 80
 MIN_HEIGHT = 200
 PERCENTAGE_IN_CROP = 0.5
 
+BATCH_SIZE = 16
+
 def classify_facing_direction(person_kpts_xy, person_kpts_conf, face_conf_thresh=0.4, dx_forward_thresh=10):
     NOSE, L_EYE, R_EYE, L_EAR, R_EAR, L_SHOULDER, R_SHOULDER = 0, 1, 2, 3, 4, 5, 6
     def visible(idx, t=face_conf_thresh): return person_kpts_conf[idx] > t
@@ -153,13 +155,14 @@ class ArgoTentCheck:
     def send_to_chatgpt(self, image: np.ndarray, results: Results) -> Results|None:
         pass
 
-    def check_image(self, image: np.ndarray, crop: Crop, save_path: str) -> np.ndarray|None:
+    def check_image(self, images: List[np.ndarray], crop: Crop, save_paths: List[str]) -> List[np.ndarray]|None:
         # if image.shape[0] > 600: return None
-        results = self.check_people(image)
+        results = self.check_people(images)
+        assert len(results) == len(images)
         self.check_bboxes(results, crop)
-        results_pose, matches = self.check_facing_direction(image, results)
+        results_pose, matches = self.check_facing_direction(images, results)
         self.check_duplicate_people(results)
-        self.send_to_chatgpt(image, results)
+        self.send_to_chatgpt(images, results)
 
         # cv2.rectangle(image, (crop.x, crop.y), (crop.x + crop.w, crop.y + crop.h), (0, 255, 255), 2)
 
@@ -180,13 +183,14 @@ class ArgoTentCheck:
         
         for i, result in enumerate(results):
             if any(self._local_information.get(f"{i}_{j}_keep", False) for j in range(len(result.boxes))):
-                cv2.imwrite(save_path, image)
-                print(f"Saved {save_path}")
+                cv2.imwrite(save_paths[i], images[i])
+                print(f"Saved {save_paths[i]}")
                 # Save all person crops with idx and direction in name
                 for j in range(len(result.boxes)):
                     if self._local_information.get(f"{i}_{j}_keep", False):
-                        person_crop = image[result.boxes[j].xyxy[0].int().tolist()[1]:result.boxes[j].xyxy[0].int().tolist()[3], result.boxes[j].xyxy[0].int().tolist()[0]:result.boxes[j].xyxy[0].int().tolist()[2]]
-                        cv2.imwrite(f"{save_path.replace('.jpg', '')}_{i}_{j}_{self._local_information[f"{i}_{j}_direction"]}.jpg", person_crop)
+                        person_crop = images[i][result.boxes[j].xyxy[0].int().tolist()[1]:result.boxes[j].xyxy[0].int().tolist()[3], result.boxes[j].xyxy[0].int().tolist()[0]:result.boxes[j].xyxy[0].int().tolist()[2]]
+                        direction = self._local_information[f"{i}_{j}_direction"]
+                        cv2.imwrite(f"{save_paths[i].replace('.jpg', '')}_{i}_{j}_{self._local_information[f"{i}_{j}_{direction}"]}.jpg", person_crop)
 
         return 
     
@@ -205,10 +209,11 @@ class ArgoTentCheck:
 
     def check_video(self, video_path: str):
         images = Sampler.unpack(video_path)
-        for i, image in tqdm(enumerate(images)):
-            save_path = os.path.join(self.output_dir, f"{video_path.replace('/', '-')}_{i}.jpg")
+        for i in range(0, len(images), BATCH_SIZE):
+            batch = images[i:i+BATCH_SIZE]
+            save_paths = [os.path.join(self.output_dir, f"{video_path.replace('/', '-').replace('.mp4', '')}_{i+j}.jpg") for j in range(len(batch))]
             crop = CROP_JYLLINGE if "Jyllinge" in video_path else CROP_ROSKILDE
-            image = self.check_image(image, crop, save_path)
+            images = self.check_image(batch, crop, save_paths)
 
     def run(self, video_paths: List[str]):
         for video_path in tqdm(video_paths):
