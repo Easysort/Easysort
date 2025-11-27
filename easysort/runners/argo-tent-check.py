@@ -172,7 +172,6 @@ class ArgoTentCheck:
         #         cv2.circle(image, (int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][0]), int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][1])), 8, (255, 0, 0), 2)
         #         cv2.putText(image, f"{i}_{j}", (int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][0]), int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][1] + 16)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
         for i, result in enumerate(results):
-            print([self._local_information.get(f"{i}_{j}_keep", False) for j in range(len(result.boxes))])
             if any(self._local_information.get(f"{i}_{j}_keep", False) for j in range(len(result.boxes))):
                 cv2.imwrite(save_path, image)
                 print(f"Saved {save_path}")
@@ -203,7 +202,8 @@ class ArgoTentCheck:
         for i, image in enumerate(images):
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             save_path = os.path.join(self.output_dir, f"{video_path.replace('/', '-')}_{i}.jpg")
-            image = self.check_image(image, CROP_JYLLINGE, save_path)
+            crop = CROP_JYLLINGE if "Jyllinge" in video_path else CROP_ROSKILDE
+            image = self.check_image(image, crop, save_path)
 
     def run(self, video_paths: List[str]):
         for video_path in tqdm(video_paths):
@@ -211,7 +211,7 @@ class ArgoTentCheck:
 
 if __name__ == "__main__":
     files = Registry.LIST("argo")
-    files = list(Sort.since(files, datetime.datetime(2025, 11, 1)))
+    files = list(Sort.since(files, datetime.datetime(2025, 11, 17)))
     files = list(Sort.before(files, datetime.datetime(2025, 11, 24)))
     print(f"Checking {len(files)} files, like: {files[0]}")
     checker = ArgoTentCheck(output_dir="output")
