@@ -22,7 +22,7 @@ class RegistryBase:
         self.projects = open(os.path.join(self.registry_path, "projects.txt")).read().splitlines() if os.path.exists(os.path.join(self.registry_path, "projects.txt")) else []
 
     def SYNC(self) -> None: # with Supabase
-        # Find all files in a bucket, download to DATA_REGISTRY_PATH
+        # Find all files in a bucket, download to registry
         supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         dirs, files, pbar = [Path(x["name"]) for x in supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET).list()], [], tqdm()
         while len(dirs) > 0:
