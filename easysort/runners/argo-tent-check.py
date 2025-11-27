@@ -174,6 +174,7 @@ class ArgoTentCheck:
         for i, result in enumerate(results):
             if any(self._local_information.get(f"{i}_{j}_keep", False) for j in range(len(result.boxes))):
                 cv2.imwrite(save_path, image)
+                print(f"Saved {save_path}")
                 # Save all person crops with idx and direction in name
                 for j in range(len(result.boxes)):
                     if self._local_information.get(f"{i}_{j}_keep", False):
