@@ -189,8 +189,7 @@ class ArgoTentCheck:
                 for j in range(len(result.boxes)):
                     if self._local_information.get(f"{i}_{j}_keep", False):
                         person_crop = images[i][result.boxes[j].xyxy[0].int().tolist()[1]:result.boxes[j].xyxy[0].int().tolist()[3], result.boxes[j].xyxy[0].int().tolist()[0]:result.boxes[j].xyxy[0].int().tolist()[2]]
-                        direction = self._local_information[f"{i}_{j}_direction"]
-                        cv2.imwrite(f"{save_paths[i].replace('.jpg', '')}_{i}_{j}_{self._local_information[f"{i}_{j}_{direction}"]}.jpg", person_crop)
+                        cv2.imwrite(f"{save_paths[i].replace('.jpg', '')}_{i}_{j}_{self._local_information[f'{i}_{j}_direction']}.jpg", person_crop)
 
         return 
     
@@ -209,11 +208,12 @@ class ArgoTentCheck:
 
     def check_video(self, video_path: str):
         images = Sampler.unpack(video_path)
+        print(f"Checking {len(images)} images from {video_path}")
         for i in range(0, len(images), BATCH_SIZE):
             batch = images[i:i+BATCH_SIZE]
             save_paths = [os.path.join(self.output_dir, f"{video_path.replace('/', '-').replace('.mp4', '')}_{i+j}.jpg") for j in range(len(batch))]
             crop = CROP_JYLLINGE if "Jyllinge" in video_path else CROP_ROSKILDE
-            images = self.check_image(batch, crop, save_paths)
+            self.check_image(batch, crop, save_paths)
 
     def run(self, video_paths: List[str]):
         for video_path in tqdm(video_paths):
