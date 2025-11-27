@@ -214,6 +214,7 @@ if __name__ == "__main__":
     files = Registry.LIST("argo")
     files = list(Sort.since(files, datetime.datetime(2025, 11, 17)))
     files = list(Sort.before(files, datetime.datetime(2025, 11, 24)))
+    os.makedirs("tmp2", exist_ok=True)
     for file in files[:20]:
         shutil.copy(Registry._registry_path(file), "tmp2/" + file.replace("/", "-"))
     
