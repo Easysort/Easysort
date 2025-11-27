@@ -172,6 +172,7 @@ class ArgoTentCheck:
         #         cv2.circle(image, (int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][0]), int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][1])), 8, (255, 0, 0), 2)
         #         cv2.putText(image, f"{i}_{j}", (int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][0]), int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][1] + 16)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
         for i, result in enumerate(results):
+            print([self._local_information.get(f"{i}_{j}_keep", False) for j in range(len(result.boxes))])
             if any(self._local_information.get(f"{i}_{j}_keep", False) for j in range(len(result.boxes))):
                 cv2.imwrite(save_path, image)
                 print(f"Saved {save_path}")
@@ -214,7 +215,7 @@ if __name__ == "__main__":
     files = list(Sort.before(files, datetime.datetime(2025, 11, 24)))
     print(f"Checking {len(files)} files, like: {files[0]}")
     checker = ArgoTentCheck(output_dir="output")
-    checker.run(files[:20])
+    checker.run(files[:50])
 
 
 
