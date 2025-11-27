@@ -20,7 +20,7 @@ from tqdm import tqdm
 import shutil
 
 CROP_ROSKILDE = Crop(x=631, y=110, w=210, h=540) # Roskilde
-CROP_JYLLINGE = Crop(x=0, y=0, w=260, h=480) # Jyllinge
+CROP_JYLLINGE = Crop(x=640, y=0, w=260, h=480) # Jyllinge
 MIN_WIDTH = 80
 MIN_HEIGHT = 200
 PERCENTAGE_IN_CROP = 0.5
@@ -82,6 +82,7 @@ class ArgoTentCheck:
         self.yolo_model = YoloTrainer("yolo11n.pt")
         self.pose_model = YoloTrainer("yolo11n-pose.pt")
         self.output_dir = output_dir
+        os.makedirs(output_dir, exist_ok=True)
         self._local_information = {}
 
     def check_people(self, image: np.ndarray) -> Results|None:
@@ -162,6 +163,7 @@ class ArgoTentCheck:
 
         # cv2.rectangle(image, (crop.x, crop.y), (crop.x + crop.w, crop.y + crop.h), (0, 255, 255), 2)
 
+        # if len(results[0].boxes) == 0: return None
         # for i, result in enumerate(results):
         #     if len(result.boxes) == 0: continue
         #     for j, box in enumerate(result.boxes):
@@ -172,6 +174,10 @@ class ArgoTentCheck:
         #         if matches[i][j] is None: continue
         #         cv2.circle(image, (int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][0]), int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][1])), 8, (255, 0, 0), 2)
         #         cv2.putText(image, f"{i}_{j}", (int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][0]), int(results_pose[i].keypoints.xy.cpu().numpy()[matches[i][j]][0][1] + 16)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
+
+        # cv2.imshow("image", image)
+        # cv2.waitKey(0)
+        
         for i, result in enumerate(results):
             if any(self._local_information.get(f"{i}_{j}_keep", False) for j in range(len(result.boxes))):
                 cv2.imwrite(save_path, image)
@@ -180,8 +186,7 @@ class ArgoTentCheck:
                 for j in range(len(result.boxes)):
                     if self._local_information.get(f"{i}_{j}_keep", False):
                         person_crop = image[result.boxes[j].xyxy[0].int().tolist()[1]:result.boxes[j].xyxy[0].int().tolist()[3], result.boxes[j].xyxy[0].int().tolist()[0]:result.boxes[j].xyxy[0].int().tolist()[2]]
-                        cv2.imwrite(os.path.join(self.output_dir, f"{save_path.replace('.jpg', '')}_{i}_{j}_{self._local_information[f"{i}_{j}_direction"]}.jpg"), person_crop)
-            
+                        cv2.imwrite(f"{save_path.replace('.jpg', '')}_{i}_{j}_{self._local_information[f"{i}_{j}_direction"]}.jpg", person_crop)
 
         return 
     
@@ -200,8 +205,7 @@ class ArgoTentCheck:
 
     def check_video(self, video_path: str):
         images = Sampler.unpack(video_path)
-        for i, image in enumerate(images):
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        for i, image in tqdm(enumerate(images)):
             save_path = os.path.join(self.output_dir, f"{video_path.replace('/', '-')}_{i}.jpg")
             crop = CROP_JYLLINGE if "Jyllinge" in video_path else CROP_ROSKILDE
             image = self.check_image(image, crop, save_path)
@@ -214,13 +218,13 @@ if __name__ == "__main__":
     files = Registry.LIST("argo")
     files = list(Sort.since(files, datetime.datetime(2025, 11, 17)))
     files = list(Sort.before(files, datetime.datetime(2025, 11, 24)))
-    os.makedirs("tmp2", exist_ok=True)
-    for file in files[:20]:
-        shutil.copy(Registry._registry_path(file), "tmp2/" + file.replace("/", "-"))
+    # os.makedirs("tmp2", exist_ok=True)
+    # for file in files[:20]:
+    #     shutil.copy(Registry._registry_path(file), "tmp2/" + file.replace("/", "-"))
     
     # print(f"Checking {len(files)} files, like: {files[0]}")
-    # checker = ArgoTentCheck(output_dir="output")
-    # checker.run(files)
+    checker = ArgoTentCheck(output_dir="output")
+    checker.run(files)
 
 
 
