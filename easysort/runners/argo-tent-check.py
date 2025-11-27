@@ -215,7 +215,7 @@ if __name__ == "__main__":
     files = list(Sort.since(files, datetime.datetime(2025, 11, 17)))
     files = list(Sort.before(files, datetime.datetime(2025, 11, 24)))
     for file in files[:20]:
-        shutil.copy(file, "tmp2/" + file.replace("/", "-"))
+        shutil.copy(Registry._registry_path(file), "tmp2/" + file.replace("/", "-"))
     
     # print(f"Checking {len(files)} files, like: {files[0]}")
     # checker = ArgoTentCheck(output_dir="output")
