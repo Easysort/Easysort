@@ -13,6 +13,7 @@ from tqdm import tqdm
 from typing import Optional, Callable, Any
 import json
 import numpy as np
+import datetime
 
 
 class RegistryBase:
@@ -42,6 +43,14 @@ class RegistryBase:
         print("Checking health: ")
         assert self.is_healthy(), "Registry is not healthy"
         print("Sync complete")
+
+        print("Cleanup videos older than 2 weeks")
+        for file in tqdm(files, desc="Cleanup videos"):
+            file = str(file)
+            year, month, day, hour, minute, second = file.split("/")[-5], file.split("/")[-4], file.split("/")[-3], file.split("/")[-1][:2], file.split("/")[-1][2:4], file.split("/")[-1][4:6]
+            timestamp = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+            if timestamp < datetime.datetime.now() - datetime.timedelta(weeks=2):
+                supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET).remove(file)
 
     def is_healthy(self, verbose: bool = True) -> bool:
         devices = [dir for dir in os.listdir(os.path.join(self.registry_path, "argo")) if os.path.isdir(os.path.join(self.registry_path, "argo", dir))]
@@ -86,7 +95,6 @@ class RegistryBase:
     def _post_bytes(self, key: str, data: bytes) -> None: open(Path(os.path.join(self.registry_path, key)).with_suffix(".bytes"), "wb").write(data)
     def _post_numpy(self, key: str, data: np.ndarray) -> None: np.save(Path(os.path.join(self.registry_path, key)).with_suffix(".npy"), data)
 
-    def cleanup(self) -> None: pass # Delete used Verdis videos and old Supabase videos
     def EXISTS(self, key: str) -> bool: return Path(self._registry_path(key)).is_file() or Path(self._registry_path(key)).is_dir()
 
 Registry = RegistryBase(REGISTRY_PATH)
