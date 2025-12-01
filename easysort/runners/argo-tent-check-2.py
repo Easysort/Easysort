@@ -8,6 +8,11 @@ from PIL import Image
 import torchreid
 import numpy as np
 from tqdm import tqdm
+import json
+from dataclasses import dataclass
+from typing import Optional, Dict
+import datetime
+from easysort.viewer import ImageViewer
 
 model = torchreid.models.build_model(
     name='osnet_x0_75',      # good small ReID model
@@ -32,6 +37,17 @@ def get_embedding(img_path: str) -> torch.Tensor:
         feat = model(x)            # [1, D]
         feat = F.normalize(feat, dim=1)
     return feat[0]  
+
+@dataclass
+class GPTResult:
+    person: bool
+    person_facing_direction: str
+    person_carrying_item: bool
+    item_desc: list[str]
+    item_cat: list[str]
+    item_count: list[int]
+    weight_kg: list[float]
+    co2_kg: list[float]
     
 
 class ArgoCounter:
@@ -39,7 +55,8 @@ class ArgoCounter:
         self.images = os.listdir(folder)
         self.people_images = sorted([folder + "/" + f for f in self.images if any(x in f for x in ["left", "right", "forward", "back", "unknown"])])
         print("found", len(self.people_images), "people images")
-
+    
+    def check_duplicates(self):
         paths_to_check = list(set(["_".join(f.split("_")[:-2]) for f in self.people_images]))
         meta_paths_to_paths = {p: [] for p in paths_to_check}
         for path in self.people_images:
@@ -110,22 +127,126 @@ class ArgoCounter:
         with open("images_to_analyze.txt", "w") as f:
             for image in images_to_analyze:
                 f.write(image + "\n")
-                    
+
+    def call_gpt(self):
+
+        GPT_PROMPT = """
+        Analyze the image and determine if there is a person, what items they are carrying. The item descriptions should only be items that people are carrying in the image.
+        Sometimes people are carrying boxes, bags, etc. If there are items in the bags/boxes, describe them as items too.
+        You should state if the person is facing 'left', 'right', 'forward' or 'back'. Make your best guess based on the image.
+        You need to give the items a category out of the following list: [Køkkenting, Fritid & Have, Møbler, Boligting, Legetøj, Andet]. In some cases, people are carrying multiple of the same items. There you can use the item_count. Else just say 1.
+        Estimate the weight and co2 emission from the item production. If you are a bit unsure, be conservative in your estimates.
+        """
+
+        model = "gpt-5-mini-2025-08-07"
+
+        from easysort.gpt_trainer import GPTTrainer
+        with open("images_to_analyze.txt", "r") as f:
+            images_to_analyze = f.readlines()
+        print(len(images_to_analyze), "images to analyze")
+        print(images_to_analyze[0])
+        images_without_results = [path.strip("\n") for path in images_to_analyze if not os.path.exists(path.strip("\n").replace(".jpg", ".gpt2"))]
+        print(len(images_without_results), "images without results")
+        unique_images_paths_saved = []
+        all_paths_saved = []
+        for i in tqdm(range(0, 10000, 500)):
+            batch = images_without_results[i:i+500]
+            batch_images = [[cv2.imread(image_path)] for image_path in batch]
+            gpt_trainer = GPTTrainer(model=model)
+            gpt_results = gpt_trainer._openai_call(gpt_trainer.model, GPT_PROMPT, batch_images, GPTResult, max_workers=250)
+            for image_path, gpt_result in zip(batch, gpt_results):
+                with open(image_path.replace(".jpg", ".gpt2"), "w") as f:
+                    f.write(json.dumps(gpt_result.__dict__))
+                unique_images_paths_saved.append(image_path)
+                all_paths_saved.append(image_path)
+
+        print(len(unique_images_paths_saved), "unique images paths saved")
+        print(len(all_paths_saved), "all paths saved")
+        print(len(set(all_paths_saved)), "unique paths saved")
+
+    def concat_results(self):
+        results: Dict[str, Dict[datetime.datetime, GPTResult]] = {"roskilde": {}, "jyllinge": {}}
+        with open("images_to_analyze.txt", "r") as f:
+            images_to_analyze = f.readlines()
+        for image_path in images_to_analyze:
+            with open(image_path.strip("\n").replace(".jpg", ".gpt2"), "r") as f:
+                gpt_result = GPTResult(**json.load(f))
+                string = image_path.replace("_", "-")
+                year, month, day, hour, minute, second = string.split("-")[-9], string.split("-")[-8], string.split("-")[-7], string.split("-")[-5][:2], string.split("-")[-5][2:4], string.split("-")[-5][4:]
+                timestamp = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+                if timestamp not in results[string.split("-")[2].lower()]:
+                    results[string.split("-")[2].lower()][timestamp] = []
+                results[string.split("-")[2].lower()][timestamp].append((gpt_result, image_path))
+
+        locations = sorted(results.keys())
+        for location in locations:
+            timestamps = sorted(results[location].keys())
+            print("------ ", location, " ------")
+            all_objects = []
+            all_co2 = 0
+            all_weight = 0
+            for timestamp in timestamps:
+                gpt_result = results[location][timestamp]
+                all_objects += sum(gpt_result.item_count)
+                all_co2 += sum(gpt_result.estimated_co2_emission_from_item_production_kg)
+                all_weight += sum(gpt_result.estimated_weight_of_item_kg)
+
+            # All the objects collected, All the co2 saved, the wieght of all objects, who takes objects
+
+            # Number of objects and weight for each category
+
+            # Co2 estimate * ~0.7-0.75, normal estimate, estimate * 1.3-1.45
+
+            # Objects per day, objects per hour
+
+
+    def show(self):
+        results: Dict[str, Dict[datetime.datetime, GPTResult]] = {"roskilde": {}, "jyllinge": {}}
+        with open("/home/lucas/Easysort/images_to_analyze.txt", "r") as f:
+            images_to_analyze = f.readlines()
+        images_to_analyze = [image_path.strip("\n") for image_path in images_to_analyze]
+        print(len(images_to_analyze), "images to analyze")
+        print("number of gpt2 files: ", len([f for f in os.listdir("/home/lucas/Easysort/output") if f.endswith(".gpt2")]))
+        print("number of relevant gpt2 files: ", len([f for f in os.listdir("/home/lucas/Easysort/output") if f.endswith(".gpt2") and "output/" + f.replace(".gpt2", ".jpg") in images_to_analyze]))
+        for path in os.listdir("/home/lucas/Easysort/output"):
+            if not path.endswith(".gpt2"):
+                continue
+            image_path = "output/" + path.replace(".gpt2", ".jpg")
+            if image_path not in images_to_analyze:
+                continue
+            with open("output/" + path, "r") as f:
+                gpt_result = GPTResult(**json.load(f))
+                string = image_path.replace("_", "-")
+                year, month, day, hour, minute, second = string.split("-")[-9], string.split("-")[-8], string.split("-")[-7], string.split("-")[-5][:2], string.split("-")[-5][2:4], string.split("-")[-5][4:]
+                timestamp = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+                if timestamp not in results[string.split("-")[2].lower()]:
+                    results[string.split("-")[2].lower()][timestamp] = []
+                results[string.split("-")[2].lower()][timestamp].append((gpt_result, image_path))
         
-    def remove_duplicates(self):
-        pass
+        roskilde_images = [len(results["roskilde"][timestamp]) for timestamp in results["roskilde"]]
+        jyllinge_images = [len(results["jyllinge"][timestamp]) for timestamp in results["jyllinge"]]
+        print("total roskilde images: ", sum(roskilde_images))
+        print("total jyllinge images: ", sum(jyllinge_images))
+        print("total images: ", sum(roskilde_images) + sum(jyllinge_images))
+        paths_with_objects = []
+        paths_without_objects = []
+        for location in results:
+            for timestamp in results[location]:
+                for gpt_result, image_path in results[location][timestamp]:
+                    if sum(gpt_result.item_count) > 0:
+                        paths_with_objects.append(image_path.strip("\n"))
+                    else:
+                        paths_without_objects.append(image_path.strip("\n"))
 
-    def send_to_gpt(self):
-        pass
+        print(len(paths_with_objects), "images with objects")
+        print(len(paths_without_objects), "images without objects")
 
-    def output_results(self):
-        pass
-
-
-
-
+        # Then show a subset of images without objects
+        # ImageViewer(paths_without_objects[:1000])
 
 
 
 if __name__ == "__main__":
     counter = ArgoCounter(folder="output")
+    counter.call_gpt()
+    # counter.show()
