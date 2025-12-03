@@ -54,6 +54,9 @@ class ArgoCounter:
     def __init__(self, folder: str):
         self.images = os.listdir(folder)
         self.people_images = sorted([folder + "/" + f for f in self.images if any(x in f for x in ["left", "right", "forward", "back", "unknown"])])
+        print(self.people_images[0].split("-")[-4], self.people_images[0].split("-")[-3], self.people_images[0])
+        self.people_images = [f for f in self.people_images if f.split("-")[-4] == "11" and int(f.split("-")[-3]) > 24]
+        print(*self.people_images[:10], sep="\n")
         print("found", len(self.people_images), "people images")
     
     def check_duplicates(self):
@@ -248,5 +251,6 @@ class ArgoCounter:
 
 if __name__ == "__main__":
     counter = ArgoCounter(folder="output")
+    # counter.check_duplicates()
     counter.call_gpt()
     # counter.show()
