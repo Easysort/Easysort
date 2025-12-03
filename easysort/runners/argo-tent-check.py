@@ -207,11 +207,16 @@ class ArgoTentCheck:
     #     cv2.destroyAllWindows()
 
     def check_video(self, video_path: str):
+        all_save_paths = [os.path.join(self.output_dir, f"{video_path.replace('/', '-').replace('.mp4', '')}_{i}.jpg") for i in range(1000)]
+        if any(os.path.exists(save_path) for save_path in all_save_paths):
+            print(f"Already checked {video_path}")
+            return
         images = Sampler.unpack(video_path)
         print(f"Checking {len(images)} images from {video_path}")
         for i in range(0, len(images), BATCH_SIZE):
             batch = images[i:i+BATCH_SIZE]
             save_paths = [os.path.join(self.output_dir, f"{video_path.replace('/', '-').replace('.mp4', '')}_{i+j}.jpg") for j in range(len(batch))]
+            if any(os.path.exists(save_path) for save_path in save_paths): continue
             crop = CROP_JYLLINGE if "Jyllinge" in video_path else CROP_ROSKILDE
             self.check_image(batch, crop, save_paths)
 
@@ -221,15 +226,26 @@ class ArgoTentCheck:
 
 if __name__ == "__main__":
     files = Registry.LIST("argo")
-    files = list(Sort.since(files, datetime.datetime(2025, 11, 24)))
-    files = list(Sort.before(files, datetime.datetime(2025, 11, 30)))
+    files = list(Sort.since(files, datetime.datetime(2025, 11, 24, 0, 0, 0)))
+    files = list(Sort.before(files, datetime.datetime(2025, 11, 30, 23, 59, 59)))
+    images_per_day_per_location = {}
+    for f in files:
+        day = datetime.datetime(int(f.split("/")[-5]), int(f.split("/")[-4]), int(f.split("/")[-3]))
+        if day not in images_per_day_per_location:
+            images_per_day_per_location[day] = {}
+        if f.split("/")[1].lower() not in images_per_day_per_location[day]:
+            images_per_day_per_location[day][f.split("/")[1].lower()] = []
+        images_per_day_per_location[day][f.split("/")[1].lower()].append(f)
+    for day in images_per_day_per_location:
+        for location in images_per_day_per_location[day]:
+            print(f"{day}: {location}: {len(images_per_day_per_location[day][location])} images")
     # os.makedirs("tmp2", exist_ok=True)
     # for file in files[:20]:
     #     shutil.copy(Registry._registry_path(file), "tmp2/" + file.replace("/", "-"))
     
     # print(f"Checking {len(files)} files, like: {files[0]}")
-    checker = ArgoTentCheck(output_dir="output")
-    checker.run(files)
+    # checker = ArgoTentCheck(output_dir="output")
+    # checker.run(files)
 
 
 
