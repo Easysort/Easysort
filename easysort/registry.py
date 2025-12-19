@@ -14,6 +14,8 @@ from typing import Optional, Callable, Any
 import json
 import numpy as np
 import datetime
+from tqdm.contrib.concurrent import thread_map
+import time
 
 
 class RegistryBase:
@@ -22,7 +24,7 @@ class RegistryBase:
         os.makedirs(self.registry_path, exist_ok=True)
         self.projects = open(os.path.join(self.registry_path, "projects.txt")).read().splitlines() if os.path.exists(os.path.join(self.registry_path, "projects.txt")) else []
 
-    def SYNC(self) -> None: # with Supabase
+    def SYNC(self, allow_special_cleanup: bool = False) -> None: # with Supabase
         # Find all files in a bucket, download to registry
         supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         dirs, files, pbar = [Path(x["name"]) for x in supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET).list()], [], tqdm()
@@ -34,34 +36,35 @@ class RegistryBase:
             pbar.update(1)
         pbar.close()
 
-        missing_files = [file for file in files if not os.path.exists(os.path.join(self.registry_path, SUPABASE_DATA_REGISTRY_BUCKET, file))]
+        missing_files = [file for file in files if not os.path.exists(os.path.join(self.registry_path, SUPABASE_DATA_REGISTRY_BUCKET, file)) if ".jpg" not in str(file)]
         print("Missing files: ", len(missing_files), "out of", len(files))
-        for file in tqdm(missing_files, desc="Downloading missing files"): 
-            dst: Path = Path(self.registry_path) / Path(SUPABASE_DATA_REGISTRY_BUCKET) / file
+        with open("missing_files.txt", "w") as f:
+            for file in missing_files:
+                f.write(str(file) + "\n")
+
+        def _download_one(file: str):
+            dst = Path(self.registry_path) / SUPABASE_DATA_REGISTRY_BUCKET / Path(file)
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(supabase_client.storage.from_("argo").download(str(file)))
+
+        thread_map(_download_one, missing_files, desc="Downloading missing files", max_workers=max(os.cpu_count(), 4)) # else rate limited
+
         print("Checking health: ")
         assert self.is_healthy(), "Registry is not healthy"
         print("Sync complete")
 
         print("Cleanup videos older than 2 weeks")
+        files_to_delete = []
         for file in tqdm(files, desc="Cleanup videos"):
             file = str(file)
             year, month, day, hour, minute, second = file.split("/")[-5], file.split("/")[-4], file.split("/")[-3], file.split("/")[-1][:2], file.split("/")[-1][2:4], file.split("/")[-1][4:6]
             timestamp = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-            if timestamp < datetime.datetime.now() - datetime.timedelta(weeks=2):
-                supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET).remove(file)
-
-    def is_healthy(self, verbose: bool = True) -> bool:
-        devices = [dir for dir in os.listdir(os.path.join(self.registry_path, "argo")) if os.path.isdir(os.path.join(self.registry_path, "argo", dir))]
-        all_entries = self.LIST("argo")
-        for entry in all_entries: pass
-            # year, month, day, hour
-        is_healthy = True
-        for device in devices: pass
-
-        # print last entry for each device, check last entry no longer that 1 hour away in the time between 22 and 6
-        return True
+            if timestamp < datetime.datetime.now() - datetime.timedelta(weeks=2): files_to_delete.append(file)
+        print(f"Deleting {len(files_to_delete)} files" if len(files_to_delete) > 0 else "No files to delete")
+        if len(files_to_delete) == 0: return
+        for i in tqdm(range(0, len(files_to_delete), 100), desc="Deleting files"):
+            supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET).remove(files_to_delete[i:i+100])
+            time.sleep(1)
 
     def GET(self, key: str, loader: Optional[Callable[[bytes], Any]] = None) -> bytes: # TODO
         if loader is None: loader = {"json": json.load, "npy": np.load, "bytes": lambda x: x}[Path(key).suffix.lstrip(".")]
@@ -70,9 +73,7 @@ class RegistryBase:
 
     def LIST(self, prefix: Optional[str] = "", suffix: Optional[str] = ".mp4") -> list[str]:
         files = [os.path.join(root, file) for root, dirs, files in os.walk(Path(self.registry_path) / prefix) for file in files]
-        print(len(files))
         files = [file for file in files if file.endswith(suffix) and not file.startswith("._")]
-        print(len(files))
         return [self._unregistry_path(file) for file in files]
     
     def add_project(self, model: str, project: str) -> None: 
@@ -100,4 +101,4 @@ class RegistryBase:
 Registry = RegistryBase(REGISTRY_PATH)
 
 if __name__ == "__main__":
-    Registry.SYNC()
+    Registry.SYNC(allow_special_cleanup=True)

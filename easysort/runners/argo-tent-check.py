@@ -225,9 +225,13 @@ class ArgoTentCheck:
             self.check_video(video_path)
 
 if __name__ == "__main__":
+    # Registry.SYNC()
     files = Registry.LIST("argo")
-    files = list(Sort.since(files, datetime.datetime(2025, 11, 24, 0, 0, 0)))
-    files = list(Sort.before(files, datetime.datetime(2025, 11, 30, 23, 59, 59)))
+    files = list(Sort.since(files, datetime.datetime(2025, 12, 7, 23, 59, 59)))
+    files = list(Sort.before(files, datetime.datetime(2025, 12, 14, 23, 59, 59)))
+    print(len(files), "files")
+    files = [f for f in files if ".jpg" not in f]
+    print(len(files), "files")
     images_per_day_per_location = {}
     for f in files:
         day = datetime.datetime(int(f.split("/")[-5]), int(f.split("/")[-4]), int(f.split("/")[-3]))
@@ -239,13 +243,14 @@ if __name__ == "__main__":
     for day in images_per_day_per_location:
         for location in images_per_day_per_location[day]:
             print(f"{day}: {location}: {len(images_per_day_per_location[day][location])} images")
-    # os.makedirs("tmp2", exist_ok=True)
-    # for file in files[:20]:
-    #     shutil.copy(Registry._registry_path(file), "tmp2/" + file.replace("/", "-"))
+    folder_name = "dec7_14"
+    os.makedirs(folder_name, exist_ok=True)
+    for file in files:
+        shutil.copy(Registry._registry_path(file), folder_name + "/" + file.replace("/", "-"))
     
-    # print(f"Checking {len(files)} files, like: {files[0]}")
-    # checker = ArgoTentCheck(output_dir="output")
-    # checker.run(files)
+    print(f"Checking {len(files)} files, like: {files[0]}")
+    checker = ArgoTentCheck(output_dir=folder_name)
+    checker.run(files)
 
 
 

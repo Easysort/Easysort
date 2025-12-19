@@ -27,6 +27,7 @@ class Sampler:
     @staticmethod
     def unpack(video_path: Path|str, crop: Crop|str = None) -> list[np.ndarray]:
         if isinstance(video_path, str): video_path = Path(video_path)
+        if video_path.suffix == ".jpg": return [cv2.imread(video_path) if crop is None else cv2.imread(video_path)[crop.y:crop.y+crop.h, crop.x:crop.x+crop.w]]
         if crop == "auto": crop = DEVICE_TO_CROP[video_path.parts[-6]]
         cap = cv2.VideoCapture(Registry._registry_path(str(video_path)))
         if not cap.isOpened(): raise RuntimeError(f"Failed to open video: {video_path}")

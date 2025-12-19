@@ -55,7 +55,7 @@ class ArgoCounter:
         self.images = os.listdir(folder)
         self.people_images = sorted([folder + "/" + f for f in self.images if any(x in f for x in ["left", "right", "forward", "back", "unknown"]) and ".jpg" in f])
         print(self.people_images[0].split("-")[-4], self.people_images[0].split("-")[-3], self.people_images[0])
-        self.people_images = [f for f in self.people_images if f.split("-")[-4] == "11" and int(f.split("-")[-3]) > 24]
+        # self.people_images = [f for f in self.people_images if f.split("-")[-4] == "11" and int(f.split("-")[-3]) > 24]
         print(*self.people_images[:10], sep="\n")
         print("found", len(self.people_images), "people images")
     
@@ -72,7 +72,7 @@ class ArgoCounter:
         paths_2_copy = None
         for i in tqdm(range(len(sorted_meta_paths)-1)):
             meta_path_1 = sorted_meta_paths[i][0]
-            paths_1 = paths_2_copy if paths_2_copy is not None else sorted_meta_paths[i][1]
+            paths_1 = list(set(paths_2_copy)) if paths_2_copy is not None else sorted_meta_paths[i][1]
             meta_path_2, paths_2 = sorted_meta_paths[i+1]
             paths_2_copy = paths_2.copy()
             if "_".join(meta_path_1.split("_")[:-2]) != "_".join(meta_path_2.split("_")[:-2]): continue
@@ -250,7 +250,7 @@ class ArgoCounter:
 
 
 if __name__ == "__main__":
-    counter = ArgoCounter(folder="output")
+    counter = ArgoCounter(folder="dec7_14")
     # counter.check_duplicates()
     counter.call_gpt()
     # counter.show()
