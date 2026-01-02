@@ -2,6 +2,7 @@ from typing import ClassVar, overload, TypeVar, Any
 import functools, os
 from dotenv import load_dotenv
 import datetime
+from typing import Callable
 
 T = TypeVar("T")
 load_dotenv()
@@ -52,3 +53,8 @@ DATA_REGISTRY_PATH, RESULTS_REGISTRY_PATH, REGISTRY_PATH = getenv("DATA_REGISTRY
 SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET = getenv("SUPABASE_URL", ""), getenv("SUPABASE_KEY", ""), getenv("SUPABASE_DATA_REGISTRY_BUCKET", "")
 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET, AWS_REGION = getenv("AWS_ACCESS_KEY_ID", ""), getenv("AWS_SECRET_ACCESS_KEY", ""), getenv("AWS_S3_BUCKET", ""), getenv("AWS_REGION", "eu-north-1")
 OPENAI_API_KEY = getenv("OPENAI_API_KEY", "")
+
+class Concat:
+  @staticmethod
+  def weekly(videos: list[str], class_sorting_func: Callable[[str], str]) -> list[str]:
+    pass

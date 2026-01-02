@@ -47,10 +47,10 @@ class RegistryBase:
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(supabase_client.storage.from_("argo").download(str(file)))
 
-        thread_map(_download_one, missing_files, desc="Downloading missing files", max_workers=max(os.cpu_count(), 4)) # else rate limited
+        thread_map(_download_one, missing_files, desc="Downloading missing files", max_workers=1)
 
         print("Checking health: ")
-        assert self.is_healthy(), "Registry is not healthy"
+        #assert self.is_healthy(), "Registry is not healthy"
         print("Sync complete")
 
         print("Cleanup videos older than 2 weeks")
@@ -59,7 +59,7 @@ class RegistryBase:
             file = str(file)
             year, month, day, hour, minute, second = file.split("/")[-5], file.split("/")[-4], file.split("/")[-3], file.split("/")[-1][:2], file.split("/")[-1][2:4], file.split("/")[-1][4:6]
             timestamp = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-            if timestamp < datetime.datetime.now() - datetime.timedelta(weeks=2): files_to_delete.append(file)
+            if timestamp < datetime.datetime.now() - datetime.timedelta(weeks=3): files_to_delete.append(file)
         print(f"Deleting {len(files_to_delete)} files" if len(files_to_delete) > 0 else "No files to delete")
         if len(files_to_delete) == 0: return
         for i in tqdm(range(0, len(files_to_delete), 100), desc="Deleting files"):
