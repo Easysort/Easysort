@@ -5,52 +5,89 @@
 # - Remove supabase dependency
 # - Data registry and compute on same machine. Once that is no longer true, GET should return bytes, not path.
 
-from easysort.helpers import DATA_REGISTRY_PATH, SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET, RESULTS_REGISTRY_PATH, REGISTRY_PATH
+from easysort.helpers import REGISTRY_PATH, T, SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET
 from supabase import create_client, Client
+
 import os
 from pathlib import Path
 from tqdm import tqdm
-from typing import Optional, Callable, Any
+from typing import Optional, Callable, Any, Dict, List
 import json
-import numpy as np
-import datetime
 from tqdm.contrib.concurrent import thread_map
+from dataclasses import make_dataclass, dataclass, is_dataclass, asdict
+import pandas as pd
+import concurrent.futures
 import time
+from datetime import datetime
+
+DEFAULT_DETECTION_DATACLASS = make_dataclass("Detection", [("x1", float), ("y1", float), ("x2", float), ("y2", float), ("conf", float), ("cls", str)])
+DEFAULT_WASTE_DATACLASS = make_dataclass("WasteDetection", [("fraction", str), ("sub_fraction", str), ("purity", float), ("weight_kg", float), ("co2_kg", float)])
 
 
 class RegistryBase:
-    def __init__(self, registry_path: str): 
+    """
+    For POST and GET use one of the default types or your own dataclass. The name of the dataclass should be the same.
+    """
+    class DefaultTypes: # Or use your own dataclass
+        RESULT_PEOPLE = make_dataclass("RESULT_PEOPLE", [("frame_results", Dict[int, List[DEFAULT_DETECTION_DATACLASS]])])
+        RESULT_WASTE = make_dataclass("RESULT_WASTE", [("frame_results", Dict[int, List[DEFAULT_WASTE_DATACLASS]])])
+
+    def __init__(self, registry_path: Path): 
         self.registry_path = registry_path
-        os.makedirs(self.registry_path, exist_ok=True)
-        self.projects = open(os.path.join(self.registry_path, "projects.txt")).read().splitlines() if os.path.exists(os.path.join(self.registry_path, "projects.txt")) else []
+        # os.makedirs(self.registry_path, exist_ok=True)
+        #self.projects = open(os.path.join(self.registry_path, "projects.txt")).read().splitlines() if os.path.exists(os.path.join(self.registry_path, "projects.txt")) else []
 
-    def SYNC(self, allow_special_cleanup: bool = False) -> None: # with Supabase
-        # Find all files in a bucket, download to registry
+    def _check_path(self, key: Path, _type: T) -> Path:
+        assert isinstance(key, Path), f"Key {key} is not a Path, but a {type(key)}"
+        assert is_dataclass(_type) or _type in self.DefaultTypes, f"Type {_type} is not a dataclass, but a {type(_type)}"
+        return Path(self.registry_path / key.with_suffix("") / str(_type.__name__).lower()).with_suffix(".parquet")
+
+    def GET(self, key: Path, _type: T, throw_error: bool = True) -> Optional[T]:
+        path = self._check_path(key, _type)
+        if not path.is_file() and throw_error: raise FileNotFoundError(f"File {path} not found")
+        if not path.is_file() and not throw_error: return None
+        return _type(**pd.read_parquet(path).iloc[0].to_dict())
+
+    def POST(self, key: Path, data: T, _type: T, overwrite: bool = False) -> None:
+        path = self._check_path(key, _type)
+        assert isinstance(data, _type), f"Data {data} is not a {_type}"
+        assert not overwrite or not path.is_file(), f"File {key} already exists"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame([asdict(data)]).to_parquet(path)
+        with open(path.with_suffix(".schema.json"), "w") as f: json.dump(asdict(_type), f)
+
+    def LIST(self, prefix: Optional[str] = "", suffix: Optional[List[str] | str] = [".mp4", ".jpeg", ".jpg", ".png"], cond: Optional[Callable[[str], bool]] = None, return_all: bool = False) -> list[Path]:
+        files = [Path(os.path.join(root, file)) for root, _, files in os.walk(Path(self.registry_path) / prefix) for file in files]
+        files = [file for file in files if (file.suffix in list(suffix) if suffix else True) and not file.startswith("._")]
+        cond_files = [file for file in files if cond(file)] if cond else files
+        return [files, cond_files] if return_all else cond_files
+
+    def SYNC(self) -> None:
+        CONCURRENT_WORKERS = 3 # Depends on connection speed, supabase rate limit, so on. Currently 3 works fairly stable and fast
         supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        dirs, files, pbar = [Path(x["name"]) for x in supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET).list()], [], tqdm()
-        while len(dirs) > 0:
-            cur = dirs.pop(0)
-            paths = [x["name"] for x in supabase_client.storage.from_("argo").list(str(cur))]
-            dirs.extend([cur / Path(x) for x in paths if not "." in x])
-            files.extend([cur / Path(x) for x in paths if "." in x])
-            pbar.update(1)
-        pbar.close()
-
+        bucket = supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET)
+        dirs, files, pbar = [Path(x["name"]) for x in bucket.list()], [], tqdm()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENT_WORKERS) as executor:
+            while len(dirs) > 0:
+                future_to_dir = {executor.submit(bucket.list, str(d)): d for d in dirs}
+                for future in concurrent.futures.as_completed(future_to_dir):
+                    cur = future_to_dir[future]
+                    dirs.remove(cur)
+                    paths = [x["name"] for x in future.result()]
+                    dirs.extend([cur / Path(x) for x in paths if not "." in x])
+                    files.extend([cur / Path(x) for x in paths if "." in x])
+                    pbar.update(1)
+            pbar.close()
+        
         missing_files = [file for file in files if not os.path.exists(os.path.join(self.registry_path, SUPABASE_DATA_REGISTRY_BUCKET, file)) if ".jpg" not in str(file)]
         print("Missing files: ", len(missing_files), "out of", len(files))
-        with open("missing_files.txt", "w") as f:
-            for file in missing_files:
-                f.write(str(file) + "\n")
 
         def _download_one(file: str):
             dst = Path(self.registry_path) / SUPABASE_DATA_REGISTRY_BUCKET / Path(file)
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(supabase_client.storage.from_("argo").download(str(file)))
 
-        thread_map(_download_one, missing_files, desc="Downloading missing files", max_workers=1)
-
-        print("Checking health: ")
-        #assert self.is_healthy(), "Registry is not healthy"
+        thread_map(_download_one, missing_files, desc="Downloading missing files", max_workers=CONCURRENT_WORKERS)
         print("Sync complete")
 
         print("Cleanup videos older than 2 weeks")
@@ -66,39 +103,12 @@ class RegistryBase:
             supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET).remove(files_to_delete[i:i+100])
             time.sleep(1)
 
-    def GET(self, key: str, loader: Optional[Callable[[bytes], Any]] = None) -> bytes: # TODO
-        if loader is None: loader = {"json": json.load, "npy": np.load, "bytes": lambda x: x}[Path(key).suffix.lstrip(".")]
-        assert self.EXISTS(key), f"File {key} not found"
-        return loader(open(Path(self.registry_path, key), "rb").read())
 
-    def LIST(self, prefix: Optional[str] = "", suffix: Optional[str] = ".mp4") -> list[str]:
-        files = [os.path.join(root, file) for root, dirs, files in os.walk(Path(self.registry_path) / prefix) for file in files]
-        files = [file for file in files if file.endswith(suffix) and not file.startswith("._")]
-        return [self._unregistry_path(file) for file in files]
-    
-    def add_project(self, model: str, project: str) -> None: 
-        if os.path.join(model, project) in self.projects: return
-        self.projects = sorted(list(set(self.projects + [os.path.join(model, project)])))
-        open(os.path.join(self.registry_path, "projects.txt"), "w").write("\n".join(self.projects))
+    def EXISTS(self, key: Path, _type: T) -> bool: return self._check_path(key, _type).is_file()
 
-    def construct_path(self, path: str, model: str, project: str, identifier: str) -> str: 
-        self.add_project(model, project)
-        return os.path.join(str(Path(path).with_suffix("")), model, project, identifier)
-
-    def _registry_path(self, path: str) -> str: return os.path.join(self.registry_path, path)
-    def _unregistry_path(self, path: str|Path) -> str: return str(path).replace(self.registry_path, "").lstrip("/")
-
-    def POST(self, key: str, data: dict|bytes|np.ndarray|list) -> None: 
-        os.makedirs(self._registry_path(str(Path(key).with_suffix(""))), exist_ok=True)
-        {dict: self._post_json, list: self._post_json, bytes: self._post_bytes, np.ndarray: self._post_numpy}[type(data)](Path(key).with_suffix(""), data)
-
-    def _post_json(self, key: str, data: dict) -> None: json.dump(data, open(Path(os.path.join(self.registry_path, key)).with_suffix(".json"), "w"))
-    def _post_bytes(self, key: str, data: bytes) -> None: open(Path(os.path.join(self.registry_path, key)).with_suffix(".bytes"), "wb").write(data)
-    def _post_numpy(self, key: str, data: np.ndarray) -> None: np.save(Path(os.path.join(self.registry_path, key)).with_suffix(".npy"), data)
-
-    def EXISTS(self, key: str) -> bool: return Path(self._registry_path(key)).is_file() or Path(self._registry_path(key)).is_dir()
 
 Registry = RegistryBase(REGISTRY_PATH)
 
 if __name__ == "__main__":
     Registry.SYNC(allow_special_cleanup=True)
+

@@ -17,10 +17,11 @@ nav:
     - Waste Landscape: why/landscape.md
     - Market Players: why/competitors.md
     - Industry Funding: why/funding.md
-
   - THE SOLUTION:
     - products/index.md
     - What we offer: products/products.md
+  - EASYSORT CODEBASE:
+    - codebase/index.md
   - CONTRIBUTING:
     - How to contribute: contributing/index.md
     - Our projects: contributing/projects.md
