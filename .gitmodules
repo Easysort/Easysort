@@ -1,0 +1,3 @@
+[submodule "Easyprod"]
+	path = Easyprod
+	url = git@github.com:Easysort/Easyprod.git
