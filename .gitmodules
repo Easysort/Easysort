@@ -1,3 +1,3 @@
-[submodule "easyprod"]
-	path = easyprod
+[submodule "Easyprod"]
+	path = Easyprod
 	url = git@github.com:Easysort/Easyprod.git

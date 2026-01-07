@@ -12,6 +12,9 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 import cv2
 
+class Runner:
+    pass
+
 class GPTTrainer:
     def __init__(self, model: str = "gpt-5-2025-08-07"):
         self.openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
