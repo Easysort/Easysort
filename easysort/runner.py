@@ -1,4 +1,51 @@
 
+import openai
+from easysort.helpers import OPENAI_API_KEY
+from typing import List, Callable
+from dataclasses import dataclass
+import json
+from pathlib import Path
+import base64
+from ultralytics import YOLO
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
+from easysort.sampler import Crop, Sampler
+from easysort import registry
+import cv2
+
 
 class Runner:
-    pass
+    def __init__(self, model: str = "gpt-5-mini-2025-08-07"):
+        self.openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        self.openai_client.models.list() # breaks if api key is invalid
+        self.model = model
+    
+    def gpt(self, videos_missing_results: List[Path], output_schema: dataclass, task_prompt: str = "", model: str = "", max_workers: int = 10):
+    #def _openai_call(self, model: str, prompt: str, image_paths: List[List[np.ndarray]], output_schema: dataclass, max_workers: int = 10) -> List[dataclass]:
+        def process_single(image_arrays):
+            images_b64 = [base64.b64encode(cv2.imencode('.jpg', img_array)[1].tobytes()).decode("utf-8") for img_array in image_arrays]
+            full_prompt = f"{task_prompt}\nReturn only a json with the following keys and types: {output_schema.__annotations__}"
+            content = [{"type": "text", "text": full_prompt}] + [{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}} for img_b64 in images_b64]
+            response = self.openai_client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], response_format={"type": "json_object"}, timeout=90,)
+            return output_schema(**json.loads(response.choices[0].message.content))
+        image_paths = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(tqdm(executor.map(process_single, image_paths), total=len(image_paths), desc="OpenAI calls"))
+        return results
+    
+    def yolo(self, model_path: str, videos_missing_results: List[Path], crop_index_func: Callable[[Path], Crop], classes: List[int]):
+        for video_path in videos_missing_results:
+            crop = crop_index_func(video_path)
+            frames = Sampler.unpack(video_path, crop=crop)
+            results = self.model(frames, classes=classes)
+
+
+
+        model = YOLO(model_path)
+        pass
+
+
+
+# Runner.yolo("yolov8m.pt", videos_missing_results, crop_index_func, "people")
+# Runner.gpt(videos_missing_results, answer_dataclass)

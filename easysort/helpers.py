@@ -2,8 +2,10 @@ from typing import ClassVar, overload, TypeVar, Any
 import functools, os
 from dotenv import load_dotenv
 import datetime
-from typing import Callable
+from typing import Callable, Generator
 from pathlib import Path
+import numpy as np
+from PIL import Image
 
 T = TypeVar("T")
 load_dotenv()
@@ -28,34 +30,32 @@ class ContextVar:
     def __gt__(self, x): return self.value > x
     def __lt__(self, x): return self.value < x
 
-class Sort:
+class Sort: # Expects paths like: ../2025/12/10/08/photo_20251210T082225Z.jpg
     @staticmethod
-    def since(data: list[str], date: datetime.datetime) -> list[str]:
+    def after(data: list[Path], date: datetime.datetime) -> Generator[Path, None, None]:
       for item in data:
-        elements = item.split("/")
-        year, month, day = elements[-5], elements[-4], elements[-3]
-        if datetime.datetime(int(year), int(month), int(day)) >= date:
-          yield item
+        year, month, day, hour, minute, second = item.parts[-5], item.parts[-4], item.parts[-3], item.parts[-1][:2], item.parts[-1][2:4], item.parts[-1][4:6]
+        if datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second)) > date: yield item
 
     @staticmethod
-    def before(data: list[str], date: datetime.datetime) -> list[str]:
+    def before(data: list[Path], date: datetime.datetime) -> Generator[Path, None, None]:
       for item in data:
-        elements = item.split("/")
-        year, month, day = elements[-5], elements[-4], elements[-3]
-        if datetime.datetime(int(year), int(month), int(day)) < date:
-          yield item
-
-    @staticmethod
-    def unique_frames(frames): pass
+        year, month, day, hour, minute, second = item.parts[-5], item.parts[-4], item.parts[-3], item.parts[-1][:2], item.parts[-1][2:4], item.parts[-1][4:6]
+        if datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second)) < date: yield item
 
 
-DEBUG = ContextVar("DEBUG", 0)
+DEBUG, TESTING = ContextVar("DEBUG", 0), ContextVar("TESTING", 0)
 DATA_REGISTRY_PATH, RESULTS_REGISTRY_PATH, REGISTRY_PATH = getenv("DATA_REGISTRY_PATH", Path("")), getenv("RESULTS_REGISTRY_PATH", Path("")), getenv("REGISTRY_PATH", Path(""))
 SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET = getenv("SUPABASE_URL", ""), getenv("SUPABASE_KEY", ""), getenv("SUPABASE_DATA_REGISTRY_BUCKET", "")
 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET, AWS_REGION = getenv("AWS_ACCESS_KEY_ID", ""), getenv("AWS_SECRET_ACCESS_KEY", ""), getenv("AWS_S3_BUCKET", ""), getenv("AWS_REGION", "eu-north-1")
 OPENAI_API_KEY = getenv("OPENAI_API_KEY", "")
 
+REGISTRY_REFERENCE_TYPES = (np.ndarray, dict, Image.Image)
+
 class Concat:
   @staticmethod
   def weekly(videos: list[str], class_sorting_func: Callable[[str], str]) -> list[str]:
     pass
+
+
+# weekly_results = Concat.weekly(all_videos, class_sorting_func)
