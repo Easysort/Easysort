@@ -30,3 +30,8 @@ package = true
 
 [tool.setuptools]
 packages = ["easysort"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.10",
+]
