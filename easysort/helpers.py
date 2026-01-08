@@ -6,6 +6,7 @@ from typing import Callable, Generator
 from pathlib import Path
 import numpy as np
 from PIL import Image
+import json
 
 T = TypeVar("T")
 load_dotenv()
@@ -44,13 +45,31 @@ class Sort: # Expects paths like: ../2025/12/10/08/photo_20251210T082225Z.jpg
         if datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second)) < date: yield item
 
 
-DEBUG, TESTING = ContextVar("DEBUG", 0), ContextVar("TESTING", 0)
+DEBUG = ContextVar("DEBUG", 0)
 DATA_REGISTRY_PATH, RESULTS_REGISTRY_PATH, REGISTRY_PATH = getenv("DATA_REGISTRY_PATH", Path("")), getenv("RESULTS_REGISTRY_PATH", Path("")), getenv("REGISTRY_PATH", Path(""))
 SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET = getenv("SUPABASE_URL", ""), getenv("SUPABASE_KEY", ""), getenv("SUPABASE_DATA_REGISTRY_BUCKET", "")
 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET, AWS_REGION = getenv("AWS_ACCESS_KEY_ID", ""), getenv("AWS_SECRET_ACCESS_KEY", ""), getenv("AWS_S3_BUCKET", ""), getenv("AWS_REGION", "eu-north-1")
 OPENAI_API_KEY = getenv("OPENAI_API_KEY", "")
 
-REGISTRY_REFERENCE_TYPES = (np.ndarray, dict, Image.Image)
+REGISTRY_REFERENCE_SUFFIXES = (".json", ".npy", ".png", ".jpg", ".jpeg")
+REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE = {
+  ".json": dict, ".npy": np.ndarray, ".png": Image.Image, ".jpg": Image.Image, ".jpeg": Image.Image}
+REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH = {
+  ".json": lambda path, _dict: json.dump(_dict, open(path, "w", encoding="utf-8")),
+  ".npy": lambda path, array: np.save(path, array),
+  ".png": lambda path, image: image.save(path, format="PNG"),
+  ".jpg": lambda path, image: image.save(path, format="JPEG"),
+  ".jpeg": lambda path, image: image.save(path, format="JPEG")
+}
+REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH = {
+  ".json": lambda path: json.load(open(path, "r", encoding="utf-8")),
+  ".npy": lambda path: np.load(path),
+  ".png": lambda path: Image.open(path),
+  ".jpg": lambda path: Image.open(path),
+  ".jpeg": lambda path: Image.open(path),
+}
+
+def current_timestamp() -> str: return datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
 
 class Concat:
   @staticmethod

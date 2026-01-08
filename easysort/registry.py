@@ -5,7 +5,8 @@
 # - Remove supabase dependency
 # - Data registry and compute on same machine. Once that is no longer true, GET should return bytes, not path.
 
-from easysort.helpers import REGISTRY_PATH, T, SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET, TESTING, REGISTRY_REFERENCE_TYPES
+from easysort.helpers import REGISTRY_PATH, T, SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET, REGISTRY_REFERENCE_SUFFIXES, \
+    REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH, REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE
 from supabase import create_client, Client
 
 import os
@@ -15,6 +16,7 @@ from typing import Optional, Callable, Dict, List, Any
 import json
 from tqdm.contrib.concurrent import thread_map
 from dataclasses import make_dataclass, dataclass, is_dataclass, asdict, fields
+from dacite import from_dict, Config
 import pandas as pd
 import concurrent.futures
 import time
@@ -32,24 +34,40 @@ class RegistryBase:
     You can make your own dataclass by inheriting from RegistryBase.DefaultTypes.BASECLASS.
     You are welcome to use the Default Metadata class or use your own.
     You should never change any of the DefaultTypes. If you absolutely must, then make sure your registry is empty.
-    """    
-    class DefaultTypes: # Or use your own dataclass by inheriting from BASECLASS
-        ORIGINAL_MARKER = make_dataclass("OriginalMarker", [("OriginalMarker", Any)]) # To get the original video/image/json/etc.
 
+    DefaultTypes will create ids and refer to them by themselves.
+    When you add a new dataclass as a type, you must first create an id with .get_id and set the default value in the dataclass to that value.
+
+    The reason we have ids is to make sure the intent of the dataclass is used and from that allow it to evolve.
+    If you evolve a dataclass, you will get an error stating you need to port the old dataclass to the new one.
+    In this way, you can trust all your 
+    If you are not able to port, you can decide to force an update, meaning all your old data will be forgotten.
+    If you want to save multiple version with the same intent, rename your dataclass and generate a new id.
+    """    
+    class BaseDefaultTypes:
         BASECLASS = make_dataclass("BaseClass", [("id", str)])
-        METADATA_CLASS = make_dataclass("MetaClass", [("model", str), ("created_at", datetime.datetime)])
+        BASEMETADATA = make_dataclass("MetaClass", [("model", str), ("created_at", str)])
         DEFAULT_DETECTION_DATACLASS = make_dataclass("Detection", [("x1", float), ("y1", float), ("x2", float), ("y2", float), ("conf", float), ("cls", str)])
         DEFAULT_WASTE_DATACLASS = make_dataclass("WasteDetection", [("fraction", str), ("sub_fraction", str), ("purity", float), ("weight_kg", float), ("co2_kg", float)])
-        RESULT_PEOPLE = make_dataclass("RESULT_PEOPLE", [("metadata", METADATA_CLASS), ("frame_results", Dict[int, List["RegistryBase.DefaultTypes.DEFAULT_DETECTION_DATACLASS"]])], bases=(BASECLASS,))
-        RESULT_WASTE = make_dataclass("RESULT_WASTE", [("metadata", METADATA_CLASS), ("frame_results", Dict[int, List["RegistryBase.DefaultTypes.DEFAULT_WASTE_DATACLASS"]])], bases=(BASECLASS,))
+
+    class DefaultTypes: # Or use your own dataclass by inheriting from BASECLASS and BASEMETADATA
+        ORIGINAL_MARKER = make_dataclass("OriginalMarker", [("OriginalMarker", Any)]) # To interact with the original video/image/json/etc.
+        # Final Result types needs BaseClass and BaseMetaClass, so they're updated and defined after RegistryBase Ends
+        RESULT_PEOPLE = ...
+        RESULT_WASTE = ...
         # RESULT_YOLOS = make_dataclass("RESULT_YOLOS", [("metadata", META_CLASS), ("frame_results", ...)])
+
+        @classmethod
+        def list(cls): return [_type for name, _type in vars(cls).items() if is_dataclass(_type)]
 
     def __init__(self, registry_path: Path): 
         self.registry_path = registry_path
         self._hash_lookup = json.load(open(self.registry_path / ".hash_lookup.json", "r", encoding="utf-8")) if os.path.exists(self.registry_path / ".hash_lookup.json") else {}
+        for _type in self.DefaultTypes.list(): self._update_hash_lookup(self.get_id(_type), self._hash(_type))
         os.makedirs(self.registry_path, exist_ok=True)
 
     def _delete_hash(self, id: str, hash: str) -> None:
+        assert id in self._hash_lookup, "The id you're trying to delete is not in the hash lookup. Make sure you the pair you are trying to delete is correct."
         assert self._hash_lookup[id] == hash, "The id you're trying to delete does not match with the expected hash. Make sure you the pair you are trying to delete is correct."
         del self._hash_lookup[id]
         with open(self.registry_path / ".hash_lookup.json", "w", encoding="utf-8") as f: json.dump(self._hash_lookup, f, indent=4)
@@ -60,46 +78,63 @@ class RegistryBase:
         return id
 
     def _hash(self, _type: T) -> str:
+        assert is_dataclass(_type), f"Type must be a dataclass, but is {type(_type)}"
         structure = str([(f.name, str(f.type)) for f in fields(_type)])
         return hashlib.sha256(structure.encode()).hexdigest()
 
+    def _convert_int_keys(self, data):
+        if isinstance(data, dict): return {int(k) if isinstance(k, str) and k.lstrip('-').isdigit() else k: self._convert_int_keys(v) for k, v in data.items()}
+        if isinstance(data, list): return [self._convert_int_keys(item) for item in data]
+        return data
+
     def _construct_path(self, key: Path, _type: T) -> Path:
         assert isinstance(key, Path), f"Key {key} is not a Path, but a {type(key)}"
-        assert is_dataclass(_type) or _type in self.DefaultTypes, f"Type {_type} is not a dataclass, but a {type(_type)}"
-        assert self._hash(_type) in self._hash_lookup, f"Hash {self._hash(_type)} not found in hash lookup. You either made a mistake in the dataclass id or "
-        id_value = next((f.default_factory() for f in fields(_type) if f.name == "id"), None)
-        assert id_value is not None, f"Type {_type} does not have a default id value"
+        assert _type is self.DefaultTypes.ORIGINAL_MARKER or (self.registry_path / key).exists(), f"Original marker {key} does not exist"
+        if _type is self.DefaultTypes.ORIGINAL_MARKER: return Path(self.registry_path / key) # TODO: Automatic Suffix?
+        assert is_dataclass(_type) or _type in self.DefaultTypes.list(), f"Type {_type} is not a dataclass, but a {type(_type)}"
+        assert self._hash(_type) in self._hash_lookup.values(), f"Hash {self._hash(_type)} not found in hash lookup. Check your id is correct using: .get_id(_type)"
+        if _type in self.DefaultTypes.list(): id_value = next((k for k, v in self._hash_lookup.items() if v == self._hash(_type)), None)# Allow reverse ID detection for static default types
+        else: id_value = next((f.default_factory() for f in fields(_type) if f.name == "id"), None)
+        assert id_value is not None or len(id_value) == 0, f"Type {_type} does not have a default id value or default id value is 0"
         return Path(self.registry_path / key.with_suffix("") / self._hash_lookup[id_value]).with_suffix(".parquet")
 
-    def get_new_id(self, _type: T) -> str: 
+    def get_id(self, _type: T) -> str: 
         assert is_dataclass(_type), f"Type {_type} is not a dataclass, but a {type(_type)}"
-        assert any(f.name == "metadata" for f in fields(_type)) and any(f.name == "id" for f in fields(_type)), f"Type {_type} does not have a metaclass and/or id field. Make sure to inherit from BASECLASS and have metadata."
+        assert _type is self.DefaultTypes.ORIGINAL_MARKER or (any(f.name == "metadata" for f in fields(_type)) and any(f.name == "id" for f in fields(_type))), f"Type {_type} does not have a metaclass and/or id field, but the following fields: {fields(_type)}"
         if (k := next((k for k, v in self._hash_lookup.items() if v == self._hash(_type)), None)): return k
         return self._update_hash_lookup(str(uuid4()), self._hash(_type))
-
+    
     def GET(self, key: Path, _type: T, throw_error: bool = True, ref: Optional[Path] = None) -> Optional[T]:
-        """
+        f"""
         If ref is provided, then the loaded data from the reference file will be returned.
-
+        The supported reference types are: {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()}. In these cases, you do not need to provide a conversion function.
+        You can save and load your own types. In these cases, you need to provide a conversion function to convert to and from bytes.
         """
         path = self._construct_path(key, _type)
         if not path.is_file() and throw_error: raise FileNotFoundError(f"File {path} not found")
         if not path.is_file() and not throw_error: return None
-        return _type(**pd.read_parquet(path).iloc[0].to_dict())
+        if _type is self.DefaultTypes.ORIGINAL_MARKER: return REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[key.suffix](path)
+        data = REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[key.suffix](path)
+        return from_dict(data_class=_type, data=self._convert_int_keys(data), config=Config(check_types=False)) if is_dataclass(_type) else data
 
-
-    def POST(self, key: Path, data: T, _type: T, overwrite: bool = False, refs: Optional[Dict[str | Path, REGISTRY_REFERENCE_TYPES]] = None) -> None:
+    def POST(self, key: Path, data: T, _type: T, overwrite: bool = False, refs: Optional[Dict[str | Path, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()]] = {}) -> None:
         path = self._construct_path(key, _type)
-        assert all(isinstance(ref, (np.ndarray, dict, Path)) for ref in refs.values()), f"Refs {refs} are not a dict of numpy arrays, json objects or paths"
-        assert isinstance(data, _type), f"Data {data} is not a {_type}"
-        assert not overwrite or not path.is_file(), f"File {key} already exists"
+        assert all(isinstance(ref, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[ref.suffix]) for ref in refs.values() if refs is not None), f"Refs {refs} are not a dict of {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()}"
+        assert isinstance(data, _type) or _type is self.DefaultTypes.ORIGINAL_MARKER, f"Data {data} is not a {_type}"
+        assert not path.is_file() or overwrite, f"File {key} already exists, and you chose to not overwrite"
+        assert _type is not self.DefaultTypes.ORIGINAL_MARKER or (key.suffix in REGISTRY_REFERENCE_SUFFIXES and isinstance(data, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[key.suffix])), \
+            f"Original marker {key} must have a supported suffix: {REGISTRY_REFERENCE_SUFFIXES} and data must be a {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[key.suffix]}. Received {type(data)} with suffix {key.suffix}"
         path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame([asdict(data)]).to_parquet(path)
-        with open(path.with_suffix(".schema.json"), "w") as f: json.dump(asdict(_type), f)
+        if _type is self.DefaultTypes.ORIGINAL_MARKER: REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[key.suffix](path, data)
+        else: 
+            data = asdict(data) if is_dataclass(data) else data
+            REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[key.suffix](path, data)
+            if is_dataclass(_type): 
+                with open(path.with_suffix(".schema.json"), "w") as f: json.dump({f.name: str(f.type) for f in fields(_type)}, f)
 
-    def LIST(self, prefix: Optional[str] = "", suffix: Optional[List[str] | str] = [".mp4", ".jpeg", ".jpg", ".png"], cond: Optional[Callable[[str], bool]] = None, return_all: bool = False) -> list[Path]:
+    def LIST(self, prefix: Optional[str] = "", suffix: Optional[List[str] | str] = REGISTRY_REFERENCE_SUFFIXES, cond: Optional[Callable[[str], bool]] = None, return_all: bool = False) -> list[Path]:
         files = [Path(os.path.join(root, file)) for root, _, files in tqdm(os.walk(Path(self.registry_path) / prefix), desc="Listing files") for file in files]
-        files = [file for file in files if (file.suffix in list(suffix) if suffix else True) and not str(file).startswith("._")]
+        files = [file for file in files if (file.suffix in list(suffix) if suffix else True) and not file.name.startswith("._")]
         cond_files = [file for file in tqdm(files, desc="Filtering files") if cond(file)] if cond else files
         return [files, cond_files] if return_all else cond_files
 
@@ -155,6 +190,9 @@ class RegistryBase:
     def EXPECT(self):
         # Potentially a EXPECT lazily generating missing results by returning list of bool, then using a specified func to generate results.
         pass
+
+RegistryBase.DefaultTypes.RESULT_PEOPLE = make_dataclass("RESULT_PEOPLE", [("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA), ("frame_results", Dict[int, List["RegistryBase.BaseDefaultTypes.DEFAULT_DETECTION_DATACLASS"]])], bases=(RegistryBase.BaseDefaultTypes.BASECLASS,))
+RegistryBase.DefaultTypes.RESULT_WASTE = make_dataclass("RESULT_WASTE", [("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA), ("frame_results", Dict[int, List["RegistryBase.BaseDefaultTypes.DEFAULT_WASTE_DATACLASS"]])], bases=(RegistryBase.BaseDefaultTypes.BASECLASS,))
 
 
 Registry = RegistryBase(REGISTRY_PATH)
