@@ -62,9 +62,9 @@ class RegistryBase:
 
     def __init__(self, registry_path: Path): 
         self.registry_path = registry_path
+        os.makedirs(self.registry_path, exist_ok=True)
         self._hash_lookup = json.load(open(self.registry_path / ".hash_lookup.json", "r", encoding="utf-8")) if os.path.exists(self.registry_path / ".hash_lookup.json") else {}
         for _type in self.DefaultTypes.list(): self._update_hash_lookup(self.get_id(_type), self._hash(_type))
-        os.makedirs(self.registry_path, exist_ok=True)
 
     def _delete_hash(self, id: str, hash: str) -> None:
         assert id in self._hash_lookup, "The id you're trying to delete is not in the hash lookup. Make sure you the pair you are trying to delete is correct."
