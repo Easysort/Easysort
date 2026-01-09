@@ -78,21 +78,57 @@ class TestRegistry(unittest.TestCase):
         assert len(registry_list) == 3, f"The list should have 3 items (2 objects + .hash_lookup.json), but has {len(registry_list)}"
         assert all(isinstance(item, Path) for item in registry_list), "The list should contain Path objects"
 
-    def test_POST_reference_types(self):
-        pass
+    def test_POST_GET_with_refs(self):
+        # Setup: create original marker first
+        self.registry.POST(Path("video.json"), {"src": "test"}, self.registry.DefaultTypes.ORIGINAL_MARKER)
+        
+        # Post result with refs (image + json metadata)
+        ref_image = Image.new("RGB", (50, 50), color=(0, 255, 0))
+        ref_json = {"extra": "metadata"}
+        result = self.registry.DefaultTypes.RESULT_PEOPLE(
+            id=self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE),
+            metadata=self.registry.BaseDefaultTypes.BASEMETADATA(model="test", created_at=current_timestamp()),
+            frame_results={0: []})
+        self.registry.POST(Path("video.json"), result, self.registry.DefaultTypes.RESULT_PEOPLE, 
+                          refs={Path("thumb.png"): ref_image, Path("meta.json"): ref_json})
+        
+        # GET refs back
+        loaded_image = self.registry.GET(Path("video.json"), ref=Path("thumb.png"))
+        loaded_json = self.registry.GET(Path("video.json"), ref=Path("meta.json"))
+        assert np.array_equal(np.array(loaded_image), np.array(ref_image))
+        assert loaded_json == ref_json
 
-    def test_POST_bad_reference_types(self):
-        pass
-        # self.assertRaises(AssertionError, self.registry.POST, Path("test.json"), {"test": "test"}, self.registry.DefaultTypes.ORIGINAL_MARKER)
+    def test_GET_ref_not_found(self):
+        self.registry.POST(Path("test.json"), {"x": 1}, self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.assertRaises(FileNotFoundError, self.registry.GET, Path("test.json"), ref=Path("nonexistent.png"))
 
-    def test_POST_incorrect_reference_path(self):
-        pass
+    def test_DELETE_type(self):
+        # Create original + result
+        self.registry.POST(Path("test.json"), {"x": 1}, self.registry.DefaultTypes.ORIGINAL_MARKER)
+        result = self.registry.DefaultTypes.RESULT_PEOPLE(
+            id=self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE),
+            metadata=self.registry.BaseDefaultTypes.BASEMETADATA(model="m", created_at="t"), frame_results={})
+        self.registry.POST(Path("test.json"), result, self.registry.DefaultTypes.RESULT_PEOPLE)
+        
+        # Delete only the result type
+        self.registry.DELETE(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
+        assert not self.registry.EXISTS(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
+        assert self.registry.EXISTS(Path("test.json"), self.registry.DefaultTypes.ORIGINAL_MARKER)
 
-    def test_GET_reference(self):
-        pass
-
-    def test_GET_incorrect_reference_path(self):
-        pass
+    def test_DELETE_original_deletes_all(self):
+        # Create original + result + refs
+        self.registry.POST(Path("vid.json"), {"x": 1}, self.registry.DefaultTypes.ORIGINAL_MARKER)
+        result = self.registry.DefaultTypes.RESULT_PEOPLE(
+            id=self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE),
+            metadata=self.registry.BaseDefaultTypes.BASEMETADATA(model="m", created_at="t"), frame_results={})
+        self.registry.POST(Path("vid.json"), result, self.registry.DefaultTypes.RESULT_PEOPLE,
+                          refs={Path("thumb.png"): Image.new("RGB", (10, 10))})
+        
+        # Delete original marker - should delete everything
+        self.registry.DELETE(Path("vid.json"), self.registry.DefaultTypes.ORIGINAL_MARKER)
+        assert not self.registry.EXISTS(Path("vid.json"), self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.assertRaises(AssertionError, self.registry.EXISTS, Path("vid.json"), self.registry.DefaultTypes.RESULT_PEOPLE) # Should fail as original marker is deleted
+        assert not self.registry._get_ref_path(Path("vid.json"), Path("thumb.png")).exists()
 
     def test_construct_path(self):
         id1 = self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE)

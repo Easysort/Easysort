@@ -15,16 +15,14 @@ from tqdm import tqdm
 from typing import Optional, Callable, Dict, List, Any
 import json
 from tqdm.contrib.concurrent import thread_map
-from dataclasses import make_dataclass, dataclass, is_dataclass, asdict, fields
+from dataclasses import make_dataclass, is_dataclass, asdict, fields
 from dacite import from_dict, Config
-import pandas as pd
 import concurrent.futures
 import time
 import datetime
 from uuid import uuid4
 import hashlib
-import numpy as np
-from PIL import Image
+import shutil
 
 
 class RegistryBase:
@@ -87,7 +85,13 @@ class RegistryBase:
         if isinstance(data, list): return [self._convert_int_keys(item) for item in data]
         return data
 
+    def _get_ref_path(self, key: Path, ref: Path) -> Path: 
+        path = self.registry_path / key.with_suffix("") / "refs" / ref
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
     def _construct_path(self, key: Path, _type: T) -> Path:
+        if isinstance(key, str): key = Path(key)
         assert isinstance(key, Path), f"Key {key} is not a Path, but a {type(key)}"
         assert _type is self.DefaultTypes.ORIGINAL_MARKER or (self.registry_path / key).exists(), f"Original marker {key} does not exist"
         if _type is self.DefaultTypes.ORIGINAL_MARKER: return Path(self.registry_path / key) # TODO: Automatic Suffix?
@@ -96,7 +100,7 @@ class RegistryBase:
         if _type in self.DefaultTypes.list(): id_value = next((k for k, v in self._hash_lookup.items() if v == self._hash(_type)), None)# Allow reverse ID detection for static default types
         else: id_value = next((f.default_factory() for f in fields(_type) if f.name == "id"), None)
         assert id_value is not None or len(id_value) == 0, f"Type {_type} does not have a default id value or default id value is 0"
-        return Path(self.registry_path / key.with_suffix("") / self._hash_lookup[id_value]).with_suffix(".parquet")
+        return Path(self.registry_path / key.with_suffix("") / self._hash_lookup[id_value]).with_suffix(".json")
 
     def get_id(self, _type: T) -> str: 
         assert is_dataclass(_type), f"Type {_type} is not a dataclass, but a {type(_type)}"
@@ -104,22 +108,30 @@ class RegistryBase:
         if (k := next((k for k, v in self._hash_lookup.items() if v == self._hash(_type)), None)): return k
         return self._update_hash_lookup(str(uuid4()), self._hash(_type))
     
-    def GET(self, key: Path, _type: T, throw_error: bool = True, ref: Optional[Path] = None) -> Optional[T]:
+    def GET(self, key: Path, _type: Optional[T] = None, throw_error: bool = True, ref: Optional[Path] = None) -> Optional[T]:
         f"""
         If ref is provided, then the loaded data from the reference file will be returned.
         The supported reference types are: {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()}. In these cases, you do not need to provide a conversion function.
         You can save and load your own types. In these cases, you need to provide a conversion function to convert to and from bytes.
+        If ref is provided, _type will be ignored.
         """
+        if ref is not None: return self._get_ref(key, ref)
         path = self._construct_path(key, _type)
         if not path.is_file() and throw_error: raise FileNotFoundError(f"File {path} not found")
         if not path.is_file() and not throw_error: return None
         if _type is self.DefaultTypes.ORIGINAL_MARKER: return REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[key.suffix](path)
         data = REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[key.suffix](path)
         return from_dict(data_class=_type, data=self._convert_int_keys(data), config=Config(check_types=False)) if is_dataclass(_type) else data
+    
+    def _get_ref(self, key: Path, ref: Path) -> REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys():
+        assert ref.suffix in REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys(), f"Ref {ref} must have a supported suffix: {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()}"
+        ref_path = self._get_ref_path(key, ref)
+        if not ref_path.is_file(): raise FileNotFoundError(f"Ref {ref} not found")
+        return REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[ref.suffix](ref_path)
 
     def POST(self, key: Path, data: T, _type: T, overwrite: bool = False, refs: Optional[Dict[str | Path, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()]] = {}) -> None:
         path = self._construct_path(key, _type)
-        assert all(isinstance(ref, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[ref.suffix]) for ref in refs.values() if refs is not None), f"Refs {refs} are not a dict of {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()}"
+        assert all(isinstance(ref_data, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[ref_path.suffix]) for ref_path, ref_data in refs.items() if refs is not None), f"Refs {refs} are not a dict of {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()}"
         assert isinstance(data, _type) or _type is self.DefaultTypes.ORIGINAL_MARKER, f"Data {data} is not a {_type}"
         assert not path.is_file() or overwrite, f"File {key} already exists, and you chose to not overwrite"
         assert _type is not self.DefaultTypes.ORIGINAL_MARKER or (key.suffix in REGISTRY_REFERENCE_SUFFIXES and isinstance(data, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[key.suffix])), \
@@ -131,6 +143,18 @@ class RegistryBase:
             REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[key.suffix](path, data)
             if is_dataclass(_type): 
                 with open(path.with_suffix(".schema.json"), "w") as f: json.dump({f.name: str(f.type) for f in fields(_type)}, f)
+        if refs is None: return
+        for ref_path, data in refs.items(): REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[ref_path.suffix](self._get_ref_path(key, ref_path), data)
+
+    def DELETE(self, key: Path, _type: Optional[T] = None) -> None:
+        "Deletes the data excluding references. If _type is ORIGINAL_MARKER, then everything related to this key will be deleted including references."
+        if _type is not self.DefaultTypes.ORIGINAL_MARKER: os.remove(self._construct_path(key, _type))
+        else:
+            os.remove(self._construct_path(key, _type))
+            results_dir = self.registry_path / key.with_suffix("")
+            if results_dir.exists(): shutil.rmtree(results_dir)
+        assert not self.EXISTS(key, _type), f"Data {key} still exists after deletion"
+
 
     def LIST(self, prefix: Optional[str] = "", suffix: Optional[List[str] | str] = REGISTRY_REFERENCE_SUFFIXES, cond: Optional[Callable[[str], bool]] = None, return_all: bool = False) -> list[Path]:
         files = [Path(os.path.join(root, file)) for root, _, files in tqdm(os.walk(Path(self.registry_path) / prefix), desc="Listing files") for file in files]
@@ -186,7 +210,7 @@ class RegistryBase:
             supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET).remove(files_to_delete[i:i+100])
             time.sleep(1)
 
-    def EXISTS(self, key: Path, _type: T) -> bool: return self._check_path(key, _type).is_file()
+    def EXISTS(self, key: Path, _type: T) -> bool: return self._construct_path(key, _type).is_file()
     def EXPECT(self):
         # Potentially a EXPECT lazily generating missing results by returning list of bool, then using a specified func to generate results.
         pass
