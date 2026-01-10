@@ -48,21 +48,26 @@ class RegistryBase:
         DEFAULT_DETECTION_DATACLASS = make_dataclass("Detection", [("x1", float), ("y1", float), ("x2", float), ("y2", float), ("conf", float), ("cls", str)])
         DEFAULT_WASTE_DATACLASS = make_dataclass("WasteDetection", [("fraction", str), ("sub_fraction", str), ("purity", float), ("weight_kg", float), ("co2_kg", float)])
 
-    class DefaultTypes: # Or use your own dataclass by inheriting from BASECLASS and BASEMETADATA
+    class DefaultMarkers:
         ORIGINAL_MARKER = make_dataclass("OriginalMarker", [("OriginalMarker", Any)]) # To interact with the original video/image/json/etc.
+        REF_MARKER = make_dataclass("RefMarker", [("RefMarker", Any)]) # To interact with the reference video/image/json/etc.
+
+        @classmethod
+        def list(cls): return [_type for _, _type in vars(cls).items() if is_dataclass(_type)]
+
+    class DefaultTypes: # Or use your own dataclass by inheriting from BASECLASS and BASEMETADATA
         # Final Result types needs BaseClass and BaseMetaClass, so they're updated and defined after RegistryBase Ends
         RESULT_PEOPLE = ...
         RESULT_WASTE = ...
-        # RESULT_YOLOS = make_dataclass("RESULT_YOLOS", [("metadata", META_CLASS), ("frame_results", ...)])
 
         @classmethod
-        def list(cls): return [_type for name, _type in vars(cls).items() if is_dataclass(_type)]
+        def list(cls): return [_type for _, _type in vars(cls).items() if is_dataclass(_type)]
 
     def __init__(self, registry_path: Path): 
         self.registry_path = registry_path
         os.makedirs(self.registry_path, exist_ok=True)
         self._hash_lookup = json.load(open(self.registry_path / ".hash_lookup.json", "r", encoding="utf-8")) if os.path.exists(self.registry_path / ".hash_lookup.json") else {}
-        for _type in self.DefaultTypes.list(): self._update_hash_lookup(self.get_id(_type), self._hash(_type))
+        for _type in self.DefaultTypes.list() + self.DefaultMarkers.list(): self._update_hash_lookup(self.get_id(_type), self._hash(_type))
 
     def _delete_hash(self, id: str, hash: str) -> None:
         assert id in self._hash_lookup, "The id you're trying to delete is not in the hash lookup. Make sure you the pair you are trying to delete is correct."
@@ -93,33 +98,33 @@ class RegistryBase:
     def _construct_path(self, key: Path, _type: T) -> Path:
         if isinstance(key, str): key = Path(key)
         assert isinstance(key, Path), f"Key {key} is not a Path, but a {type(key)}"
-        assert _type is self.DefaultTypes.ORIGINAL_MARKER or (self.registry_path / key).exists(), f"Original marker {key} does not exist"
-        if _type is self.DefaultTypes.ORIGINAL_MARKER: return Path(self.registry_path / key) # TODO: Automatic Suffix?
-        assert is_dataclass(_type) or _type in self.DefaultTypes.list(), f"Type {_type} is not a dataclass, but a {type(_type)}"
+        assert _type is self.DefaultMarkers.ORIGINAL_MARKER or (self.registry_path / key).exists(), f"Original marker {key} does not exist"
+        if _type is self.DefaultMarkers.ORIGINAL_MARKER: return Path(self.registry_path / key) # TODO: Automatic Suffix?
+        assert is_dataclass(_type) or _type in self.DefaultMarkers.list(), f"Type {_type} is not a dataclass, but a {type(_type)}"
         assert self._hash(_type) in self._hash_lookup.values(), f"Hash {self._hash(_type)} not found in hash lookup. Check your id is correct using: .get_id(_type)"
-        if _type in self.DefaultTypes.list(): id_value = next((k for k, v in self._hash_lookup.items() if v == self._hash(_type)), None)# Allow reverse ID detection for static default types
+        if _type in self.DefaultTypes.list() or _type in self.DefaultMarkers.list(): id_value = next((k for k, v in self._hash_lookup.items() if v == self._hash(_type)), None)# Allow reverse ID detection for static default types
         else: id_value = next((f.default_factory() for f in fields(_type) if f.name == "id"), None)
         assert id_value is not None or len(id_value) == 0, f"Type {_type} does not have a default id value or default id value is 0"
         return Path(self.registry_path / key.with_suffix("") / self._hash_lookup[id_value]).with_suffix(".json")
 
     def get_id(self, _type: T) -> str: 
         assert is_dataclass(_type), f"Type {_type} is not a dataclass, but a {type(_type)}"
-        assert _type is self.DefaultTypes.ORIGINAL_MARKER or (any(f.name == "metadata" for f in fields(_type)) and any(f.name == "id" for f in fields(_type))), f"Type {_type} does not have a metaclass and/or id field, but the following fields: {fields(_type)}"
+        assert _type in self.DefaultMarkers.list() or (any(f.name == "metadata" for f in fields(_type)) and any(f.name == "id" for f in fields(_type))), f"Type {_type} does not have a metaclass and/or id field, but the following fields: {fields(_type)}"
         if (k := next((k for k, v in self._hash_lookup.items() if v == self._hash(_type)), None)): return k
         return self._update_hash_lookup(str(uuid4()), self._hash(_type))
     
-    def GET(self, key: Path, _type: Optional[T] = None, throw_error: bool = True, ref: Optional[Path] = None) -> Optional[T]:
+    def GET(self, key: Path, _type: T, throw_error: bool = True, ref: Optional[Path] = None) -> Optional[T]:
         f"""
-        If ref is provided, then the loaded data from the reference file will be returned.
-        The supported reference types are: {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()}. In these cases, you do not need to provide a conversion function.
-        You can save and load your own types. In these cases, you need to provide a conversion function to convert to and from bytes.
-        If ref is provided, _type will be ignored.
+        If _type is REF_MARKER, ref must be provided and the reference will be returned.
+        The supported reference types are: {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()}.
         """
-        if ref is not None: return self._get_ref(key, ref)
+        if ref is not None or _type is self.DefaultMarkers.REF_MARKER:
+            assert ref is not None, "ref must be provided when _type is REF_MARKER"
+            return self._get_ref(key, ref)
         path = self._construct_path(key, _type)
         if not path.is_file() and throw_error: raise FileNotFoundError(f"File {path} not found")
         if not path.is_file() and not throw_error: return None
-        if _type is self.DefaultTypes.ORIGINAL_MARKER: return REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[key.suffix](path)
+        if _type is self.DefaultMarkers.ORIGINAL_MARKER: return REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[key.suffix](path)
         data = REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[key.suffix](path)
         return from_dict(data_class=_type, data=self._convert_int_keys(data), config=Config(check_types=False)) if is_dataclass(_type) else data
     
@@ -132,12 +137,12 @@ class RegistryBase:
     def POST(self, key: Path, data: T, _type: T, overwrite: bool = False, refs: Optional[Dict[str | Path, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()]] = {}) -> None:
         path = self._construct_path(key, _type)
         assert all(isinstance(ref_data, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[ref_path.suffix]) for ref_path, ref_data in refs.items() if refs is not None), f"Refs {refs} are not a dict of {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()}"
-        assert isinstance(data, _type) or _type is self.DefaultTypes.ORIGINAL_MARKER, f"Data {data} is not a {_type}"
+        assert isinstance(data, _type) or _type in self.DefaultMarkers.list(), f"Data {data} is not a {_type}"
         assert not path.is_file() or overwrite, f"File {key} already exists, and you chose to not overwrite"
-        assert _type is not self.DefaultTypes.ORIGINAL_MARKER or (key.suffix in REGISTRY_REFERENCE_SUFFIXES and isinstance(data, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[key.suffix])), \
+        assert _type is not self.DefaultMarkers.ORIGINAL_MARKER or (key.suffix in REGISTRY_REFERENCE_SUFFIXES and isinstance(data, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[key.suffix])), \
             f"Original marker {key} must have a supported suffix: {REGISTRY_REFERENCE_SUFFIXES} and data must be a {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[key.suffix]}. Received {type(data)} with suffix {key.suffix}"
         path.parent.mkdir(parents=True, exist_ok=True)
-        if _type is self.DefaultTypes.ORIGINAL_MARKER: REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[key.suffix](path, data)
+        if _type is self.DefaultMarkers.ORIGINAL_MARKER: REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[key.suffix](path, data)
         else: 
             data = asdict(data) if is_dataclass(data) else data
             REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[key.suffix](path, data)
@@ -146,9 +151,9 @@ class RegistryBase:
         if refs is None: return
         for ref_path, data in refs.items(): REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[ref_path.suffix](self._get_ref_path(key, ref_path), data)
 
-    def DELETE(self, key: Path, _type: Optional[T] = None) -> None:
+    def DELETE(self, key: Path, _type: T) -> None:
         "Deletes the data excluding references. If _type is ORIGINAL_MARKER, then everything related to this key will be deleted including references."
-        if _type is not self.DefaultTypes.ORIGINAL_MARKER: os.remove(self._construct_path(key, _type))
+        if _type is not self.DefaultMarkers.ORIGINAL_MARKER: os.remove(self._construct_path(key, _type))
         else:
             os.remove(self._construct_path(key, _type))
             results_dir = self.registry_path / key.with_suffix("")

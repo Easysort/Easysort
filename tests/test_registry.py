@@ -28,8 +28,8 @@ class TestRegistry(unittest.TestCase):
 
     def test_GET_default_type(self):
         data = {"test": "test"}
-        self.registry.POST(Path("test.json"), data, self.registry.DefaultTypes.ORIGINAL_MARKER)
-        loaded_data = self.registry.GET(Path("test.json"), self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.registry.POST(Path("test.json"), data, self.registry.DefaultMarkers.ORIGINAL_MARKER)
+        loaded_data = self.registry.GET(Path("test.json"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
         assert loaded_data == data, "The loaded data should be the same as the posted data"
 
         result_people = self.registry.DefaultTypes.RESULT_PEOPLE(id=self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE), metadata=self.registry.BaseDefaultTypes.BASEMETADATA(model="test", created_at=current_timestamp()), \
@@ -42,7 +42,7 @@ class TestRegistry(unittest.TestCase):
     def test_POST_custom_type(self): pass # Potentially support other, custom suffixes
     
     def test_GET_bad_input_silent(self):
-        self.registry.POST(Path("test.json"), {"test": "test"}, self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.registry.POST(Path("test.json"), {"test": "test"}, self.registry.DefaultMarkers.ORIGINAL_MARKER)
         loaded_result_people = self.registry.GET(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE, throw_error=False)
         assert loaded_result_people is None, "The loaded result people should be None"
         loaded_result_people = self.registry.GET(Path("test.json"), self.registry.DefaultTypes.RESULT_WASTE, throw_error=False)
@@ -55,24 +55,24 @@ class TestRegistry(unittest.TestCase):
 
     def test_POST_GET_original_marker(self):
         data = {"test": "test"}
-        self.registry.POST(Path("test.json"), data, self.registry.DefaultTypes.ORIGINAL_MARKER)
-        loaded_data = self.registry.GET(Path("test.json"), self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.registry.POST(Path("test.json"), data, self.registry.DefaultMarkers.ORIGINAL_MARKER)
+        loaded_data = self.registry.GET(Path("test.json"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
         assert loaded_data == data, "The loaded data should be the same as the posted data"
 
         dummy_image = Image.new("RGB", (100, 100), color = (255, 0, 0))
-        self.registry.POST(Path("test.png"), dummy_image, self.registry.DefaultTypes.ORIGINAL_MARKER)
-        loaded_image = self.registry.GET(Path("test.png"), self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.registry.POST(Path("test.png"), dummy_image, self.registry.DefaultMarkers.ORIGINAL_MARKER)
+        loaded_image = self.registry.GET(Path("test.png"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
         assert np.array_equal(np.array(loaded_image), np.array(dummy_image)), "The loaded image should be the same as the posted image"
 
         dummy_array = np.array([1, 2, 3])
-        self.registry.POST(Path("test.npy"), dummy_array, self.registry.DefaultTypes.ORIGINAL_MARKER)
-        loaded_array = self.registry.GET(Path("test.npy"), self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.registry.POST(Path("test.npy"), dummy_array, self.registry.DefaultMarkers.ORIGINAL_MARKER)
+        loaded_array = self.registry.GET(Path("test.npy"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
         assert np.array_equal(loaded_array, dummy_array), "The loaded array should be the same as the posted array"
         # Check all other supported types
 
     def test_LIST(self):
-        self.registry.POST(Path("test.json"), {"test": "test"}, self.registry.DefaultTypes.ORIGINAL_MARKER)
-        self.registry.POST(Path("test2.json"), {"test": "test"}, self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.registry.POST(Path("test.json"), {"test": "test"}, self.registry.DefaultMarkers.ORIGINAL_MARKER)
+        self.registry.POST(Path("test2.json"), {"test": "test"}, self.registry.DefaultMarkers.ORIGINAL_MARKER)
         registry_list = self.registry.LIST()
         print(registry_list)
         assert len(registry_list) == 3, f"The list should have 3 items (2 objects + .hash_lookup.json), but has {len(registry_list)}"
@@ -80,7 +80,7 @@ class TestRegistry(unittest.TestCase):
 
     def test_POST_GET_with_refs(self):
         # Setup: create original marker first
-        self.registry.POST(Path("video.json"), {"src": "test"}, self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.registry.POST(Path("video.json"), {"src": "test"}, self.registry.DefaultMarkers.ORIGINAL_MARKER)
         
         # Post result with refs (image + json metadata)
         ref_image = Image.new("RGB", (50, 50), color=(0, 255, 0))
@@ -93,18 +93,18 @@ class TestRegistry(unittest.TestCase):
                           refs={Path("thumb.png"): ref_image, Path("meta.json"): ref_json})
         
         # GET refs back
-        loaded_image = self.registry.GET(Path("video.json"), ref=Path("thumb.png"))
-        loaded_json = self.registry.GET(Path("video.json"), ref=Path("meta.json"))
+        loaded_image = self.registry.GET(Path("video.json"), self.registry.DefaultMarkers.REF_MARKER, ref=Path("thumb.png"))
+        loaded_json = self.registry.GET(Path("video.json"), self.registry.DefaultMarkers.REF_MARKER, ref=Path("meta.json"))
         assert np.array_equal(np.array(loaded_image), np.array(ref_image))
         assert loaded_json == ref_json
 
     def test_GET_ref_not_found(self):
-        self.registry.POST(Path("test.json"), {"x": 1}, self.registry.DefaultTypes.ORIGINAL_MARKER)
-        self.assertRaises(FileNotFoundError, self.registry.GET, Path("test.json"), ref=Path("nonexistent.png"))
+        self.registry.POST(Path("test.json"), {"x": 1}, self.registry.DefaultMarkers.ORIGINAL_MARKER)
+        self.assertRaises(FileNotFoundError, self.registry.GET, Path("test.json"), self.registry.DefaultMarkers.REF_MARKER, ref=Path("nonexistent.png"))
 
     def test_DELETE_type(self):
         # Create original + result
-        self.registry.POST(Path("test.json"), {"x": 1}, self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.registry.POST(Path("test.json"), {"x": 1}, self.registry.DefaultMarkers.ORIGINAL_MARKER)
         result = self.registry.DefaultTypes.RESULT_PEOPLE(
             id=self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE),
             metadata=self.registry.BaseDefaultTypes.BASEMETADATA(model="m", created_at="t"), frame_results={})
@@ -113,11 +113,11 @@ class TestRegistry(unittest.TestCase):
         # Delete only the result type
         self.registry.DELETE(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
         assert not self.registry.EXISTS(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
-        assert self.registry.EXISTS(Path("test.json"), self.registry.DefaultTypes.ORIGINAL_MARKER)
+        assert self.registry.EXISTS(Path("test.json"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
 
     def test_DELETE_original_deletes_all(self):
         # Create original + result + refs
-        self.registry.POST(Path("vid.json"), {"x": 1}, self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.registry.POST(Path("vid.json"), {"x": 1}, self.registry.DefaultMarkers.ORIGINAL_MARKER)
         result = self.registry.DefaultTypes.RESULT_PEOPLE(
             id=self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE),
             metadata=self.registry.BaseDefaultTypes.BASEMETADATA(model="m", created_at="t"), frame_results={})
@@ -125,14 +125,14 @@ class TestRegistry(unittest.TestCase):
                           refs={Path("thumb.png"): Image.new("RGB", (10, 10))})
         
         # Delete original marker - should delete everything
-        self.registry.DELETE(Path("vid.json"), self.registry.DefaultTypes.ORIGINAL_MARKER)
-        assert not self.registry.EXISTS(Path("vid.json"), self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.registry.DELETE(Path("vid.json"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
+        assert not self.registry.EXISTS(Path("vid.json"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
         self.assertRaises(AssertionError, self.registry.EXISTS, Path("vid.json"), self.registry.DefaultTypes.RESULT_PEOPLE) # Should fail as original marker is deleted
         assert not self.registry._get_ref_path(Path("vid.json"), Path("thumb.png")).exists()
 
     def test_construct_path(self):
         id1 = self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE)
-        self.registry.POST(Path("test.json"), {"test": "test"}, self.registry.DefaultTypes.ORIGINAL_MARKER)
+        self.registry.POST(Path("test.json"), {"test": "test"}, self.registry.DefaultMarkers.ORIGINAL_MARKER)
         path = self.registry._construct_path(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
         assert self.registry._hash_lookup[id1] in path.name, "The hash should be in the path"
 
@@ -143,8 +143,9 @@ class TestRegistry(unittest.TestCase):
         self.assertRaises(AssertionError, self.registry._hash, {"test": "test"})
 
     def test_auto_generate_ids_for_defaulttypes(self):
-        assert len(self.registry._hash_lookup) == len(self.registry.DefaultTypes.list())
+        assert len(self.registry._hash_lookup) == len(self.registry.DefaultTypes.list()) + len(self.registry.DefaultMarkers.list())
         assert all(self.registry._hash(_type) in self.registry._hash_lookup.values() for _type in self.registry.DefaultTypes.list())
+        assert all(self.registry._hash(_type) in self.registry._hash_lookup.values() for _type in self.registry.DefaultMarkers.list())
 
     def test_get_new_id(self):
         id1 = self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE)
@@ -155,12 +156,12 @@ class TestRegistry(unittest.TestCase):
         assert id1 != id3, "The two ids should be different"
         id4 = self.registry.get_id(self.dummy_dataclass)
         assert id1 != id4, "The two ids should be different"
-        assert len(self.registry._hash_lookup) == len(self.registry.DefaultTypes.list()) + 1
+        assert len(self.registry._hash_lookup) == len(self.registry.DefaultTypes.list()) + len(self.registry.DefaultMarkers.list()) + 1
         assert id4 in self.registry._hash_lookup, "The hash lookup should have the id"
         assert self.registry._hash_lookup[id4] == self.registry._hash(self.dummy_dataclass), "The hash lookup should have the correct hash"
         self.assertRaises(AssertionError, self.registry._delete_hash, id1, self.registry._hash(self.dummy_dataclass))
         self.registry._delete_hash(id4, self.registry._hash(self.dummy_dataclass))
-        assert len(self.registry._hash_lookup) == len(self.registry.DefaultTypes.list())
+        assert len(self.registry._hash_lookup) == len(self.registry.DefaultTypes.list()) + len(self.registry.DefaultMarkers.list())
         assert id4 not in self.registry._hash_lookup, "The hash lookup should not have the deleted id"
         assert id1 in self.registry._hash_lookup, "The hash lookup should have the original id"
         self.assertRaises(AssertionError, self.registry._delete_hash, id4, self.registry._hash(self.dummy_dataclass2))
