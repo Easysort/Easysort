@@ -152,10 +152,9 @@ class RegistryBase:
         path.parent.mkdir(parents=True, exist_ok=True)
         if _type is self.DefaultMarkers.ORIGINAL_MARKER: REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[key.suffix](path, data)
         else: 
-            data = asdict(data) if is_dataclass(data) else data
-            REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[key.suffix](path, data)
-            if is_dataclass(_type): 
-                with open(path.with_suffix(".schema.json"), "w") as f: json.dump({f.name: str(f.type) for f in fields(_type)}, f)
+            assert is_dataclass(_type), f"Data {data} is not a dataclass, but a {type(data)}. Currently only dataclasses are supported."
+            REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[".json"](path, asdict(data))
+            with open(path.with_suffix(".schema.json"), "w", encoding="utf-8") as f: json.dump({f.name: str(f.type) for f in fields(_type)}, f, indent=4)
         if refs is None: return
         for ref_path, data in refs.items(): REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[ref_path.suffix](self._get_ref_path(key, ref_path), data)
 
