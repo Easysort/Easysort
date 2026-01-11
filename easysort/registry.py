@@ -133,7 +133,7 @@ class RegistryBase:
         if not path.is_file() and throw_error: raise FileNotFoundError(f"File {path} not found")
         if not path.is_file() and not throw_error: return None
         if _type is self.DefaultMarkers.ORIGINAL_MARKER: return REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[key.suffix](path)
-        assert key.suffix == ".json", "Only .json files /dataclasses are supported for not original markers or refs"
+        assert path.suffix == ".json", f"Only .json files /dataclasses are supported for not original markers or refs, but {path.suffix} is not supported"
         data = REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[".json"](path)
         return from_dict(data_class=_type, data=self._convert_int_keys(data), config=Config(check_types=False)) if is_dataclass(_type) else data
     
