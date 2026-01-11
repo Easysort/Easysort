@@ -112,6 +112,14 @@ class RegistryBase:
         assert _type in self.DefaultMarkers.list() or (any(f.name == "metadata" for f in fields(_type)) and any(f.name == "id" for f in fields(_type))), f"Type {_type} does not have a metaclass and/or id field, but the following fields: {fields(_type)}"
         if (k := next((k for k, v in self._hash_lookup.items() if v == self._hash(_type)), None)): return k
         return self._update_hash_lookup(str(uuid4()), self._hash(_type))
+
+    def add_id(self, _type: T, id: str) -> None:
+        assert is_dataclass(_type), f"Type {_type} is not a dataclass, but a {type(_type)}"
+        assert _type in self.DefaultMarkers.list() or (any(f.name == "metadata" for f in fields(_type)) and any(f.name == "id" for f in fields(_type))), f"Type {_type} does not have a metaclass and/or id field, but the following fields: {fields(_type)}"
+        assert id is not None and len(id) == 36 and id.count("-") == 4, f"Id {id} is not a valid uuid4"
+        if id in self._hash_lookup and self._hash_lookup[id] == self._hash(_type): return
+        assert id not in self._hash_lookup, f"Id {id} already exists"
+        self._update_hash_lookup(id, self._hash(_type))
     
     def GET(self, key: Path, _type: T, throw_error: bool = True, ref: Optional[Path] = None) -> Optional[T]:
         f"""
