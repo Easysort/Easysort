@@ -35,10 +35,10 @@ class Runner:
         self.model = model
     
     def gpt(self, videos_missing_results: List[List[np.ndarray]], output_schema: T, task_prompt: str = "", model: str = "", max_workers: int = 10) -> List[T]:
-    #def _openai_call(self, model: str, prompt: str, image_paths: List[List[np.ndarray]], output_schema: dataclass, max_workers: int = 10) -> List[dataclass]:
+        schema = {k: v for k, v in output_schema.__annotations__.items() if k not in ("id", "metadata")}
         def process_single(image_arrays):
             images_b64 = [base64.b64encode(cv2.imencode('.jpg', img_array)[1].tobytes()).decode("utf-8") for img_array in image_arrays]
-            full_prompt = f"{task_prompt}\nReturn only a json with the following keys and types: {output_schema.__annotations__}"
+            full_prompt = f"{task_prompt}\nReturn only a json with the following keys and types: {schema}"
             content = [{"type": "text", "text": full_prompt}] + [{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}} for img_b64 in images_b64]
             response = self.openai_client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], response_format={"type": "json_object"}, timeout=90,)
             return output_schema(**json.loads(response.choices[0].message.content))
