@@ -1,3 +1,0 @@
-
-class Pusher:
-    pass
