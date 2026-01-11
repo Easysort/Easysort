@@ -1,7 +1,7 @@
-
-import openai, time
+import openai, time, fcntl
 from easysort.helpers import OPENAI_API_KEY, T
 from typing import List, Callable
+from contextlib import contextmanager
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -13,6 +13,19 @@ from tqdm import tqdm
 from easysort.sampler import Crop, Sampler
 from easysort import Registry
 import cv2
+
+VPN_LOCK_FILE = Path("/tmp/verdis_vpn.lock")
+
+@contextmanager
+def vpn_lock(): # TODO: Make a better solution to this lock
+    """Acquire exclusive lock - blocks if VPN is active. Ensures OpenAI calls don't go through VPN."""
+    VPN_LOCK_FILE.touch(exist_ok=True)
+    with open(VPN_LOCK_FILE, "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 class Runner:
@@ -63,8 +76,16 @@ class ContinuousRunner:
         self.runner = Runner()
 
     def run(self):
+        print(f"Starting ContinuousRunner for {self.run_job.folder} (interval: {self.run_job.interval_mins}min)")
         while True:
-            _, missing = Registry.LIST(self.run_job.folder, suffix=self.run_job.suffix, cond=lambda x: not Registry.EXISTS(x, self.run_job.result_type), return_all=True)
-            if missing: self.run_job.process(missing, self.runner)
-            if missing: self.push_job.push(missing, self.run_job.result_type)
+            print(f"\n{'='*50}\nScanning for missing results...")
+            all_files, missing = Registry.LIST(self.run_job.folder, suffix=self.run_job.suffix, cond=lambda x: not Registry.EXISTS(x, self.run_job.result_type), return_all=True)
+            print(f"Found {len(missing)} missing / {len(all_files)} total")
+            if missing:
+                print("Waiting for VPN lock...")
+                with vpn_lock():
+                    print("Lock acquired, processing...")
+                    self.run_job.process(missing, self.runner)
+                    self.push_job.push(missing)
+            print(f"Sleeping {self.run_job.interval_mins} minutes...")
             time.sleep(self.run_job.interval_mins * 60)
