@@ -36,6 +36,7 @@ class Runner:
     
     def gpt(self, videos_missing_results: List[List[np.ndarray]], output_schema: T, task_prompt: str = "", model: str = "", max_workers: int = 10) -> List[T]:
         schema = {k: v for k, v in output_schema.__annotations__.items() if k not in ("id", "metadata")}
+        model = model or self.model
         def process_single(image_arrays):
             images_b64 = [base64.b64encode(cv2.imencode('.jpg', img_array)[1].tobytes()).decode("utf-8") for img_array in image_arrays]
             full_prompt = f"{task_prompt}\nReturn only a json with the following keys and types: {schema}"
