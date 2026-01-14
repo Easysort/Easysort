@@ -175,6 +175,15 @@ class RegistryBase:
         cond_files = [file for file in tqdm(files, desc="Filtering files") if cond(file)] if cond else files
         return [files, cond_files] if return_all else cond_files
 
+    def _registry_path(self, key: str | Path) -> Path:
+        """Return absolute on-disk path for a registry key (relative keys are resolved under `registry_path`)."""
+        key = Path(key)
+        return key if key.is_absolute() else (self.registry_path / key)
+
+    def HTTP_VIEW(self) -> None:
+        pass
+
+
     def SYNC(self) -> None:
         CONCURRENT_WORKERS = 1 # Depends on connection speed, supabase rate limit, so on. Currently 3 works fairly stable and fast
         supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -218,6 +227,7 @@ class RegistryBase:
             if timestamp < datetime.datetime.now() - datetime.timedelta(weeks=4): files_to_delete.append(file)
 
         print(f"Deleting {len(files_to_delete)} files" if len(files_to_delete) > 0 else "No files to delete")
+        return
         if len(files_to_delete) == 0: return
         for i in tqdm(range(0, len(files_to_delete), 100), desc="Deleting files"):
             supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET).remove(files_to_delete[i:i+100])
@@ -236,5 +246,6 @@ Registry = RegistryBase(REGISTRY_PATH)
 
 if __name__ == "__main__":
     Registry.SYNC()
-    print(Registry.LIST("argo")[0])
+    print(Registry.LIST("argo/Argo-roskilde-03-01")[0])
+    print(Registry.LIST("argo/Argo-Jyllinge-Entrance-01")[0])
 
