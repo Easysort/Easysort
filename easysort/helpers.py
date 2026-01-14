@@ -102,6 +102,7 @@ class Concat:
   @staticmethod
   def _summary(items: list[tuple[datetime.datetime, Any]], loc_key: str, seed: str) -> dict:
     obj_f, w_f, c_f = Concat._ARGO_FACTORS.get(Concat._loc_id(loc_key), (1.0, 1.0, 1.0))
+    print(f"Using the following factors for {loc_key}: {obj_f}, {w_f}, {c_f}")
     cats = {c: {"count": 0.0, "weight": 0.0} for c in Concat._ARGO_CATS}
     per_day, per_hour, roles, co2, weight, objs = [0.0] * 7, {h: 0.0 for h in range(24)}, {"citizen": 0, "personnel": 0}, 0.0, 0.0, 0.0
     for ts, r in items:
