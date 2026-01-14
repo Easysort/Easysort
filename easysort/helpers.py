@@ -73,7 +73,7 @@ REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH = {
 def current_timestamp() -> str: return datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
 
 class Concat:
-  _ARGO_FACTORS = {"roskilde": (1.6, 0.8, 0.22), "jyllinge": (0.3, 0.15, 0.07)}  # objects, weight, co2
+  _ARGO_FACTORS = {"roskilde": (1.6, 1.2, 0.5), "jyllinge": (0.3, 0.15, 0.07)}  # objects, weight, co2
   _ARGO_CATS = ["køkkenting", "fritid_&_have", "møbler", "boligting", "legetøj", "andet"]
   _DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
   _HOURS = tuple(f"{i}-{i+3}" for i in range(0, 24, 3))
