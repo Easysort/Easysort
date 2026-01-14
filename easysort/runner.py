@@ -134,6 +134,36 @@ def extract_person_crops(
     return out
 
 
+def extract_person_crops_from_video(
+    video_path: Path | str,
+    crop: Crop | None = None,
+    *,
+    model_path: str = "yolo11n-pose.pt",
+    batch: int = 16,
+    min_w: int = 80,
+    min_h: int = 200,
+    pad: float = 0.08,
+) -> list[PersonCrop]:
+    path = Registry._registry_path(video_path)
+    cap = cv2.VideoCapture(str(path))
+    if not cap.isOpened(): return []
+    out, frames, idxs, i = [], [], [], 0
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret: break
+            if crop is not None: frame = frame[crop.y:crop.y + crop.h, crop.x:crop.x + crop.w]
+            frames.append(frame); idxs.append(i); i += 1
+            if len(frames) < batch: continue
+            out += [PersonCrop(idxs[c.frame_idx], c.direction, c.image) for c in extract_person_crops(frames, None, model_path=model_path, batch=batch, min_w=min_w, min_h=min_h, min_in_crop=0.0, pad=pad)]
+            frames.clear(); idxs.clear()
+        if frames:
+            out += [PersonCrop(idxs[c.frame_idx], c.direction, c.image) for c in extract_person_crops(frames, None, model_path=model_path, batch=len(frames), min_w=min_w, min_h=min_h, min_in_crop=0.0, pad=pad)]
+    finally:
+        cap.release()
+    return out
+
+
 @functools.cache
 def _reid():
     import torch, torchreid
