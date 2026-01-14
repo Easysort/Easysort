@@ -77,11 +77,15 @@ class Concat:
   _ARGO_CATS = ["køkkenting", "fritid_&_have", "møbler", "boligting", "legetøj", "andet"]
 
   @staticmethod
-  def _ts(p: str | Path) -> datetime.datetime:
+  def _ts(p: str | Path) -> datetime.datetime | None:
     p = Path(p)
-    y, m, d = map(int, (p.parts[-5], p.parts[-4], p.parts[-3]))
-    t = p.stem
-    return datetime.datetime(y, m, d, int(t[:2]), int(t[2:4]), int(t[4:6]))
+    try:
+      y, m, d = map(int, (p.parts[-5], p.parts[-4], p.parts[-3]))
+      t = p.stem
+      if len(t) != 6 or not t.isdigit(): return None
+      return datetime.datetime(y, m, d, int(t[:2]), int(t[2:4]), int(t[4:6]))
+    except Exception:
+      return None
 
   @staticmethod
   def _slug(cat: str) -> str:
@@ -136,7 +140,9 @@ class Concat:
     for v in videos:
       v = Path(v); r = Registry.GET(v, result_type, throw_error=False)
       if r is None: continue
-      ts = Concat._ts(v); y, w, _ = ts.isocalendar()
+      ts = Concat._ts(v)
+      if ts is None: continue
+      y, w, _ = ts.isocalendar()
       groups.setdefault((y, w), {}).setdefault(class_sorting_func(v), []).append((ts, r))
     out = []
     for (y, w), locs in sorted(groups.items()):
@@ -153,7 +159,9 @@ class Concat:
     for v in videos:
       v = Path(v); r = Registry.GET(v, result_type, throw_error=False)
       if r is None: continue
-      ts = Concat._ts(v); key = (ts.year, ts.month)
+      ts = Concat._ts(v)
+      if ts is None: continue
+      key = (ts.year, ts.month)
       groups.setdefault(key, {}).setdefault(class_sorting_func(v), []).append((ts, r))
     out = []
     for (y, m), locs in sorted(groups.items()):
