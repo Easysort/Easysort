@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 import json
-import calendar, random
+import calendar, random, re
 
 T = TypeVar("T")
 load_dotenv()
@@ -75,6 +75,8 @@ def current_timestamp() -> str: return datetime.datetime.now().strftime("%Y%m%dT
 class Concat:
   _ARGO_FACTORS = {"roskilde": (1.6, 0.8, 0.22), "jyllinge": (0.3, 0.15, 0.07)}  # objects, weight, co2
   _ARGO_CATS = ["køkkenting", "fritid_&_have", "møbler", "boligting", "legetøj", "andet"]
+  _DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+  _HOURS = tuple(f"{i}-{i+3}" for i in range(0, 24, 3))
 
   @staticmethod
   def _ts(p: str | Path) -> datetime.datetime | None:
@@ -101,7 +103,7 @@ class Concat:
   def _summary(items: list[tuple[datetime.datetime, Any]], loc_key: str, seed: str) -> dict:
     obj_f, w_f, c_f = Concat._ARGO_FACTORS.get(Concat._loc_id(loc_key), (1.0, 1.0, 1.0))
     cats = {c: {"count": 0.0, "weight": 0.0} for c in Concat._ARGO_CATS}
-    per_day, per_hour, roles, co2, weight, objs = {}, {h: 0.0 for h in range(24)}, {"citizen": 0, "personnel": 0}, 0.0, 0.0, 0.0
+    per_day, per_hour, roles, co2, weight, objs = [0.0] * 7, {h: 0.0 for h in range(24)}, {"citizen": 0, "personnel": 0}, 0.0, 0.0, 0.0
     for ts, r in items:
       for dets in getattr(r, "frame_results", {}).values():
         for d in dets:
@@ -109,7 +111,7 @@ class Concat:
           roles["personnel" if role.startswith("pers") else "citizen"] += 1
           n = float(sum(getattr(d, "item_count", []) or []))
           co2 += float(sum(getattr(d, "co2_kg", []) or [])); weight += float(sum(getattr(d, "weight_kg", []) or [])); objs += n
-          per_day[ts.strftime("%Y-%m-%d")] = per_day.get(ts.strftime("%Y-%m-%d"), 0.0) + n
+          per_day[int(ts.strftime("%w")) - 1] += n  # Monday=0..Sunday=6
           per_hour[int(ts.strftime("%H"))] += n
           for cat, cnt, w in zip(getattr(d, "item_cat", []) or [], getattr(d, "item_count", []) or [], getattr(d, "weight_kg", []) or []):
             s = Concat._slug(cat); cats[s]["count"] += float(cnt); cats[s]["weight"] += float(w)
@@ -129,7 +131,7 @@ class Concat:
       "co2_estimate_best_kg": str(best_co2),
       "co2_estimate_low_kg": str(low_co2),
       "co2_estimate_high_kg": str(high_co2),
-      "objects_per_day": [{"day": d, "count": str(int(v * obj_f))} for d, v in sorted(per_day.items()) if v > 0],
+      "objects_per_day": [{"day": Concat._DAYS[i], "count": str(int(per_day[i] * obj_f))} for i in range(7)],
       "objects_per_hour": [{"hour": f"{i}-{i+3}", "count": str(int((per_hour[i] + per_hour[i+1] + per_hour[i+2]) * obj_f))} for i in range(0, 24, 3)],
     }
 
@@ -155,20 +157,84 @@ class Concat:
   @staticmethod
   def monthly(videos: list[str | Path], class_sorting_func: Callable[[Path], str], result_type: Any, out_prefix: str = "argo/results") -> list[Path]:
     from easysort.registry import Registry
-    groups: dict[tuple[int, int], dict[str, list[tuple[datetime.datetime, Any]]]] = {}
-    for v in videos:
-      v = Path(v); r = Registry.GET(v, result_type, throw_error=False)
-      if r is None: continue
-      ts = Concat._ts(v)
-      if ts is None: continue
-      key = (ts.year, ts.month)
-      groups.setdefault(key, {}).setdefault(class_sorting_func(v), []).append((ts, r))
-    out = []
-    for (y, m), locs in sorted(groups.items()):
-      start = datetime.date(y, m, 1); end = datetime.date(y, m, calendar.monthrange(y, m)[1])
-      data = {"date_start": start.strftime("%d_%m_%Y"), "date_end": end.strftime("%d_%m_%Y")}
-      for loc, items in locs.items(): data[loc] = Concat._summary(items, loc, f"month_{m}_{y}")
-      key = Path(out_prefix) / f"month_{m}_{y}.json"; Registry.POST(key, data, Registry.DefaultMarkers.ORIGINAL_MARKER, overwrite=True); out.append(key)
+    rx = re.compile(r"^week_(\d+)_(\d+)(?:_force)?\.json$", re.I)
+    best: dict[tuple[int, int], Path] = {}
+    for f in Registry.LIST(out_prefix, suffix=[".json"]):
+      m = rx.match(f.name)
+      if not m: continue
+      w, y = int(m.group(1)), int(m.group(2))
+      if (y, w) not in best or f.stem.endswith("_force"): best[(y, w)] = f
+
+    def _i(x) -> int:
+      try: return int(float(x))
+      except Exception: return 0
+
+    day_idx = {d.lower(): i for i, d in enumerate(Concat._DAYS)}
+    months: dict[tuple[int, int], list[tuple[datetime.date, datetime.date, dict]]] = {}
+    for (y, w), f in best.items():
+      try:
+        mon = datetime.date.fromisocalendar(y, w, 1); sun = mon + datetime.timedelta(days=6)
+      except Exception:
+        continue
+      try:
+        wk = json.load(open(f, "r", encoding="utf-8"))
+      except Exception:
+        continue
+      months.setdefault((sun.year, sun.month), []).append((mon, sun, wk))
+
+    out: list[Path] = []
+    for (y, m), weeks in sorted(months.items()):
+      weeks.sort(key=lambda x: x[0])
+      start, end = weeks[0][0], weeks[-1][1]
+      data: dict[str, Any] = {"date_start": start.strftime("%d_%m_%Y"), "date_end": end.strftime("%d_%m_%Y")}
+      acc: dict[str, Any] = {}
+      for _, _, wk in weeks:
+        for loc, locd in wk.items():
+          if loc in ("date_start", "date_end") or not isinstance(locd, dict): continue
+          a = acc.setdefault(loc, {"o": 0, "w": 0, "c": 0, "lo": 0, "hi": 0, "ppn": 0, "ppd": 0,
+                                   "cats": {c: [0, 0] for c in Concat._ARGO_CATS}, "d": [0] * 7, "h": {k: 0 for k in Concat._HOURS}})
+          o = _i(locd.get("registrered_objects")); a["o"] += o
+          a["w"] += _i(locd.get("objects_weight_kg")); a["c"] += _i(locd.get("co2_estimate_best_kg") or locd.get("co2_estimate_kg"))
+          a["lo"] += _i(locd.get("co2_estimate_low_kg")); a["hi"] += _i(locd.get("co2_estimate_high_kg"))
+          a["ppn"] += _i(locd.get("percentage_personnel")) * o; a["ppd"] += o
+          for row in (locd.get("categories") or []):
+            if not isinstance(row, dict): continue
+            cat = str(row.get("category", "")).strip().lower()
+            if cat not in a["cats"]: continue
+            a["cats"][cat][0] += _i(row.get("count")); a["cats"][cat][1] += _i(row.get("weight_kg"))
+          for row in (locd.get("objects_per_day") or []):
+            if not isinstance(row, dict): continue
+            day = str(row.get("day", "")).strip()
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+              try: idx = datetime.date.fromisoformat(day).weekday()
+              except Exception: continue
+            else:
+              idx = day_idx.get(day.lower())
+            if idx is not None: a["d"][idx] += _i(row.get("count"))
+          for row in (locd.get("objects_per_hour") or []):
+            if not isinstance(row, dict): continue
+            hr = str(row.get("hour", "")).strip()
+            if hr in a["h"]: a["h"][hr] += _i(row.get("count"))
+
+      for loc, a in acc.items():
+        pp = int(round(a["ppn"] / (a["ppd"] or 1)))
+        data[loc] = {
+          "registrered_objects": str(a["o"]),
+          "co2_estimate_kg": str(a["c"]),
+          "objects_weight_kg": str(a["w"]),
+          "percentage_citizens": str(100 - pp),
+          "percentage_personnel": str(pp),
+          "categories": [{"category": c, "count": str(a["cats"][c][0]), "weight_kg": str(a["cats"][c][1])} for c in Concat._ARGO_CATS],
+          "co2_estimate_best_kg": str(a["c"]),
+          "co2_estimate_low_kg": str(a["lo"]),
+          "co2_estimate_high_kg": str(a["hi"]),
+          "objects_per_day": [{"day": Concat._DAYS[i], "count": str(a["d"][i])} for i in range(7)],
+          "objects_per_hour": [{"hour": k, "count": str(a["h"][k])} for k in Concat._HOURS],
+        }
+
+      key = Path(out_prefix) / f"month_{m}_{y}.json"
+      Registry.POST(key, data, Registry.DefaultMarkers.ORIGINAL_MARKER, overwrite=True)
+      out.append(key)
     return out
 
 
