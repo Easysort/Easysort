@@ -204,7 +204,7 @@ class RunnerJob:
 
 class PusherJob:
     folder: str
-    def push(self, paths: List[Path], _type: T): raise NotImplementedError
+    def push(self): raise NotImplementedError
 
 class ContinuousRunner:
     def __init__(self, run_job: RunnerJob, push_job: PusherJob):
@@ -218,11 +218,12 @@ class ContinuousRunner:
             print(f"\n{'='*50}\nScanning for missing results...")
             all_files, missing = Registry.LIST(self.run_job.folder, suffix=self.run_job.suffix, cond=lambda x: not Registry.EXISTS(x, self.run_job.result_type), return_all=True)
             print(f"Found {len(missing)} missing / {len(all_files)} total")
+            print("Waiting for VPN lock...")
             if missing:
-                print("Waiting for VPN lock...")
                 with vpn_lock():
                     print("Lock acquired, processing...")
                     self.run_job.process(missing, self.runner)
-                    self.push_job.push(missing)
+                # Always run the pusher so it can recover from previous push failures.
+                self.push_job.push()
             print(f"Sleeping {self.run_job.interval_mins} minutes...")
             time.sleep(self.run_job.interval_mins * 60)
