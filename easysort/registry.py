@@ -5,8 +5,10 @@
 # - Remove supabase dependency
 # - Data registry and compute on same machine. Once that is no longer true, GET should return bytes, not path.
 
+from httpx import request
 from easysort.helpers import REGISTRY_PATH, T, SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET, REGISTRY_REFERENCE_SUFFIXES, \
-    REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH, REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE
+    REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH, REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE, \
+    REGISTRY_LOCAL_IP
 from supabase import create_client, Client
 
 import os
@@ -14,6 +16,7 @@ from pathlib import Path
 from tqdm import tqdm
 from typing import Optional, Callable, Dict, List, Any
 import json
+from urllib.parse import quote
 from tqdm.contrib.concurrent import thread_map
 from dataclasses import make_dataclass, is_dataclass, asdict, fields
 from dacite import from_dict, Config
@@ -23,6 +26,37 @@ import datetime
 from uuid import uuid4
 import hashlib
 import shutil
+
+
+
+class RegistryConnector:
+    def __init__(self, base: str = REGISTRY_LOCAL_IP, *, timeout: float = 30):
+        self.base, self.timeout = "http://" + base if not base.startswith("http://") else base, timeout
+        if not self.base: raise ValueError("Missing REGISTRY_LOCAL_IP / base URL (e.g. http://localhost:3000)")
+
+    def _url(self, key: str | Path = "", query: str = "") -> str: return (f"{self.base}/{quote(str(key).lstrip('/'), safe='/')}" if key else f"{self.base}/") + (query or "")
+
+    def _req(self, method: str, key: str | Path = "", *, query: str = "", content: bytes | str | None = None):
+        if isinstance(content, str): content = content.encode()
+        r = request(method, self._url(key, query), content=content, follow_redirects=True, timeout=self.timeout)
+        if r.status_code >= 400: raise RuntimeError(f"{method} {key}{query} -> {r.status_code}: {r.text[:200]}")
+        return r
+
+    def GET(self, key: Path) -> bytes: return self._req("GET", key).content
+    def POST(self, key: Path, data: bytes) -> None: self._req("PUT", key, content=data)
+    def DELETE(self, key: Path) -> None: self._req("DELETE", key)
+    def LIST(self, prefix: str | Path = "") -> list[Path]: return self._keys(self._req("GET", prefix, query="?list"))
+    def PUT_FILE(self, key: Path, local_path: str | Path) -> None: self.POST(key, Path(local_path).read_bytes())
+    def GET_FILE(self, key: Path, local_path: str | Path) -> None: Path(local_path).write_bytes(self.GET(key))
+
+    @staticmethod
+    def _keys(r) -> list[Path]:
+        try:
+            j = r.json()
+            if isinstance(j, list): return [Path(str(x)) for x in j]
+        except Exception: pass
+        return [Path(s) for line in r.text.splitlines() if (s := line.strip())]
+
 
 
 class RegistryBase:
@@ -244,8 +278,33 @@ RegistryBase.DefaultTypes.RESULT_WASTE = make_dataclass("RESULT_WASTE", [("metad
 
 Registry = RegistryBase(REGISTRY_PATH)
 
-if __name__ == "__main__":
-    Registry.SYNC()
-    print(Registry.LIST("argo/Argo-roskilde-03-01")[0])
-    print(Registry.LIST("argo/Argo-Jyllinge-Entrance-01")[0])
+# if __name__ == "__main__":
+    # Registry.SYNC()
+    # print(Registry.LIST("argo/Argo-roskilde-03-01")[0])
+    # print(Registry.LIST("argo/Argo-Jyllinge-Entrance-01")[0])
 
+if __name__ == "__main__":
+    print("=== Testing minikeyvalue ===\n")
+    connector = RegistryConnector()
+    
+    # Test PUT
+    print("1. Storing 'hello world' in key 'testkey'")
+    connector.POST("testkey", bytes("hello world", "utf-8"))
+    assert connector.GET("testkey") == bytes("hello world", "utf-8")
+    
+    print("\n3. Listing keys starting with 'test'")
+    keys = connector.LIST("test")
+    print(f"   Keys: {keys}")
+    assert len(keys) > 0
+    assert "testkey" in keys
+    
+    # Test DELETE
+    print("\n4. Deleting 'testkey'")
+    connector.DELETE("testkey")
+    try:
+        connector.GET("testkey")
+    except FileNotFoundError:
+        pass
+    else:
+        raise AssertionError("Key should not be found")
+    
