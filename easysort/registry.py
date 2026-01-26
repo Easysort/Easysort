@@ -30,24 +30,32 @@ import shutil
 
 
 class RegistryConnector:
-    def __init__(self, base: str = REGISTRY_LOCAL_IP, *, timeout: float = 30):
-        self.base, self.timeout = "http://" + base if not base.startswith("http://") else base, timeout
-        if not self.base: raise ValueError("Missing REGISTRY_LOCAL_IP / base URL (e.g. http://localhost:3000)")
+    def __init__(self, base: str = REGISTRY_LOCAL_IP or "localhost:3001", *, timeout: float = 30):
+        base = (base or "").rstrip("/")
+        if not base: raise ValueError("Missing REGISTRY_LOCAL_IP / base URL (e.g. http://localhost:3000)")
+        self.base = base if base.startswith(("http://", "https://")) else "http://" + base
+        self.timeout = timeout
 
-    def _url(self, key: str | Path = "", query: str = "") -> str: return (f"{self.base}/{quote(str(key).lstrip('/'), safe='/')}" if key else f"{self.base}/") + (query or "")
+    def _url(self, key: str | Path = "", query: str = "") -> str:
+        k = str(key).lstrip("/")
+        return (f"{self.base}/{quote(k, safe='/')}" if k else f"{self.base}/") + (query or "")
 
     def _req(self, method: str, key: str | Path = "", *, query: str = "", content: bytes | str | None = None):
         if isinstance(content, str): content = content.encode()
         r = request(method, self._url(key, query), content=content, follow_redirects=True, timeout=self.timeout)
+        if r.status_code == 404: raise FileNotFoundError(str(key))
+        if r.status_code == 403: raise PermissionError(str(key))
         if r.status_code >= 400: raise RuntimeError(f"{method} {key}{query} -> {r.status_code}: {r.text[:200]}")
         return r
 
-    def GET(self, key: Path) -> bytes: return self._req("GET", key).content
-    def POST(self, key: Path, data: bytes) -> None: self._req("PUT", key, content=data)
-    def DELETE(self, key: Path) -> None: self._req("DELETE", key)
+    def GET(self, key: str | Path) -> bytes: return self._req("GET", key).content
+    def POST(self, key: str | Path, data: bytes) -> None: self._req("PUT", key, content=data)
+    def DELETE(self, key: str | Path) -> None: self._req("DELETE", key)
+    def UNLINK(self, key: str | Path) -> None: self._req("UNLINK", key)
     def LIST(self, prefix: str | Path = "") -> list[Path]: return self._keys(self._req("GET", prefix, query="?list"))
-    def PUT_FILE(self, key: Path, local_path: str | Path) -> None: self.POST(key, Path(local_path).read_bytes())
-    def GET_FILE(self, key: Path, local_path: str | Path) -> None: Path(local_path).write_bytes(self.GET(key))
+    def UNLINKED(self) -> list[Path]: return self._keys(self._req("GET", query="?unlinked"))
+    def PUT_FILE(self, key: str | Path, local_path: str | Path) -> None: self.POST(key, Path(local_path).read_bytes())
+    def GET_FILE(self, key: str | Path, local_path: str | Path) -> None: Path(local_path).write_bytes(self.GET(key))
 
     @staticmethod
     def _keys(r) -> list[Path]:
@@ -278,33 +286,5 @@ RegistryBase.DefaultTypes.RESULT_WASTE = make_dataclass("RESULT_WASTE", [("metad
 
 Registry = RegistryBase(REGISTRY_PATH)
 
-# if __name__ == "__main__":
-    # Registry.SYNC()
-    # print(Registry.LIST("argo/Argo-roskilde-03-01")[0])
-    # print(Registry.LIST("argo/Argo-Jyllinge-Entrance-01")[0])
-
-if __name__ == "__main__":
-    print("=== Testing minikeyvalue ===\n")
-    connector = RegistryConnector()
-    
-    # Test PUT
-    print("1. Storing 'hello world' in key 'testkey'")
-    connector.POST("testkey", bytes("hello world", "utf-8"))
-    assert connector.GET("testkey") == bytes("hello world", "utf-8")
-    
-    print("\n3. Listing keys starting with 'test'")
-    keys = connector.LIST("test")
-    print(f"   Keys: {keys}")
-    assert len(keys) > 0
-    assert "testkey" in keys
-    
-    # Test DELETE
-    print("\n4. Deleting 'testkey'")
-    connector.DELETE("testkey")
-    try:
-        connector.GET("testkey")
-    except FileNotFoundError:
-        pass
-    else:
-        raise AssertionError("Key should not be found")
-    
+if __name__ == "__main__":  # kept empty on purpose (avoid side-effects like SYNC during imports/tests)
+    pass
