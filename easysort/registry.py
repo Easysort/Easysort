@@ -249,8 +249,9 @@ class RegistryBase:
                     pbar.update(1)
             pbar.close()
 
+        missing_files = [file for file in files if not self.backend.EXISTS(Path(SUPABASE_DATA_REGISTRY_BUCKET) / file)]
         def _download_one(file: Path): self.backend.POST(Path(SUPABASE_DATA_REGISTRY_BUCKET) / file, bucket.download(str(file)))
-        thread_map(_download_one, files, desc="Downloading missing files", max_workers=CONCURRENT_WORKERS)
+        thread_map(_download_one, missing_files, desc="Downloading missing files", max_workers=CONCURRENT_WORKERS)
         print("Sync complete")
 
         print("Cleanup videos older than 2 weeks")
