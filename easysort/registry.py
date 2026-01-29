@@ -6,9 +6,8 @@
 # - Data registry and compute on same machine. Once that is no longer true, GET should return bytes, not path.
 
 from httpx import request
-from easysort.helpers import REGISTRY_PATH, T, SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET, REGISTRY_REFERENCE_SUFFIXES, \
-    REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH, REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE, \
-    REGISTRY_LOCAL_IP
+from easysort.helpers import T, SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET, REGISTRY_REFERENCE_SUFFIXES, REGISTRY_LOCAL_IP, REGISTRY_TAILSCALE_IP, \
+    REGISTRY_REFERENCE_TYPES_MAPPING_TO_BYTES, REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE
 from supabase import create_client, Client
 
 import os
@@ -40,30 +39,36 @@ class RegistryConnector:
         k = str(key).lstrip("/")
         return (f"{self.base}/{quote(k, safe='/')}" if k else f"{self.base}/") + (query or "")
 
-    def _req(self, method: str, key: str | Path = "", *, query: str = "", content: bytes | str | None = None):
+    def _req(self, method: str, key: str | Path = "", *, query: str = "", content: bytes | str | None = None, ignore_errors: bool = False):
         if isinstance(content, str): content = content.encode()
         r = request(method, self._url(key, query), content=content, follow_redirects=True, timeout=self.timeout)
-        if r.status_code == 404: raise FileNotFoundError(str(key))
-        if r.status_code == 403: raise PermissionError(str(key))
+        if ignore_errors: return r
+        if r.status_code == 404: raise FileNotFoundError(str(key), self._url(key, query))
+        if r.status_code == 403: raise PermissionError(str(key), self._url(key, query))
         if r.status_code >= 400: raise RuntimeError(f"{method} {key}{query} -> {r.status_code}: {r.text[:200]}")
         return r
 
+    def POST(self, key: str | Path, data: bytes, allow_overwrite: bool = False) -> None: 
+        if allow_overwrite and self.EXISTS(key): self.DELETE(key)
+        self._req("PUT", key, content=data)
+
     def GET(self, key: str | Path) -> bytes: return self._req("GET", key).content
-    def POST(self, key: str | Path, data: bytes) -> None: self._req("PUT", key, content=data)
     def DELETE(self, key: str | Path) -> None: self._req("DELETE", key)
     def UNLINK(self, key: str | Path) -> None: self._req("UNLINK", key)
     def LIST(self, prefix: str | Path = "") -> list[Path]: return self._keys(self._req("GET", prefix, query="?list"))
     def UNLINKED(self) -> list[Path]: return self._keys(self._req("GET", query="?unlinked"))
     def PUT_FILE(self, key: str | Path, local_path: str | Path) -> None: self.POST(key, Path(local_path).read_bytes())
     def GET_FILE(self, key: str | Path, local_path: str | Path) -> None: Path(local_path).write_bytes(self.GET(key))
+    def EXISTS(self, key: str | Path) -> bool: return self._req("HEAD", key, ignore_errors=True).status_code == 200
 
     @staticmethod
     def _keys(r) -> list[Path]:
         try:
             j = r.json()
-            if isinstance(j, list): return [Path(str(x)) for x in j]
+            if isinstance(j, dict) and isinstance(j.get("keys"), list): return [Path(str(k).lstrip("/")) for k in j["keys"]]
+            if isinstance(j, list): return [Path(str(k).lstrip("/")) for k in j]
         except Exception: pass
-        return [Path(s) for line in r.text.splitlines() if (s := line.strip())]
+        return [Path(s.lstrip("/")) for line in r.text.splitlines() if (s := line.strip())]
 
 
 
@@ -105,21 +110,25 @@ class RegistryBase:
         @classmethod
         def list(cls): return [_type for _, _type in vars(cls).items() if is_dataclass(_type)]
 
-    def __init__(self, registry_path: Path): 
-        self.registry_path = registry_path
-        os.makedirs(self.registry_path, exist_ok=True)
-        self._hash_lookup = json.load(open(self.registry_path / ".hash_lookup.json", "r", encoding="utf-8")) if os.path.exists(self.registry_path / ".hash_lookup.json") else {}
+    def __init__(self, registry_connector: RegistryConnector): 
+        self.backend = registry_connector
+        self._hash_lookup_path = "hash_lookup.json"
         for _type in self.DefaultTypes.list() + self.DefaultMarkers.list(): self._update_hash_lookup(self.get_id(_type), self._hash(_type))
 
+    def _get_hash_lookup(self) -> dict[str, str]:
+        return json.loads(self.backend.GET(self._hash_lookup_path))
+
     def _delete_hash(self, id: str, hash: str) -> None:
-        assert id in self._hash_lookup, "The id you're trying to delete is not in the hash lookup. Make sure you the pair you are trying to delete is correct."
-        assert self._hash_lookup[id] == hash, "The id you're trying to delete does not match with the expected hash. Make sure you the pair you are trying to delete is correct."
-        del self._hash_lookup[id]
-        with open(self.registry_path / ".hash_lookup.json", "w", encoding="utf-8") as f: json.dump(self._hash_lookup, f, indent=4)
+        hash_lookup = self._get_hash_lookup()
+        assert id in hash_lookup, "The id you're trying to delete is not in the hash lookup. Make sure you the pair you are trying to delete is correct."
+        assert hash_lookup[id] == hash, "The id you're trying to delete does not match with the expected hash. Make sure you the pair you are trying to delete is correct."
+        del hash_lookup[id]
+        self.backend.POST(self._hash_lookup_path, json.dumps(hash_lookup), allow_overwrite=True)
 
     def _update_hash_lookup(self, id: str, hash: str) -> str:
-        self._hash_lookup[id] = hash
-        with open(self.registry_path / ".hash_lookup.json", "w", encoding="utf-8") as f: json.dump(self._hash_lookup, f, indent=4)
+        hash_lookup = self._get_hash_lookup()
+        hash_lookup[id] = hash
+        self.backend.POST(self._hash_lookup_path, json.dumps(hash_lookup), allow_overwrite=True)
         return id
 
     def _hash(self, _type: T) -> str:
@@ -132,35 +141,33 @@ class RegistryBase:
         if isinstance(data, list): return [self._convert_int_keys(item) for item in data]
         return data
 
-    def _get_ref_path(self, key: Path, ref: Path) -> Path: 
-        path = self.registry_path / key.with_suffix("") / "refs" / ref
-        path.parent.mkdir(parents=True, exist_ok=True)
-        return path
-
     def _construct_path(self, key: Path, _type: T) -> Path:
         if isinstance(key, str): key = Path(key)
+        assert not str(key).startswith("."), "Key cannot start with a dot"
         assert isinstance(key, Path), f"Key {key} is not a Path, but a {type(key)}"
-        assert _type is self.DefaultMarkers.ORIGINAL_MARKER or (self.registry_path / key).exists(), f"Original marker {key} does not exist"
-        if _type is self.DefaultMarkers.ORIGINAL_MARKER: return Path(self.registry_path / key) # TODO: Automatic Suffix?
+        assert _type is self.DefaultMarkers.ORIGINAL_MARKER or self.backend.EXISTS(key), f"Original marker {key} does not exist"
+        if _type is self.DefaultMarkers.ORIGINAL_MARKER: return key # TODO: Automatic Suffix?
         assert is_dataclass(_type) or _type in self.DefaultMarkers.list(), f"Type {_type} is not a dataclass, but a {type(_type)}"
-        assert self._hash(_type) in self._hash_lookup.values(), f"Hash {self._hash(_type)} not found in hash lookup. Check your id is correct using: .get_id(_type)"
-        if _type in self.DefaultTypes.list() or _type in self.DefaultMarkers.list(): id_value = next((k for k, v in self._hash_lookup.items() if v == self._hash(_type)), None)# Allow reverse ID detection for static default types
+        hash_lookup = self._get_hash_lookup()
+        assert self._hash(_type) in hash_lookup.values(), f"Hash {self._hash(_type)} not found in hash lookup. Check your id is correct using: .get_id(_type)"
+        if _type in self.DefaultTypes.list() or _type in self.DefaultMarkers.list(): id_value = next((k for k, v in hash_lookup.items() if v == self._hash(_type)), None)# Allow reverse ID detection for static default types
         else: id_value = next((f.default_factory() for f in fields(_type) if f.name == "id"), None)
         assert id_value is not None or len(id_value) == 0, f"Type {_type} does not have a default id value or default id value is 0"
-        return Path(self.registry_path / key.with_suffix("") / self._hash_lookup[id_value]).with_suffix(".json")
+        return Path(key.with_suffix("") / hash_lookup[id_value]).with_suffix(".json")
 
     def get_id(self, _type: T) -> str: 
         assert is_dataclass(_type), f"Type {_type} is not a dataclass, but a {type(_type)}"
         assert _type in self.DefaultMarkers.list() or (any(f.name == "metadata" for f in fields(_type)) and any(f.name == "id" for f in fields(_type))), f"Type {_type} does not have a metaclass and/or id field, but the following fields: {fields(_type)}"
-        if (k := next((k for k, v in self._hash_lookup.items() if v == self._hash(_type)), None)): return k
+        if (k := next((k for k, v in self._get_hash_lookup().items() if v == self._hash(_type)), None)): return k
         return self._update_hash_lookup(str(uuid4()), self._hash(_type))
 
     def add_id(self, _type: T, id: str) -> None:
         assert is_dataclass(_type), f"Type {_type} is not a dataclass, but a {type(_type)}"
         assert _type in self.DefaultMarkers.list() or (any(f.name == "metadata" for f in fields(_type)) and any(f.name == "id" for f in fields(_type))), f"Type {_type} does not have a metaclass and/or id field, but the following fields: {fields(_type)}"
         assert id is not None and len(id) == 36 and id.count("-") == 4, f"Id {id} is not a valid uuid4"
-        if id in self._hash_lookup and self._hash_lookup[id] == self._hash(_type): return
-        assert id not in self._hash_lookup, f"Id {id} already exists"
+        hash_lookup = self._get_hash_lookup()
+        if id in hash_lookup and hash_lookup[id] == self._hash(_type): return
+        assert id not in hash_lookup, f"Id {id} already exists"
         self._update_hash_lookup(id, self._hash(_type))
     
     def GET(self, key: Path, _type: T, throw_error: bool = True, ref: Optional[Path] = None) -> Optional[T]:
@@ -171,59 +178,58 @@ class RegistryBase:
         if ref is not None or _type is self.DefaultMarkers.REF_MARKER:
             assert ref is not None, "ref must be provided when _type is REF_MARKER"
             return self._get_ref(key, ref)
-        path = self._construct_path(key, _type)
-        if not path.is_file() and throw_error: raise FileNotFoundError(f"File {path} not found")
-        if not path.is_file() and not throw_error: return None
-        if _type is self.DefaultMarkers.ORIGINAL_MARKER: return REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[key.suffix](path)
-        assert path.suffix == ".json", f"Only .json files /dataclasses are supported for not original markers or refs, but {path.suffix} is not supported"
-        data = REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[".json"](path)
+        try:
+            data = self.backend.GET(self._construct_path(key, _type))
+        except FileNotFoundError:
+            if throw_error: raise
+            return None
+        if _type is self.DefaultMarkers.ORIGINAL_MARKER: return REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES[key.suffix](data)
+        assert key.suffix == ".json", f"Only .json files /dataclasses are supported for not original markers or refs, but {key.suffix} is not supported"
+        data = REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES[".json"](data)
         return from_dict(data_class=_type, data=self._convert_int_keys(data), config=Config(check_types=False)) if is_dataclass(_type) else data
-    
+
+    def _get_ref_path(self, key: Path, ref: Path) -> Path: return key.with_suffix("") / "refs" / ref
+
     def _get_ref(self, key: Path, ref: Path) -> REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys():
         assert ref.suffix in REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys(), f"Ref {ref} must have a supported suffix: {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()}"
         ref_path = self._get_ref_path(key, ref)
-        if not ref_path.is_file(): raise FileNotFoundError(f"Ref {ref} not found")
-        return REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH[ref.suffix](ref_path)
+        if not self.backend.EXISTS(ref_path): raise FileNotFoundError(f"Ref {ref} not found")
+        return REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES[ref.suffix](self.backend.GET(ref_path))
 
     def POST(self, key: Path, data: T, _type: T, overwrite: bool = False, refs: Optional[Dict[str | Path, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()]] = {}) -> None:
-        path = self._construct_path(key, _type)
+        original_key = Path(key) if isinstance(key, str) else key
+        key = self._construct_path(key, _type)
         assert all(isinstance(ref_data, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[ref_path.suffix]) for ref_path, ref_data in refs.items() if refs is not None), f"Refs {refs} are not a dict of {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE.keys()}"
         assert isinstance(data, _type) or _type in self.DefaultMarkers.list(), f"Data {data} is not a {_type}"
-        assert not path.is_file() or overwrite, f"File {key} already exists, and you chose to not overwrite"
+        assert not self.backend.EXISTS(key) or overwrite, f"File {key} already exists, and you chose to not overwrite"
         assert _type is not self.DefaultMarkers.ORIGINAL_MARKER or (key.suffix in REGISTRY_REFERENCE_SUFFIXES and isinstance(data, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[key.suffix])), \
             f"Original marker {key} must have a supported suffix: {REGISTRY_REFERENCE_SUFFIXES} and data must be a {REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE[key.suffix]}. Received {type(data)} with suffix {key.suffix}"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if _type is self.DefaultMarkers.ORIGINAL_MARKER: REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[key.suffix](path, data)
+        if _type is self.DefaultMarkers.ORIGINAL_MARKER: self.backend.POST(key, REGISTRY_REFERENCE_TYPES_MAPPING_TO_BYTES[key.suffix](data), allow_overwrite=overwrite)
         else: 
             assert is_dataclass(_type), f"Data {data} is not a dataclass, but a {type(data)}. Currently only dataclasses are supported."
-            REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[".json"](path, asdict(data))
-            with open(path.with_suffix(".schema.json"), "w", encoding="utf-8") as f: json.dump({f.name: str(f.type) for f in fields(_type)}, f, indent=4)
+            self.backend.POST(key, REGISTRY_REFERENCE_TYPES_MAPPING_TO_BYTES[".json"](asdict(data)), allow_overwrite=overwrite)
+            self.backend.POST(key.with_suffix(".schema.json"), REGISTRY_REFERENCE_TYPES_MAPPING_TO_BYTES[".json"]({f.name: str(f.type) for f in fields(_type)}), allow_overwrite=overwrite)
         if refs is None: return
-        for ref_path, data in refs.items(): REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH[ref_path.suffix](self._get_ref_path(key, ref_path), data)
+        for ref_path, ref_data in refs.items(): self.backend.POST(self._get_ref_path(original_key, ref_path), REGISTRY_REFERENCE_TYPES_MAPPING_TO_BYTES[ref_path.suffix](ref_data), allow_overwrite=overwrite)
 
     def DELETE(self, key: Path, _type: T) -> None:
         "Deletes the data excluding references. If _type is ORIGINAL_MARKER, then everything related to this key will be deleted including references."
-        if _type is not self.DefaultMarkers.ORIGINAL_MARKER: os.remove(self._construct_path(key, _type))
+        if _type is not self.DefaultMarkers.ORIGINAL_MARKER: self.backend.DELETE(self._construct_path(key, _type))
         else:
-            os.remove(self._construct_path(key, _type))
-            results_dir = self.registry_path / key.with_suffix("")
-            if results_dir.exists(): shutil.rmtree(results_dir)
+            self.backend.DELETE(key)
+            # Delete all related keys (results, refs, etc.) by listing and deleting keys with this prefix
+            prefix = str(key.with_suffix(""))
+            for related_key in self.backend.LIST(prefix):
+                try: self.backend.DELETE(related_key)
+                except FileNotFoundError: pass
         assert not self.EXISTS(key, _type), f"Data {key} still exists after deletion"
 
 
     def LIST(self, prefix: Optional[str] = "", suffix: Optional[List[str] | str] = REGISTRY_REFERENCE_SUFFIXES, cond: Optional[Callable[[str], bool]] = None, return_all: bool = False) -> list[Path]:
-        files = [Path(os.path.join(root, file)) for root, _, files in tqdm(os.walk(Path(self.registry_path) / prefix), desc="Listing files") for file in files]
+        files = self.backend.LIST(prefix)
         files = [file for file in files if (file.suffix in list(suffix) if suffix else True) and not file.name.startswith("._")]
         cond_files = [file for file in tqdm(files, desc="Filtering files") if cond(file)] if cond else files
         return [files, cond_files] if return_all else cond_files
-
-    def _registry_path(self, key: str | Path) -> Path:
-        """Return absolute on-disk path for a registry key (relative keys are resolved under `registry_path`)."""
-        key = Path(key)
-        return key if key.is_absolute() else (self.registry_path / key)
-
-    def HTTP_VIEW(self) -> None:
-        pass
 
 
     def SYNC(self) -> None:
@@ -242,16 +248,9 @@ class RegistryBase:
                     files.extend([cur / Path(x) for x in paths if "." in x])
                     pbar.update(1)
             pbar.close()
-        
-        missing_files = [file for file in files if not os.path.exists(os.path.join(self.registry_path, SUPABASE_DATA_REGISTRY_BUCKET, file)) if ".jpg" not in str(file)]
-        print("Missing files: ", len(missing_files), "out of", len(files))
 
-        def _download_one(file: str):
-            dst = Path(self.registry_path) / SUPABASE_DATA_REGISTRY_BUCKET / Path(file)
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            dst.write_bytes(supabase_client.storage.from_("argo").download(str(file)))
-
-        thread_map(_download_one, missing_files, desc="Downloading missing files", max_workers=CONCURRENT_WORKERS)
+        def _download_one(file: Path): self.backend.POST(Path(SUPABASE_DATA_REGISTRY_BUCKET) / file, bucket.download(str(file)))
+        thread_map(_download_one, files, desc="Downloading missing files", max_workers=CONCURRENT_WORKERS)
         print("Sync complete")
 
         print("Cleanup videos older than 2 weeks")
@@ -275,7 +274,7 @@ class RegistryBase:
             supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET).remove(files_to_delete[i:i+100])
             time.sleep(1)
 
-    def EXISTS(self, key: Path, _type: T) -> bool: return self._construct_path(key, _type).is_file()
+    def EXISTS(self, key: Path, _type: T) -> bool: return self.backend.EXISTS(self._construct_path(key, _type))
     def EXPECT(self):
         # Potentially a EXPECT lazily generating missing results by returning list of bool, then using a specified func to generate results.
         pass
@@ -283,8 +282,9 @@ class RegistryBase:
 RegistryBase.DefaultTypes.RESULT_PEOPLE = make_dataclass("RESULT_PEOPLE", [("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA), ("frame_results", Dict[int, List["RegistryBase.BaseDefaultTypes.DEFAULT_DETECTION_DATACLASS"]])], bases=(RegistryBase.BaseDefaultTypes.BASECLASS,))
 RegistryBase.DefaultTypes.RESULT_WASTE = make_dataclass("RESULT_WASTE", [("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA), ("frame_results", Dict[int, List["RegistryBase.BaseDefaultTypes.DEFAULT_WASTE_DATACLASS"]])], bases=(RegistryBase.BaseDefaultTypes.BASECLASS,))
 
-
-Registry = RegistryBase(REGISTRY_PATH)
+RegistryConnectorLocal = RegistryConnector(REGISTRY_LOCAL_IP)
+Registry = RegistryBase(RegistryConnectorLocal)
 
 if __name__ == "__main__":  # kept empty on purpose (avoid side-effects like SYNC during imports/tests)
-    pass
+    Registry.SYNC()
+    # SYNC, EXPLORE (HTML-VIEWER)

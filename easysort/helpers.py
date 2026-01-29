@@ -46,28 +46,30 @@ class Sort: # Expects paths like: ../2025/12/10/08/photo_20251210T082225Z.jpg
         if datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second)) < date: yield item
 
 
-DEBUG = ContextVar("DEBUG", 0)
+DEBUG, ON_LOCAL_CLOUD = ContextVar("DEBUG", 0), ContextVar("ON_LOCAL_CLOUD", 0) # ON_LOCAL_CLOUD: Everything must be run locally, on this device. 
 DATA_REGISTRY_PATH, RESULTS_REGISTRY_PATH, REGISTRY_PATH = getenv("DATA_REGISTRY_PATH", Path("")), getenv("RESULTS_REGISTRY_PATH", Path("")), getenv("REGISTRY_PATH", Path(""))
+REGISTRY_LOCAL_IP, REGISTRY_TAILSCALE_IP = getenv("REGISTRY_LOCAL_IP", ""), getenv("REGISTRY_TAILSCALE_IP", "")
 SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET = getenv("SUPABASE_URL", ""), getenv("SUPABASE_KEY", ""), getenv("SUPABASE_DATA_REGISTRY_BUCKET", "")
-AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET, AWS_REGION = getenv("AWS_ACCESS_KEY_ID", ""), getenv("AWS_SECRET_ACCESS_KEY", ""), getenv("AWS_S3_BUCKET", ""), getenv("AWS_REGION", "eu-north-1")
 OPENAI_API_KEY = getenv("OPENAI_API_KEY", "")
 
 REGISTRY_REFERENCE_SUFFIXES = (".json", ".npy", ".png", ".jpg", ".jpeg")
 REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE = {
   ".json": dict, ".npy": np.ndarray, ".png": Image.Image, ".jpg": Image.Image, ".jpeg": Image.Image}
-REGISTRY_REFERENCE_TYPES_MAPPING_TO_PATH = {
-  ".json": lambda path, _dict: json.dump(_dict, open(path, "w", encoding="utf-8")),
-  ".npy": lambda path, array: np.save(path, array),
-  ".png": lambda path, image: image.save(path, format="PNG"),
-  ".jpg": lambda path, image: image.save(path, format="JPEG"),
-  ".jpeg": lambda path, image: image.save(path, format="JPEG")
+import io
+
+REGISTRY_REFERENCE_TYPES_MAPPING_TO_BYTES = {
+  ".json": lambda obj: json.dumps(obj, ensure_ascii=False).encode("utf-8"),
+  ".npy": lambda array: (lambda buf=io.BytesIO(): (np.save(buf, array), buf.seek(0), buf.read())[2])(),
+  ".png": lambda image: (lambda buf=io.BytesIO(): (image.save(buf, format="PNG"), buf.getvalue())[1])(),
+  ".jpg": lambda image: (lambda buf=io.BytesIO(): (image.save(buf, format="JPEG"), buf.getvalue())[1])(),
+  ".jpeg": lambda image: (lambda buf=io.BytesIO(): (image.save(buf, format="JPEG"), buf.getvalue())[1])(),
 }
-REGISTRY_REFERENCE_TYPES_MAPPING_FROM_PATH = {
-  ".json": lambda path: json.load(open(path, "r", encoding="utf-8")),
-  ".npy": lambda path: np.load(path),
-  ".png": lambda path: Image.open(path),
-  ".jpg": lambda path: Image.open(path),
-  ".jpeg": lambda path: Image.open(path),
+REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES = {
+  ".json": lambda data: json.loads(data.decode("utf-8")),
+  ".npy": lambda data: np.load(io.BytesIO(data)),
+  ".png": lambda data: Image.open(io.BytesIO(data)),
+  ".jpg": lambda data: Image.open(io.BytesIO(data)),
+  ".jpeg": lambda data: Image.open(io.BytesIO(data)),
 }
 
 def current_timestamp() -> str: return datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
