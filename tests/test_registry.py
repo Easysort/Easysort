@@ -1,30 +1,34 @@
 import unittest
 from pathlib import Path
-import os
 import numpy as np
-import pandas as pd
-import shutil
-from dataclasses import make_dataclass, asdict
+from dataclasses import make_dataclass
 from PIL import Image
-from datetime import datetime
 
 from easysort.helpers import current_timestamp
+from easysort.registry import RegistryBase, RegistryConnector
+from tests.helpers import minikeyvalue_server
 
 
 class TestRegistry(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._srv = minikeyvalue_server()
+        cls._base = cls._srv.__enter__()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._srv.__exit__(None, None, None)
 
     def setUp(self):
-        from easysort.registry import RegistryBase
-        from easysort.helpers import REGISTRY_PATH
-        test_registry_path = REGISTRY_PATH.parent / "test_registry"
-        if os.path.exists(test_registry_path): shutil.rmtree(test_registry_path)
-        os.makedirs(test_registry_path, exist_ok=True)
-        self.registry = RegistryBase(test_registry_path)
+        # Reset state: delete all keys, re-init hash_lookup
+        connector = RegistryConnector(self._base)
+        for key in connector.LIST():
+            try: connector.DELETE(key)
+            except: pass
+        connector.POST("hash_lookup.json", b"{}")
+        self.registry = RegistryBase(connector)
         self.dummy_dataclass = make_dataclass("DummyDataclass", [("id", str), ("dummy", str), ("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA)])
         self.dummy_dataclass2 = make_dataclass("DummyDataclass2", [("id", str), ("dummy2", str), ("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA)])
-
-    def tearDown(self) -> None:
-        shutil.rmtree(self.registry.registry_path)
 
     def test_GET_default_type(self):
         data = {"test": "test"}
@@ -128,13 +132,13 @@ class TestRegistry(unittest.TestCase):
         self.registry.DELETE(Path("vid.json"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
         assert not self.registry.EXISTS(Path("vid.json"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
         self.assertRaises(AssertionError, self.registry.EXISTS, Path("vid.json"), self.registry.DefaultTypes.RESULT_PEOPLE) # Should fail as original marker is deleted
-        assert not self.registry._get_ref_path(Path("vid.json"), Path("thumb.png")).exists()
+        assert not self.registry.backend.EXISTS(self.registry._get_ref_path(Path("vid.json"), Path("thumb.png")))
 
     def test_construct_path(self):
         id1 = self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE)
         self.registry.POST(Path("test.json"), {"test": "test"}, self.registry.DefaultMarkers.ORIGINAL_MARKER)
         path = self.registry._construct_path(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
-        assert self.registry._hash_lookup[id1] in path.name, "The hash should be in the path"
+        assert self.registry._get_hash_lookup()[id1] in path.name, "The hash should be in the path"
 
     def test_no_dataclass_type(self):
         self.assertRaises(AssertionError, self.registry._construct_path, Path("test.json"), "bad_type")
@@ -143,9 +147,10 @@ class TestRegistry(unittest.TestCase):
         self.assertRaises(AssertionError, self.registry._hash, {"test": "test"})
 
     def test_auto_generate_ids_for_defaulttypes(self):
-        assert len(self.registry._hash_lookup) == len(self.registry.DefaultTypes.list()) + len(self.registry.DefaultMarkers.list())
-        assert all(self.registry._hash(_type) in self.registry._hash_lookup.values() for _type in self.registry.DefaultTypes.list())
-        assert all(self.registry._hash(_type) in self.registry._hash_lookup.values() for _type in self.registry.DefaultMarkers.list())
+        hl = self.registry._get_hash_lookup()
+        assert len(hl) == len(self.registry.DefaultTypes.list()) + len(self.registry.DefaultMarkers.list())
+        assert all(self.registry._hash(_type) in hl.values() for _type in self.registry.DefaultTypes.list())
+        assert all(self.registry._hash(_type) in hl.values() for _type in self.registry.DefaultMarkers.list())
 
     def test_get_new_id(self):
         id1 = self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE)
@@ -156,14 +161,16 @@ class TestRegistry(unittest.TestCase):
         assert id1 != id3, "The two ids should be different"
         id4 = self.registry.get_id(self.dummy_dataclass)
         assert id1 != id4, "The two ids should be different"
-        assert len(self.registry._hash_lookup) == len(self.registry.DefaultTypes.list()) + len(self.registry.DefaultMarkers.list()) + 1
-        assert id4 in self.registry._hash_lookup, "The hash lookup should have the id"
-        assert self.registry._hash_lookup[id4] == self.registry._hash(self.dummy_dataclass), "The hash lookup should have the correct hash"
+        hl = self.registry._get_hash_lookup()
+        assert len(hl) == len(self.registry.DefaultTypes.list()) + len(self.registry.DefaultMarkers.list()) + 1
+        assert id4 in hl, "The hash lookup should have the id"
+        assert hl[id4] == self.registry._hash(self.dummy_dataclass), "The hash lookup should have the correct hash"
         self.assertRaises(AssertionError, self.registry._delete_hash, id1, self.registry._hash(self.dummy_dataclass))
         self.registry._delete_hash(id4, self.registry._hash(self.dummy_dataclass))
-        assert len(self.registry._hash_lookup) == len(self.registry.DefaultTypes.list()) + len(self.registry.DefaultMarkers.list())
-        assert id4 not in self.registry._hash_lookup, "The hash lookup should not have the deleted id"
-        assert id1 in self.registry._hash_lookup, "The hash lookup should have the original id"
+        hl = self.registry._get_hash_lookup()
+        assert len(hl) == len(self.registry.DefaultTypes.list()) + len(self.registry.DefaultMarkers.list())
+        assert id4 not in hl, "The hash lookup should not have the deleted id"
+        assert id1 in hl, "The hash lookup should have the original id"
         self.assertRaises(AssertionError, self.registry._delete_hash, id4, self.registry._hash(self.dummy_dataclass2))
 
     def test_hashing(self):
@@ -177,12 +184,14 @@ class TestRegistry(unittest.TestCase):
     def test_hash_lookup(self):
         id1 = self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE)
         hash1 = self.registry._hash(self.registry.DefaultTypes.RESULT_PEOPLE)
-        assert id1 in self.registry._hash_lookup, "The hash lookup should have the id"
-        assert self.registry._hash_lookup[id1] == hash1, "The hash lookup should have the correct hash"
+        hl = self.registry._get_hash_lookup()
+        assert id1 in hl, "The hash lookup should have the id"
+        assert hl[id1] == hash1, "The hash lookup should have the correct hash"
         id2 = self.registry.get_id(self.registry.DefaultTypes.RESULT_WASTE)
         hash2 = self.registry._hash(self.registry.DefaultTypes.RESULT_WASTE)
-        assert id2 in self.registry._hash_lookup, "The hash lookup should have the id"
-        assert self.registry._hash_lookup[id2] == hash2, "The hash lookup should have the correct hash"
+        hl = self.registry._get_hash_lookup()
+        assert id2 in hl, "The hash lookup should have the id"
+        assert hl[id2] == hash2, "The hash lookup should have the correct hash"
         assert id1 != id2, "The two ids should be different"
         assert hash1 != hash2, "The two hashes should be different"
 
