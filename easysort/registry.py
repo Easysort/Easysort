@@ -24,12 +24,13 @@ import time
 import datetime
 from uuid import uuid4
 import hashlib
-import shutil
-
+import sys
 
 
 class RegistryConnector:
-    def __init__(self, base: str = REGISTRY_LOCAL_IP or "localhost:3001", *, timeout: float = 30):
+    def __init__(self, base: str = REGISTRY_LOCAL_IP, *, timeout: float = 30):
+        if len(REGISTRY_LOCAL_IP) == 0: print("Warning: REGISTRY_LOCAL_IP is not set, using default 'localhost:3001'")
+        base = REGISTRY_LOCAL_IP if len(REGISTRY_LOCAL_IP) > 0 else "localhost:3001"
         base = (base or "").rstrip("/")
         if not base: raise ValueError("Missing REGISTRY_LOCAL_IP / base URL (e.g. http://localhost:3000)")
         self.base = base if base.startswith(("http://", "https://")) else "http://" + base
@@ -48,9 +49,13 @@ class RegistryConnector:
         if r.status_code >= 400: raise RuntimeError(f"{method} {key}{query} -> {r.status_code}: {r.text[:200]}")
         return r
 
-    def POST(self, key: str | Path, data: bytes, allow_overwrite: bool = False) -> None: 
+    def POST(self, key: str | Path, data: bytes, allow_overwrite: bool = False, ignore_already_exists: bool = False) -> None: 
         if allow_overwrite and self.EXISTS(key): self.DELETE(key)
-        self._req("PUT", key, content=data)
+        r = self._req("PUT", key, content=data, ignore_errors=ignore_already_exists)
+        if ignore_already_exists and r.status_code == 403: 
+            print(key, "already exists, skipping")
+            return
+        if r.status_code != 201: raise RuntimeError(f"PUT {key} -> {r.status_code}: {r.text[:200]}")
 
     def GET(self, key: str | Path) -> bytes: return self._req("GET", key).content
     def DELETE(self, key: str | Path) -> None: self._req("DELETE", key)
@@ -249,9 +254,8 @@ class RegistryBase:
                     pbar.update(1)
             pbar.close()
 
-        missing_files = [file for file in files if not self.backend.EXISTS(Path(SUPABASE_DATA_REGISTRY_BUCKET) / file)]
-        def _download_one(file: Path): self.backend.POST(Path(SUPABASE_DATA_REGISTRY_BUCKET) / file, bucket.download(str(file)))
-        thread_map(_download_one, missing_files, desc="Downloading missing files", max_workers=CONCURRENT_WORKERS)
+        def _download_one(file: Path): self.backend.POST(Path(SUPABASE_DATA_REGISTRY_BUCKET) / file, bucket.download(str(file)), ignore_already_exists=True)
+        thread_map(_download_one, files, desc="Downloading missing files", max_workers=CONCURRENT_WORKERS)
         print("Sync complete")
 
         print("Cleanup videos older than 2 weeks")
@@ -287,5 +291,7 @@ RegistryConnectorLocal = RegistryConnector(REGISTRY_LOCAL_IP)
 Registry = RegistryBase(RegistryConnectorLocal)
 
 if __name__ == "__main__":  # kept empty on purpose (avoid side-effects like SYNC during imports/tests)
-    Registry.SYNC()
-    # SYNC, EXPLORE (HTML-VIEWER)
+    command = sys.argv[1]
+    if command == "sync": Registry.SYNC()
+    elif command == "explore": raise NotImplementedError("Explore not implemented") # Will be a HTML viewer of contents (AWS style)
+    elif command == "uuid": print(uuid4())
