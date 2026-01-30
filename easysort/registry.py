@@ -262,8 +262,9 @@ class RegistryBase:
                     pbar.update(1)
             pbar.close()
 
-        missing_bools = self.backend.EXISTS_MULTIPLE(files)
-        missing_files = [file for file, bool in zip(files, missing_bools) if not bool]
+        files_with_bucket = [Path(SUPABASE_DATA_REGISTRY_BUCKET) / file for file in files]
+        exists_bools = self.backend.EXISTS_MULTIPLE(files_with_bucket)
+        missing_files = [file for file, exists in zip(files, exists_bools) if not exists]
         print(len(missing_files), "out of", len(files), "files are missing")
         def _download_one(file: Path): self.backend.POST(Path(SUPABASE_DATA_REGISTRY_BUCKET) / file, bucket.download(str(file)), ignore_already_exists=True)
         thread_map(_download_one, missing_files, desc="Downloading missing files", max_workers=CONCURRENT_WORKERS)
@@ -302,18 +303,18 @@ RegistryConnectorLocal = RegistryConnector(REGISTRY_LOCAL_IP)
 Registry = RegistryBase(RegistryConnectorLocal)
 
 if __name__ == "__main__":  # kept empty on purpose (avoid side-effects like SYNC during imports/tests)
-    directory = Path("/Users/lucasvilsen/Desktop/registry")
-    new_files = [f for f in tqdm(directory.rglob("*")) if f.is_file() and not f.name.startswith("._") and "hash_lookup" not in f.name]
-    new_files_without_dir = [f.relative_to(directory) for f in new_files]
-    bools = Registry.backend.EXISTS_MULTIPLE(new_files_without_dir)
-    print(len(new_files_without_dir) - sum(bools), "out of", len(new_files), "files are missing")
-    for file, file_without_dir, bool in tqdm(zip(new_files, new_files_without_dir, bools), total=len(new_files)):
-        if bool: continue
-        Registry.backend.PUT_FILE(file_without_dir, file)
-    # if len(sys.argv) < 2:
-    #     print("Usage: uv run easysort.registry sync|explore|uuid")
-    #     sys.exit(1)
-    # command = sys.argv[1]
-    # if command == "sync": Registry.SYNC()
-    # elif command == "explore": raise NotImplementedError("Explore not implemented") # Will be a HTML viewer of contents (AWS style)
-    # elif command == "uuid": print(uuid4())
+    # directory = Path("/Users/lucasvilsen/Desktop/registry")
+    # new_files = [f for f in tqdm(directory.rglob("*")) if f.is_file() and not f.name.startswith("._") and "hash_lookup" not in f.name]
+    # new_files_without_dir = [f.relative_to(directory) for f in new_files]
+    # bools = Registry.backend.EXISTS_MULTIPLE(new_files_without_dir)
+    # print(len(new_files_without_dir) - sum(bools), "out of", len(new_files), "files are missing")
+    # for file, file_without_dir, bool in tqdm(zip(new_files, new_files_without_dir, bools), total=len(new_files)):
+    #     if bool: continue
+    #     Registry.backend.PUT_FILE(file_without_dir, file)
+    if len(sys.argv) < 2:
+        print("Usage: uv run easysort.registry sync|explore|uuid")
+        sys.exit(1)
+    command = sys.argv[1]
+    if command == "sync": Registry.SYNC()
+    elif command == "explore": raise NotImplementedError("Explore not implemented") # Will be a HTML viewer of contents (AWS style)
+    elif command == "uuid": print(uuid4())
