@@ -1,3 +1,6 @@
 [submodule "easyprod"]
 	path = easyprod
 	url = git@github.com:Easysort/Easyprod.git
+[submodule "stats"]
+	path = stats
+	url = git@github.com:Easysort/stats.git

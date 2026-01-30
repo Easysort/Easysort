@@ -25,6 +25,7 @@ dependencies = [
     "torchreid>=0.2.5",
     "tqdm>=4.67.1",
     "ultralytics>=8.3.227",
+    "raylib>=5.5.0.4",
 ]
 [tool.uv]
 package = true
