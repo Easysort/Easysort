@@ -57,14 +57,22 @@ class RegistryConnector:
             return
         if r.status_code != 201: raise RuntimeError(f"PUT {key} -> {r.status_code}: {r.text[:200]}")
 
+    def GET_MULTIPLE(self, keys: list[str | Path]) -> list[bytes]: 
+        listed_keys = self.LIST()
+        return [self.GET(key) for key in keys if key in listed_keys]
+
     def GET(self, key: str | Path) -> bytes: return self._req("GET", key).content
-    def DELETE(self, key: str | Path) -> None: self._req("DELETE", key)
+    def DELETE(self, key: str | Path, ignore_errors: bool = False) -> None: self._req("DELETE", key, ignore_errors=ignore_errors)
     def UNLINK(self, key: str | Path) -> None: self._req("UNLINK", key)
     def LIST(self, prefix: str | Path = "") -> list[Path]: return self._keys(self._req("GET", prefix, query="?list"))
     def UNLINKED(self) -> list[Path]: return self._keys(self._req("GET", query="?unlinked"))
     def PUT_FILE(self, key: str | Path, local_path: str | Path) -> None: self.POST(key, Path(local_path).read_bytes())
     def GET_FILE(self, key: str | Path, local_path: str | Path) -> None: Path(local_path).write_bytes(self.GET(key))
     def EXISTS(self, key: str | Path) -> bool: return self._req("HEAD", key, ignore_errors=True).status_code == 200
+
+    def EXISTS_MULTIPLE(self, keys: list[str | Path]) -> list[bool]: 
+        listed_keys = self.LIST()
+        return [Path(key) in listed_keys for key in keys]
 
     @staticmethod
     def _keys(r) -> list[Path]:
@@ -254,8 +262,11 @@ class RegistryBase:
                     pbar.update(1)
             pbar.close()
 
+        missing_bools = self.backend.EXISTS_MULTIPLE(files)
+        missing_files = [file for file, bool in zip(files, missing_bools) if not bool]
+        print(len(missing_files), "out of", len(files), "files are missing")
         def _download_one(file: Path): self.backend.POST(Path(SUPABASE_DATA_REGISTRY_BUCKET) / file, bucket.download(str(file)), ignore_already_exists=True)
-        thread_map(_download_one, files, desc="Downloading missing files", max_workers=CONCURRENT_WORKERS)
+        thread_map(_download_one, missing_files, desc="Downloading missing files", max_workers=CONCURRENT_WORKERS)
         print("Sync complete")
 
         print("Cleanup videos older than 2 weeks")
@@ -291,7 +302,18 @@ RegistryConnectorLocal = RegistryConnector(REGISTRY_LOCAL_IP)
 Registry = RegistryBase(RegistryConnectorLocal)
 
 if __name__ == "__main__":  # kept empty on purpose (avoid side-effects like SYNC during imports/tests)
-    command = sys.argv[1]
-    if command == "sync": Registry.SYNC()
-    elif command == "explore": raise NotImplementedError("Explore not implemented") # Will be a HTML viewer of contents (AWS style)
-    elif command == "uuid": print(uuid4())
+    directory = Path("/Users/lucasvilsen/Desktop/registry")
+    new_files = [f for f in tqdm(directory.rglob("*")) if f.is_file() and not f.name.startswith("._") and "hash_lookup" not in f.name]
+    new_files_without_dir = [f.relative_to(directory) for f in new_files]
+    bools = Registry.backend.EXISTS_MULTIPLE(new_files_without_dir)
+    print(len(new_files_without_dir) - sum(bools), "out of", len(new_files), "files are missing")
+    for file, file_without_dir, bool in tqdm(zip(new_files, new_files_without_dir, bools), total=len(new_files)):
+        if bool: continue
+        Registry.backend.PUT_FILE(file_without_dir, file)
+    # if len(sys.argv) < 2:
+    #     print("Usage: uv run easysort.registry sync|explore|uuid")
+    #     sys.exit(1)
+    # command = sys.argv[1]
+    # if command == "sync": Registry.SYNC()
+    # elif command == "explore": raise NotImplementedError("Explore not implemented") # Will be a HTML viewer of contents (AWS style)
+    # elif command == "uuid": print(uuid4())

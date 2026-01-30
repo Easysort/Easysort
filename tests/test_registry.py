@@ -195,6 +195,12 @@ class TestRegistry(unittest.TestCase):
         assert id1 != id2, "The two ids should be different"
         assert hash1 != hash2, "The two hashes should be different"
 
+    def test_EXISTS_MULTIPLE(self):
+        self.registry.backend.POST(Path("test.json"), b"test")
+        bools = self.registry.backend.EXISTS_MULTIPLE([Path("test.json"), Path("test2.json")])
+        self.registry.backend.DELETE(Path("test.json"))
+        assert bools == [True, False]
+
 
 if __name__ == '__main__':
   unittest.main()
