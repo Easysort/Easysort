@@ -47,39 +47,47 @@ class YoloTrainer:
     def _to_bgr(self, img: np.ndarray) -> np.ndarray:
         return cv2.cvtColor(img, cv2.COLOR_RGB2BGR) if len(img.shape) == 3 else img
     
-    def _stratified_split(self, images: List[np.ndarray], labels: List[str], val_ratio: float = 0.2) -> Tuple[List, List, List, List]:
-        """Split data maintaining class distribution in both train and val sets."""
+    def _stratified_split(self, images: List[np.ndarray], labels: List[str], 
+                          val_ratio: float = 0.15, test_ratio: float = 0.15) -> Tuple[List, List, List, List, List, List]:
+        """Split data into train/val/test maintaining class distribution.
+        
+        Returns: train_imgs, train_labels, val_imgs, val_labels, test_imgs, test_labels
+        """
         # Group indices by class
         class_indices: Dict[str, List[int]] = defaultdict(list)
         for i, label in enumerate(labels):
             if label in self.classes:
                 class_indices[label].append(i)
         
-        train_indices, val_indices = [], []
+        train_indices, val_indices, test_indices = [], [], []
         
-        # For each class, take val_ratio for validation
+        # For each class, split proportionally
         for cls, indices in class_indices.items():
             random.shuffle(indices)
-            n_val = max(1, int(len(indices) * val_ratio))  # At least 1 sample for val
-            val_indices.extend(indices[:n_val])
-            train_indices.extend(indices[n_val:])
+            n = len(indices)
+            n_test = max(1, int(n * test_ratio))
+            n_val = max(1, int(n * val_ratio))
+            
+            test_indices.extend(indices[:n_test])
+            val_indices.extend(indices[n_test:n_test + n_val])
+            train_indices.extend(indices[n_test + n_val:])
         
         random.shuffle(train_indices)
         random.shuffle(val_indices)
+        random.shuffle(test_indices)
         
-        train_imgs = [images[i] for i in train_indices]
-        train_labels = [labels[i] for i in train_indices]
-        val_imgs = [images[i] for i in val_indices]
-        val_labels = [labels[i] for i in val_indices]
-        
-        return train_imgs, train_labels, val_imgs, val_labels
+        return (
+            [images[i] for i in train_indices], [labels[i] for i in train_indices],
+            [images[i] for i in val_indices], [labels[i] for i in val_indices],
+            [images[i] for i in test_indices], [labels[i] for i in test_indices],
+        )
     
     def _compute_metrics(self, model: YOLO, images: List[np.ndarray], labels: List[str]) -> Tuple[Dict[str, Dict], float]:
-        """Compute per-class metrics and balanced accuracy."""
-        preds = []
-        for img in images:
-            result = model.predict(self._to_bgr(img), verbose=False)[0]
-            preds.append(model.names[int(result.probs.top1)])
+        """Compute per-class metrics and balanced accuracy using batch prediction."""
+        # Batch predict for speed
+        bgr_images = [self._to_bgr(img) for img in images]
+        results = model.predict(bgr_images, verbose=False, batch=32)
+        preds = [model.names[int(r.probs.top1)] for r in results]
         
         class_metrics = {}
         class_accuracies = []
@@ -110,60 +118,72 @@ class YoloTrainer:
         
         return class_metrics, balanced_acc
     
-    def _print_epoch_metrics(self, epoch: int, train_metrics: Dict, val_metrics: Dict, train_bal_acc: float, val_bal_acc: float, is_best: bool):
-        """Print per-category metrics for an epoch."""
+    def _print_epoch_metrics(self, epoch: int, val_metrics: Dict, test_metrics: Dict, 
+                             val_bal_acc: float, test_bal_acc: float, is_best: bool):
+        """Print per-category metrics for an epoch (val + held-out test)."""
         best_marker = " *** BEST ***" if is_best else ""
-        print(f"\n{'='*60}")
+        print(f"\n{'='*80}")
         print(f"EPOCH {epoch}{best_marker}")
-        print(f"{'='*60}")
-        print(f"\n{'Class':<18} {'Train Acc':<12} {'Val Acc':<12} {'Val Prec':<12} {'Val Rec':<12} {'Val F1':<10} {'N(val)':<8}")
-        print("-" * 90)
+        print(f"{'='*80}")
+        print(f"\n{'Class':<16} {'Val Acc':<10} {'Test Acc':<10} {'Test Prec':<11} {'Test Rec':<10} {'Test F1':<9} {'N(val)':<8} {'N(test)':<8}")
+        print("-" * 92)
         
         for cls in self.classes:
-            t = train_metrics.get(cls, {})
             v = val_metrics.get(cls, {})
-            train_acc = f"{t.get('accuracy', 0):.1%}" if t else "N/A"
+            t = test_metrics.get(cls, {})
             val_acc = f"{v.get('accuracy', 0):.1%}" if v else "N/A"
-            val_prec = f"{v.get('precision', 0):.1%}" if v else "N/A"
-            val_rec = f"{v.get('recall', 0):.1%}" if v else "N/A"
-            val_f1 = f"{v.get('f1', 0):.2f}" if v else "N/A"
+            test_acc = f"{t.get('accuracy', 0):.1%}" if t else "N/A"
+            test_prec = f"{t.get('precision', 0):.1%}" if t else "N/A"
+            test_rec = f"{t.get('recall', 0):.1%}" if t else "N/A"
+            test_f1 = f"{t.get('f1', 0):.2f}" if t else "N/A"
             n_val = v.get('n_samples', 0)
-            print(f"{cls:<18} {train_acc:<12} {val_acc:<12} {val_prec:<12} {val_rec:<12} {val_f1:<10} {n_val:<8}")
+            n_test = t.get('n_samples', 0)
+            print(f"{cls:<16} {val_acc:<10} {test_acc:<10} {test_prec:<11} {test_rec:<10} {test_f1:<9} {n_val:<8} {n_test:<8}")
         
-        print("-" * 90)
-        print(f"{'BALANCED ACC':<18} {train_bal_acc:<12.1%} {val_bal_acc:<12.1%}")
+        print("-" * 92)
+        print(f"{'BALANCED ACC':<16} {val_bal_acc:<10.1%} {test_bal_acc:<10.1%}")
+        
+        # Overfitting indicator: val much better than test
+        if val_bal_acc - test_bal_acc > 0.10:
+            print(f"⚠️  Val-Test gap: {val_bal_acc - test_bal_acc:.1%} (possible overfitting to val set)")
         print()
     
     def train(self, images: List[np.ndarray], labels: List[str], epochs: int = 20, 
               patience: int = 5, min_epochs: int = 3):
         """
-        Train with stratified validation, per-epoch evaluation, and early stopping.
+        Train with stratified train/val/test split, per-epoch evaluation, and early stopping.
+        
+        The test set is completely held out from YOLO - never seen during training.
+        Best model is selected based on validation balanced accuracy.
         
         Args:
             images: Training images
-            labels: Training labels
+            labels: Training labels  
             epochs: Maximum number of epochs
             patience: Stop training if no improvement for this many epochs
             min_epochs: Minimum epochs before early stopping can trigger
         """
-        # Stratified split
-        train_imgs, train_labels, val_imgs, val_labels = self._stratified_split(images, labels)
+        # Stratified 3-way split: train (70%), val (15%), test (15%)
+        train_imgs, train_labels, val_imgs, val_labels, test_imgs, test_labels = self._stratified_split(images, labels)
         
         # Print split distribution
-        print(f"\n{'='*60}")
+        print(f"\n{'='*70}")
         print(f"DATASET SPLIT - {self.name}")
-        print(f"{'='*60}")
-        print(f"\n{'Class':<20} {'Train':<10} {'Val':<10} {'Total':<10}")
-        print("-" * 50)
+        print(f"{'='*70}")
+        print(f"\n{'Class':<20} {'Train':<10} {'Val':<10} {'Test':<10} {'Total':<10}")
+        print("-" * 60)
         for cls in self.classes:
             n_train = sum(1 for l in train_labels if l == cls)
             n_val = sum(1 for l in val_labels if l == cls)
-            print(f"{cls:<20} {n_train:<10} {n_val:<10} {n_train + n_val:<10}")
-        print("-" * 50)
-        print(f"{'TOTAL':<20} {len(train_labels):<10} {len(val_labels):<10} {len(train_labels) + len(val_labels):<10}")
+            n_test = sum(1 for l in test_labels if l == cls)
+            print(f"{cls:<20} {n_train:<10} {n_val:<10} {n_test:<10} {n_train + n_val + n_test:<10}")
+        print("-" * 60)
+        total = len(train_labels) + len(val_labels) + len(test_labels)
+        print(f"{'TOTAL':<20} {len(train_labels):<10} {len(val_labels):<10} {len(test_labels):<10} {total:<10}")
+        print(f"\nNote: Test set is completely held out from YOLO training")
         print()
         
-        # Create dataset directories and save images
+        # Create dataset directories (only train and val for YOLO)
         for split in ['train', 'val']:
             for cls in self.classes:
                 (self.dataset / split / cls).mkdir(parents=True, exist_ok=True)
@@ -173,20 +193,23 @@ class YoloTrainer:
             path = self.dataset / 'train' / label / f"{i:06d}.jpg"
             cv2.imwrite(str(path), self._to_bgr(img))
         
-        # Save validation images
+        # Save validation images (for YOLO's internal validation)
         for i, (img, label) in enumerate(tqdm(zip(val_imgs, val_labels), total=len(val_imgs), desc="Saving val")):
             path = self.dataset / 'val' / label / f"{i:06d}.jpg"
             cv2.imwrite(str(path), self._to_bgr(img))
         
-        # Training with per-epoch validation
+        # Test set is kept in memory only - never written to disk for YOLO
+        
+        # Training with per-epoch evaluation
         best_val_balanced_acc = 0.0
+        best_test_balanced_acc = 0.0
         best_epoch = 0
         epochs_without_improvement = 0
         
-        print(f"\n{'='*60}")
+        print(f"\n{'='*70}")
         print("TRAINING START")
         print(f"Max epochs: {epochs}, Early stopping patience: {patience}, Min epochs: {min_epochs}")
-        print(f"{'='*60}")
+        print(f"{'='*70}")
         
         for epoch in range(1, epochs + 1):
             print(f"\n>>> Training epoch {epoch}/{epochs}...")
@@ -213,48 +236,49 @@ class YoloTrainer:
             
             eval_model = YOLO(str(current_model_path))
             
-            # Evaluate on train and val
-            train_metrics, train_bal_acc = self._compute_metrics(eval_model, train_imgs, train_labels)
+            # Evaluate on val and test (not train - too slow and less informative)
             val_metrics, val_bal_acc = self._compute_metrics(eval_model, val_imgs, val_labels)
+            test_metrics, test_bal_acc = self._compute_metrics(eval_model, test_imgs, test_labels)
             
-            # Check if this is the best model
+            # Check if this is the best model (based on val, since test should stay held-out)
             is_best = val_bal_acc > best_val_balanced_acc
             if is_best:
                 best_val_balanced_acc = val_bal_acc
+                best_test_balanced_acc = test_bal_acc
                 best_epoch = epoch
                 epochs_without_improvement = 0
                 # Save as best model
                 shutil.copy(current_model_path, self.best_model_path)
-                shutil.copy(current_model_path, self.model_path)  # Also update the standard best.pt
+                shutil.copy(current_model_path, self.model_path)
             else:
                 epochs_without_improvement += 1
             
             # Print metrics
-            self._print_epoch_metrics(epoch, train_metrics, val_metrics, train_bal_acc, val_bal_acc, is_best)
-            
-            # Check for overfitting warning
-            if train_bal_acc - val_bal_acc > 0.15:
-                print(f"⚠️  OVERFITTING WARNING: Train-Val gap = {train_bal_acc - val_bal_acc:.1%}")
+            self._print_epoch_metrics(epoch, val_metrics, test_metrics, val_bal_acc, test_bal_acc, is_best)
             
             # Early stopping check
             if epoch >= min_epochs and epochs_without_improvement >= patience:
                 print(f"\n🛑 EARLY STOPPING: No improvement for {patience} epochs")
-                print(f"   Best epoch: {best_epoch} with balanced accuracy: {best_val_balanced_acc:.1%}")
+                print(f"   Best epoch: {best_epoch}")
+                print(f"   Best val balanced acc: {best_val_balanced_acc:.1%}")
+                print(f"   Best test balanced acc: {best_test_balanced_acc:.1%}")
                 break
         
         # Final summary
-        print(f"\n{'='*60}")
+        print(f"\n{'='*70}")
         print("TRAINING COMPLETE")
-        print(f"{'='*60}")
+        print(f"{'='*70}")
         print(f"Best model saved at: {self.best_model_path}")
         print(f"Best epoch: {best_epoch}")
         print(f"Best validation balanced accuracy: {best_val_balanced_acc:.1%}")
+        print(f"Best TEST balanced accuracy: {best_test_balanced_acc:.1%} (held-out)")
         
-        # Final evaluation with best model
-        print("\n>>> Final evaluation with best model:")
+        # Final evaluation with best model on test set
+        print("\n>>> Final evaluation with best model on HELD-OUT TEST SET:")
         best_model = YOLO(str(self.best_model_path))
         val_metrics, val_bal_acc = self._compute_metrics(best_model, val_imgs, val_labels)
-        self._print_epoch_metrics(best_epoch, {}, val_metrics, 0, val_bal_acc, True)
+        test_metrics, test_bal_acc = self._compute_metrics(best_model, test_imgs, test_labels)
+        self._print_epoch_metrics(best_epoch, val_metrics, test_metrics, val_bal_acc, test_bal_acc, True)
     
     def evaluate(self, images: List[np.ndarray], labels: List[str], model_path: Optional[str] = None):
         """Evaluate model on given images."""
