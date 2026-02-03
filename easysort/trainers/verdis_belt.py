@@ -73,6 +73,10 @@ def copy_models_to_prod():
 
 if __name__ == "__main__":
     registry = RegistryBase(RegistryConnector(REGISTRY_LOCAL_IP))
+    if len(sys.argv) < 2 or sys.argv[1] == "copy":
+        copy_models_to_prod()
+        sys.exit(0)
+
     cat_imgs, cat_labels, motion_imgs, motion_labels = load_data(registry)
     
     cat_trainer = YoloTrainer("verdis_category", [c.lower().replace(' ', '_') for c in ALLOWED_CATEGORIES])
