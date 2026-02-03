@@ -216,13 +216,11 @@ class ContinuousRunner:
         print(f"Starting ContinuousRunner for {self.run_job.folder} (interval: {self.run_job.interval_mins}min)")
         while True:
             print(f"\n{'='*50}\nScanning for missing results...")
-            all_files, missing = Registry.LIST(self.run_job.folder, suffix=self.run_job.suffix, cond=lambda x: not Registry.EXISTS(x, self.run_job.result_type), return_all=True)
+            all_files, missing = Registry.LIST(self.run_job.folder, suffix=self.run_job.suffix, return_all=True, check_exists_with_type=self.run_job.result_type)
             print(f"Found {len(missing)} missing / {len(all_files)} total")
             print("Waiting for VPN lock...")
             if missing:
-                with vpn_lock():
-                    print("Lock acquired, processing...")
-                    self.run_job.process(missing, self.runner)
+                self.run_job.process(missing, self.runner)
                 # Always run the pusher so it can recover from previous push failures.
                 self.push_job.push()
             print(f"Sleeping {self.run_job.interval_mins} minutes...")

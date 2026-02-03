@@ -155,9 +155,9 @@ class RegistryBase:
         return data
 
     def _construct_path(self, key: Path, _type: T) -> Path:
+        assert isinstance(key, Path) or isinstance(key, str), f"Key {key} is not a Path or str, but a {type(key)}"
         if isinstance(key, str): key = Path(key)
         assert not str(key).startswith("."), "Key cannot start with a dot"
-        assert isinstance(key, Path), f"Key {key} is not a Path, but a {type(key)}"
         assert _type is self.DefaultMarkers.ORIGINAL_MARKER or self.backend.EXISTS(key), f"Original marker {key} does not exist"
         if _type is self.DefaultMarkers.ORIGINAL_MARKER: return key # TODO: Automatic Suffix?
         assert is_dataclass(_type) or _type in self.DefaultMarkers.list(), f"Type {_type} is not a dataclass, but a {type(_type)}"
@@ -168,11 +168,29 @@ class RegistryBase:
         assert id_value is not None or len(id_value) == 0, f"Type {_type} does not have a default id value or default id value is 0"
         return Path(key.with_suffix("") / hash_lookup[id_value]).with_suffix(".json")
 
+    def _construct_many_paths(self, keys: list[Path], _type: T) -> list[Path]:
+        assert all(isinstance(key, Path) or isinstance(key, str) for key in keys), f"Keys {keys} are not all Paths or str, but a {type(keys)}"
+        if isinstance(keys[0], str): keys = [Path(key) for key in keys]
+        assert not any(str(key).startswith(".") for key in keys), "Key cannot start with a dot"
+        assert _type is self.DefaultMarkers.ORIGINAL_MARKER or self.backend.EXISTS(keys[0]), f"Original marker {keys[0]} does not exist"
+        if _type is self.DefaultMarkers.ORIGINAL_MARKER: return keys # TODO: Automatic Suffix?
+        assert is_dataclass(_type) or _type in self.DefaultMarkers.list(), f"Type {_type} is not a dataclass, but a {type(_type)}"
+        hash_lookup = self._get_hash_lookup()
+        assert self._hash(_type) in hash_lookup.values(), f"Hash {self._hash(_type)} not found in hash lookup. Check your id is correct using: .get_id(_type)"
+        if _type in self.DefaultTypes.list() or _type in self.DefaultMarkers.list(): id_value = next((k for k, v in hash_lookup.items() if v == self._hash(_type)), None)# Allow reverse ID detection for static default types
+        else: id_value = next((f.default_factory() for f in fields(_type) if f.name == "id"), None)
+        assert id_value is not None or len(id_value) == 0, f"Type {_type} does not have a default id value or default id value is 0"
+        return [Path(key.with_suffix("") / hash_lookup[id_value]).with_suffix(".json") for key in keys]
+
     def get_id(self, _type: T) -> str: 
         assert is_dataclass(_type), f"Type {_type} is not a dataclass, but a {type(_type)}"
         assert _type in self.DefaultMarkers.list() or (any(f.name == "metadata" for f in fields(_type)) and any(f.name == "id" for f in fields(_type))), f"Type {_type} does not have a metaclass and/or id field, but the following fields: {fields(_type)}"
         if (k := next((k for k, v in self._get_hash_lookup().items() if v == self._hash(_type)), None)): return k
+        # TODO: Check id not already exists
         return self._update_hash_lookup(str(uuid4()), self._hash(_type))
+
+    def port_ids(self, original_id: str, new_id: str, _porting_type: T, _new_type: T) -> None:
+        pass
 
     def add_id(self, _type: T, id: str) -> None:
         assert is_dataclass(_type), f"Type {_type} is not a dataclass, but a {type(_type)}"
@@ -197,7 +215,7 @@ class RegistryBase:
             if throw_error: raise
             return None
         if _type is self.DefaultMarkers.ORIGINAL_MARKER: return REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES[key.suffix](data)
-        assert key.suffix == ".json", f"Only .json files /dataclasses are supported for not original markers or refs, but {key.suffix} is not supported"
+        # Data is always JSON for dataclass results (constructed path ends in .json)
         data = REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES[".json"](data)
         return from_dict(data_class=_type, data=self._convert_int_keys(data), config=Config(check_types=False)) if is_dataclass(_type) else data
 
@@ -238,10 +256,13 @@ class RegistryBase:
         assert not self.EXISTS(key, _type), f"Data {key} still exists after deletion"
 
 
-    def LIST(self, prefix: Optional[str] = "", suffix: Optional[List[str] | str] = REGISTRY_REFERENCE_SUFFIXES, cond: Optional[Callable[[str], bool]] = None, return_all: bool = False) -> list[Path]:
+    def LIST(self, prefix: Optional[str] = "", suffix: Optional[List[str] | str] = REGISTRY_REFERENCE_SUFFIXES, cond: Optional[Callable[[str], bool]] = None, return_all: bool = False, check_exists_with_type: T = None) -> list[Path]:
         files = self.backend.LIST(prefix)
-        files = [file for file in files if (file.suffix in list(suffix) if suffix else True) and not file.name.startswith("._")]
+        files = [file for file in tqdm(files) if (file.suffix in list(suffix) if suffix else True) and not file.name.startswith("._")]
         cond_files = [file for file in tqdm(files, desc="Filtering files") if cond(file)] if cond else files
+        if check_exists_with_type: 
+            exists_bools = self.EXISTS_MULTIPLE(cond_files, check_exists_with_type)
+            cond_files = [file for file, exists in zip(cond_files, exists_bools) if not exists]
         return [files, cond_files] if return_all else cond_files
 
 
@@ -292,9 +313,28 @@ class RegistryBase:
             time.sleep(1)
 
     def EXISTS(self, key: Path, _type: T) -> bool: return self.backend.EXISTS(self._construct_path(key, _type))
+
+    def EXISTS_MULTIPLE(self, keys: list[Path], _type: T) -> list[bool]: 
+        set_file_list, paths = set(self.LIST()), self._construct_many_paths(keys, _type)
+        return [path in set_file_list for path in tqdm(paths)]
+
     def EXPECT(self):
         # Potentially a EXPECT lazily generating missing results by returning list of bool, then using a specified func to generate results.
         pass
+
+    # def PUT_FOLDER(self, local_path: Path, prefix: str = "", validate: bool = True) -> None:
+    #     "Puts a folder into the registry. All files in the folder will have their relative path as the key. Example: /local/folder/my_data.jpg -> /prefix/my_data.jpg"
+    #     assert local_path.is_dir(), f"Local path {local_path} is not a directory"
+    #     new_files = [f.relative_to(local_path) for f in tqdm(local_path.rglob("*")) if f.is_file() and not f.name.startswith("._") and "hash_lookup" not in f.name]
+    #     bools = self.backend.EXISTS_MULTIPLE(new_files)
+    #     if validate:
+    #         # Check with user that the registry path is as expected
+    #     new_files = [prefix + str(file) for file in new_files]
+    #     print(len(new_files) - sum(bools), "out of", len(new_files), "files are missing")
+    #     for file, bool in tqdm(zip(new_files, bools), total=len(new_files)):
+    #         if bool: continue
+    #         self.backend.PUT_FILE(file, local_path / file)
+
 
 RegistryBase.DefaultTypes.RESULT_PEOPLE = make_dataclass("RESULT_PEOPLE", [("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA), ("frame_results", Dict[int, List["RegistryBase.BaseDefaultTypes.DEFAULT_DETECTION_DATACLASS"]])], bases=(RegistryBase.BaseDefaultTypes.BASECLASS,))
 RegistryBase.DefaultTypes.RESULT_WASTE = make_dataclass("RESULT_WASTE", [("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA), ("frame_results", Dict[int, List["RegistryBase.BaseDefaultTypes.DEFAULT_WASTE_DATACLASS"]])], bases=(RegistryBase.BaseDefaultTypes.BASECLASS,))
