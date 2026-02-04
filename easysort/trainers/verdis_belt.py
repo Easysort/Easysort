@@ -23,7 +23,11 @@ def crop(img, pad=20):
     return img[max(0,y1-pad):min(h,y2+pad), max(0,x1-pad):min(w,x2+pad)]
 
 def load_data(registry):
-    """Load labeled data from registry with balanced sampling."""
+    """Load labeled data from registry with balanced sampling.
+    
+    Returns cat_imgs, cat_labels, motion_labels (NO motion_imgs to save memory).
+    Motion images can be created later by stacking every 3 cat_imgs.
+    """
     # List all files ONCE upfront
     print("Listing all files from registry...")
     all_files = list(registry.backend.LIST("verdis/gadstrup/5"))
@@ -74,32 +78,24 @@ def load_data(registry):
     print(f"\nAfter balancing: {len(balanced_samples)} samples (max {MAX_SAMPLES_PER_CLASS}/class)")
     random.shuffle(balanced_samples)
     
-    # Second pass: load images
-    # - Category: each of 3 images is a separate sample
-    # - Motion: stack all 3 images horizontally → 1 sample per sequence (needs all frames to detect motion)
-    cat_imgs, cat_labels = [], []
-    motion_imgs, motion_labels = [], []
+    # Second pass: load images (only cat_imgs, motion_imgs created later to save memory)
+    cat_imgs, cat_labels, motion_labels = [], [], []
     errors = 0
     
     for i, (gt_file, gt, folder) in enumerate(tqdm(balanced_samples, desc="Loading images")):
         img_paths = folder_images.get(folder, [])
-        if len(img_paths) < 3: continue  # Need all 3 frames for motion
+        if len(img_paths) < 3: continue  # Need all 3 frames
         try:
             cat = gt.category.lower().replace(' ', '_')
             motion = "motion" if gt.motion else "no_motion"
             
-            # Load all 3 images
-            loaded_imgs = []
+            # Load all 3 images for category (each is a separate sample)
             for p in img_paths:
                 img = crop(np.array(registry.GET(p, registry.DefaultMarkers.ORIGINAL_MARKER)))
-                loaded_imgs.append(img)
-                # Category: each image is a separate sample
                 cat_imgs.append(img)
                 cat_labels.append(cat)
             
-            # Motion: stack 3 images horizontally → model sees temporal sequence
-            stacked = np.concatenate(loaded_imgs, axis=1)  # Stack horizontally
-            motion_imgs.append(stacked)
+            # Store motion label (1 per 3 images)
             motion_labels.append(motion)
             
         except Exception as e:
@@ -110,13 +106,23 @@ def load_data(registry):
         if i > 0 and i % 200 == 0:
             import psutil
             mem = psutil.Process().memory_info().rss / 1024**3
-            print(f"\n[{i}/{len(balanced_samples)}] Memory: {mem:.2f}GB, {len(cat_imgs)} cat, {len(motion_imgs)} motion", flush=True)
+            print(f"\n[{i}/{len(balanced_samples)}] Memory: {mem:.2f}GB, {len(cat_imgs)} imgs", flush=True)
     
-    print(f"\nLoaded {len(cat_imgs)} category images, {len(motion_imgs)} motion sequences ({errors} errors)")
+    print(f"\nLoaded {len(cat_imgs)} category images, {len(motion_labels)} motion labels ({errors} errors)")
     print(f"Categories: {len(set(cat_labels))} classes")
     print(f"Motion: { {l: motion_labels.count(l) for l in set(motion_labels)} }")
     
-    return cat_imgs, cat_labels, motion_imgs, motion_labels
+    return cat_imgs, cat_labels, motion_labels
+
+
+def convert_to_motion_imgs(cat_imgs: list) -> list:
+    """Convert category images to motion images by stacking every 3 horizontally."""
+    motion_imgs = []
+    for i in range(0, len(cat_imgs), 3):
+        if i + 2 < len(cat_imgs):
+            stacked = np.concatenate([cat_imgs[i], cat_imgs[i+1], cat_imgs[i+2]], axis=1)
+            motion_imgs.append(stacked)
+    return motion_imgs
 
 def copy_models_to_prod():
     """Copy trained models to easyprod/models for production use.
@@ -143,30 +149,60 @@ def copy_models_to_prod():
             print(f"Warning: Neither {primary_src} nor {fallback_src} found")
 
 if __name__ == "__main__":
+    import gc
+    
     registry = RegistryBase(RegistryConnector(REGISTRY_LOCAL_IP))
     if len(sys.argv) < 2 or sys.argv[1] == "copy":
         copy_models_to_prod()
         sys.exit(0)
 
-    cat_imgs, cat_labels, motion_imgs, motion_labels = load_data(registry)
+    # Load data (no motion_imgs yet - saves memory)
+    cat_imgs, cat_labels, motion_labels = load_data(registry)
     
-    cat_trainer = YoloTrainer("verdis_category", [c.lower().replace(' ', '_') for c in ALLOWED_CATEGORIES])
-    motion_trainer = YoloTrainer("verdis_motion", ["motion", "no_motion"])
+    # Only use classes that actually have samples (fixes class mismatch errors)
+    actual_cat_classes = sorted(set(cat_labels))
+    actual_motion_classes = sorted(set(motion_labels))
+    
+    print(f"\nCategory classes with data: {actual_cat_classes}")
+    print(f"Motion classes with data: {actual_motion_classes}")
+    
+    cat_trainer = YoloTrainer("verdis_category", actual_cat_classes)
+    motion_trainer = YoloTrainer("verdis_motion", actual_motion_classes)
     
     if len(sys.argv) < 2 or sys.argv[1] == "train":
+        # === CATEGORY TRAINING ===
         print("\n" + "="*70)
         print("=== CATEGORY CLASSIFIER ===")
         print("="*70)
         cat_trainer.train(cat_imgs, cat_labels, epochs=EPOCHS, patience=PATIENCE)
         
+        # Convert cat_imgs to motion_imgs (stack every 3)
+        print("\nConverting to motion images...")
+        motion_imgs = convert_to_motion_imgs(cat_imgs)
+        print(f"Created {len(motion_imgs)} motion images from {len(cat_imgs)} category images")
+        
+        # Free category data - motion_imgs now holds the stacked versions
+        del cat_imgs, cat_labels
+        gc.collect()
+        print("Freed category data from memory")
+        
+        # === MOTION TRAINING ===
         print("\n" + "="*70)
         print("=== MOTION CLASSIFIER ===")
         print("="*70)
         motion_trainer.train(motion_imgs, motion_labels, epochs=EPOCHS, patience=PATIENCE)
         
-        # Copy to production after training
+        # Free motion data
+        del motion_imgs, motion_labels
+        gc.collect()
+        
+        # Copy to production
         copy_models_to_prod()
+        
     elif sys.argv[1] == "eval":
+        # For eval, we need motion_imgs
+        motion_imgs = convert_to_motion_imgs(cat_imgs)
+        
         print("\n" + "="*70)
         print("=== CATEGORY EVALUATION ===")
         print("="*70)

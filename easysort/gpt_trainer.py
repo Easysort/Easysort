@@ -8,6 +8,7 @@ import json
 import base64
 import random
 import shutil
+import gc
 
 import openai
 import numpy as np
@@ -192,6 +193,11 @@ class YoloTrainer:
         for i, (img, label) in enumerate(tqdm(zip(val_imgs, val_labels), total=len(val_imgs), desc="Saving val")):
             path = self.dataset / 'val' / label / f"{i:06d}.jpg"
             cv2.imwrite(str(path), self._to_bgr(img))
+        
+        # Free memory - images are now saved to disk
+        del train_imgs, val_imgs
+        gc.collect()
+        print("Freed image memory before training")
         
         # Train with YOLO's built-in early stopping
         print(f"\n{'='*70}")
