@@ -75,7 +75,7 @@ REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES = {
 def current_timestamp() -> str: return datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
 
 class Concat:
-  _ARGO_FACTORS = {"roskilde": (1.6, 1.2, 0.5), "jyllinge": (0.3, 0.15, 0.07)}  # objects, weight, co2
+  _ARGO_FACTORS = {"roskilde": (1.0, 0.6, 0.2), "jyllinge": (1.0, 0.6, 0.2)}  # objects, weight, co2
   _ARGO_CATS = ["køkkenting", "fritid_&_have", "møbler", "boligting", "legetøj", "andet"]
   _DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
   _HOURS = tuple(f"{i}-{i+3}" for i in range(0, 24, 3))
@@ -102,7 +102,8 @@ class Concat:
     return "roskilde" if "roskilde" in l else ("jyllinge" if "jyllinge" in l else l)
 
   @staticmethod
-  def _summary(items: list[tuple[datetime.datetime, Any]], loc_key: str, seed: str) -> dict:
+  def _summary(items: list[tuple[datetime.datetime, Any]], loc_key: str, seed: str, filter_personal: bool | None = None) -> dict:
+    """Generate summary. filter_personal: None=all items, True=only personal, False=only recycling."""
     obj_f, w_f, c_f = Concat._ARGO_FACTORS.get(Concat._loc_id(loc_key), (1.0, 1.0, 1.0))
     print(f"Using the following factors for {loc_key}: {obj_f}, {w_f}, {c_f}")
     cats = {c: {"count": 0.0, "weight": 0.0} for c in Concat._ARGO_CATS}
@@ -112,11 +113,19 @@ class Concat:
         for d in dets:
           role = str(getattr(d, "person_role", "unknown") or "unknown").lower()
           roles["personnel" if role.startswith("pers") else "citizen"] += 1
-          n = float(sum(getattr(d, "item_count", []) or []))
-          co2 += float(sum(getattr(d, "co2_kg", []) or [])); weight += float(sum(getattr(d, "weight_kg", []) or [])); objs += n
-          per_day[int(ts.strftime("%w")) - 1] += n  # Monday=0..Sunday=6
-          per_hour[int(ts.strftime("%H"))] += n
-          for cat, cnt, w in zip(getattr(d, "item_cat", []) or [], getattr(d, "item_count", []) or [], getattr(d, "weight_kg", []) or []):
+          personal_flags = getattr(d, "personal_item", []) or []
+          item_cats = getattr(d, "item_cat", []) or []
+          item_counts = getattr(d, "item_count", []) or []
+          item_weights = getattr(d, "weight_kg", []) or []
+          item_co2s = getattr(d, "co2_kg", []) or []
+          for i, (cat, cnt, w, c) in enumerate(zip(item_cats, item_counts, item_weights, item_co2s)):
+            if filter_personal is not None:
+              is_personal = personal_flags[i] if i < len(personal_flags) else False
+              if filter_personal and not is_personal: continue
+              if not filter_personal and is_personal: continue
+            co2 += float(c); weight += float(w); objs += float(cnt)
+            per_day[int(ts.strftime("%w")) - 1] += float(cnt)
+            per_hour[int(ts.strftime("%H"))] += float(cnt)
             s = Concat._slug(cat); cats[s]["count"] += float(cnt); cats[s]["weight"] += float(w)
     total_role = roles["citizen"] + roles["personnel"] or 1
     pct_personnel = int(round(100 * roles["personnel"] / total_role))
@@ -139,7 +148,7 @@ class Concat:
     }
 
   @staticmethod
-  def weekly(videos: list[str | Path], class_sorting_func: Callable[[Path], str], result_type: Any, out_prefix: str = "argo/results") -> list[Path]:
+  def weekly(videos: list[str | Path], class_sorting_func: Callable[[Path], str], result_type: Any, out_prefix: str = "argo/results", filter_personal: bool | None = None) -> list[Path]:
     from easysort.registry import Registry
     groups: dict[tuple[int, int], dict[str, list[tuple[datetime.datetime, Any]]]] = {}
     for v in videos:
@@ -150,17 +159,19 @@ class Concat:
       y, w, _ = ts.isocalendar()
       groups.setdefault((y, w), {}).setdefault(class_sorting_func(v), []).append((ts, r))
     out = []
+    suffix = "_personal" if filter_personal else ""
     for (y, w), locs in sorted(groups.items()):
       monday = datetime.date.fromisocalendar(y, w, 1); sunday = monday + datetime.timedelta(days=6)
       data = {"date_start": monday.strftime("%d_%m_%Y"), "date_end": sunday.strftime("%d_%m_%Y")}
-      for loc, items in locs.items(): data[loc] = Concat._summary(items, loc, f"week_{w}_{y}")
-      key = Path(out_prefix) / f"week_{w}_{y}.json"; Registry.POST(key, data, Registry.DefaultMarkers.ORIGINAL_MARKER, overwrite=True); out.append(key)
+      for loc, items in locs.items(): data[loc] = Concat._summary(items, loc, f"week_{w}_{y}", filter_personal)
+      key = Path(out_prefix) / f"week_{w}_{y}{suffix}.json"; Registry.POST(key, data, Registry.DefaultMarkers.ORIGINAL_MARKER, overwrite=True); out.append(key)
     return out
 
   @staticmethod
-  def monthly(videos: list[str | Path], class_sorting_func: Callable[[Path], str], result_type: Any, out_prefix: str = "argo/results") -> list[Path]:
+  def monthly(videos: list[str | Path], class_sorting_func: Callable[[Path], str], result_type: Any, out_prefix: str = "argo/results", filter_personal: bool | None = None) -> list[Path]:
     from easysort.registry import Registry
-    rx = re.compile(r"^week_(\d+)_(\d+)(?:_force)?\.json$", re.I)
+    suffix = "_personal" if filter_personal else ""
+    rx = re.compile(rf"^week_(\d+)_(\d+){suffix}(?:_force)?\.json$", re.I)
     best: dict[tuple[int, int], Path] = {}
     for f in Registry.LIST(out_prefix, suffix=[".json"]):
       m = rx.match(f.name)
@@ -180,7 +191,7 @@ class Concat:
       except Exception:
         continue
       try:
-        wk = json.load(open(f, "r", encoding="utf-8"))
+        wk = Registry.GET(f, Registry.DefaultMarkers.ORIGINAL_MARKER)
       except Exception:
         continue
       months.setdefault((sun.year, sun.month), []).append((mon, sun, wk))
@@ -235,7 +246,7 @@ class Concat:
           "objects_per_hour": [{"hour": k, "count": str(a["h"][k])} for k in Concat._HOURS],
         }
 
-      key = Path(out_prefix) / f"month_{m}_{y}.json"
+      key = Path(out_prefix) / f"month_{m}_{y}{suffix}.json"
       Registry.POST(key, data, Registry.DefaultMarkers.ORIGINAL_MARKER, overwrite=True)
       out.append(key)
     return out
