@@ -148,42 +148,37 @@ class YoloTrainer:
             print(f"⚠️  Val-Test gap: {val_bal_acc - test_bal_acc:.1%} (possible overfitting to val set)")
         print()
     
-    def train(self, images: List[np.ndarray], labels: List[str], epochs: int = 20, 
-              patience: int = 5, min_epochs: int = 3):
+    def train(self, images: List[np.ndarray], labels: List[str], epochs: int = 30, 
+              patience: int = 5):
         """
-        Train with stratified train/val/test split, per-epoch evaluation, and early stopping.
-        
-        The test set is completely held out from YOLO - never seen during training.
-        Best model is selected based on validation balanced accuracy.
+        Train with stratified train/val split. Uses YOLO's built-in early stopping.
         
         Args:
             images: Training images
             labels: Training labels  
             epochs: Maximum number of epochs
-            patience: Stop training if no improvement for this many epochs
-            min_epochs: Minimum epochs before early stopping can trigger
+            patience: Early stopping patience (YOLO stops if no val improvement)
         """
-        # Stratified 3-way split: train (70%), val (15%), test (15%)
-        train_imgs, train_labels, val_imgs, val_labels, test_imgs, test_labels = self._stratified_split(images, labels)
+        # Stratified split: train (85%), val (15%)
+        train_imgs, train_labels, val_imgs, val_labels, _, _ = self._stratified_split(
+            images, labels, val_ratio=0.15, test_ratio=0.0
+        )
         
         # Print split distribution
         print(f"\n{'='*70}")
         print(f"DATASET SPLIT - {self.name}")
         print(f"{'='*70}")
-        print(f"\n{'Class':<20} {'Train':<10} {'Val':<10} {'Test':<10} {'Total':<10}")
-        print("-" * 60)
+        print(f"\n{'Class':<20} {'Train':<10} {'Val':<10} {'Total':<10}")
+        print("-" * 50)
         for cls in self.classes:
             n_train = sum(1 for l in train_labels if l == cls)
             n_val = sum(1 for l in val_labels if l == cls)
-            n_test = sum(1 for l in test_labels if l == cls)
-            print(f"{cls:<20} {n_train:<10} {n_val:<10} {n_test:<10} {n_train + n_val + n_test:<10}")
-        print("-" * 60)
-        total = len(train_labels) + len(val_labels) + len(test_labels)
-        print(f"{'TOTAL':<20} {len(train_labels):<10} {len(val_labels):<10} {len(test_labels):<10} {total:<10}")
-        print(f"\nNote: Test set is completely held out from YOLO training")
+            print(f"{cls:<20} {n_train:<10} {n_val:<10} {n_train + n_val:<10}")
+        print("-" * 50)
+        print(f"{'TOTAL':<20} {len(train_labels):<10} {len(val_labels):<10} {len(train_labels) + len(val_labels):<10}")
         print()
         
-        # Create dataset directories (only train and val for YOLO)
+        # Create dataset directories
         for split in ['train', 'val']:
             for cls in self.classes:
                 (self.dataset / split / cls).mkdir(parents=True, exist_ok=True)
@@ -193,92 +188,41 @@ class YoloTrainer:
             path = self.dataset / 'train' / label / f"{i:06d}.jpg"
             cv2.imwrite(str(path), self._to_bgr(img))
         
-        # Save validation images (for YOLO's internal validation)
+        # Save validation images
         for i, (img, label) in enumerate(tqdm(zip(val_imgs, val_labels), total=len(val_imgs), desc="Saving val")):
             path = self.dataset / 'val' / label / f"{i:06d}.jpg"
             cv2.imwrite(str(path), self._to_bgr(img))
         
-        # Test set is kept in memory only - never written to disk for YOLO
-        
-        # Training with per-epoch evaluation
-        best_val_balanced_acc = 0.0
-        best_test_balanced_acc = 0.0
-        best_epoch = 0
-        epochs_without_improvement = 0
-        
+        # Train with YOLO's built-in early stopping
         print(f"\n{'='*70}")
         print("TRAINING START")
-        print(f"Max epochs: {epochs}, Early stopping patience: {patience}, Min epochs: {min_epochs}")
-        print(f"{'='*70}")
+        print(f"Max epochs: {epochs}, Early stopping patience: {patience}")
+        print(f"{'='*70}\n")
         
-        for epoch in range(1, epochs + 1):
-            print(f"\n>>> Training epoch {epoch}/{epochs}...")
-            
-            # Train for 1 epoch
-            model = YOLO("yolo11s-cls.pt" if epoch == 1 else str(self.model_path.parent / "last.pt"))
-            model.train(
-                data=str(self.dataset),
-                epochs=1,
-                imgsz=224,
-                batch=32,
-                project=f"{self.name}_model",
-                name="train",
-                exist_ok=True,
-                verbose=False,
-                plots=False,
-            )
-            
-            # Load the latest model for evaluation
-            current_model_path = Path(f"{self.name}_model/train/weights/last.pt")
-            if not current_model_path.exists():
-                print(f"Warning: Model not found at {current_model_path}")
-                continue
-            
-            eval_model = YOLO(str(current_model_path))
-            
-            # Evaluate on val and test (not train - too slow and less informative)
-            val_metrics, val_bal_acc = self._compute_metrics(eval_model, val_imgs, val_labels)
-            test_metrics, test_bal_acc = self._compute_metrics(eval_model, test_imgs, test_labels)
-            
-            # Check if this is the best model (based on val, since test should stay held-out)
-            is_best = val_bal_acc > best_val_balanced_acc
-            if is_best:
-                best_val_balanced_acc = val_bal_acc
-                best_test_balanced_acc = test_bal_acc
-                best_epoch = epoch
-                epochs_without_improvement = 0
-                # Save as best model
-                shutil.copy(current_model_path, self.best_model_path)
-                shutil.copy(current_model_path, self.model_path)
-            else:
-                epochs_without_improvement += 1
-            
-            # Print metrics
-            self._print_epoch_metrics(epoch, val_metrics, test_metrics, val_bal_acc, test_bal_acc, is_best)
-            
-            # Early stopping check
-            if epoch >= min_epochs and epochs_without_improvement >= patience:
-                print(f"\n🛑 EARLY STOPPING: No improvement for {patience} epochs")
-                print(f"   Best epoch: {best_epoch}")
-                print(f"   Best val balanced acc: {best_val_balanced_acc:.1%}")
-                print(f"   Best test balanced acc: {best_test_balanced_acc:.1%}")
-                break
+        model = YOLO("yolo11s-cls.pt")
+        model.train(
+            data=str(self.dataset),
+            epochs=epochs,
+            patience=patience,  # YOLO's early stopping based on val metrics
+            imgsz=224,
+            batch=32,
+            project=f"{self.name}_model",
+            name="train",
+            exist_ok=True,
+            verbose=True,
+            plots=True,
+        )
         
-        # Final summary
+        # Copy best model
+        if self.model_path.exists():
+            shutil.copy(self.model_path, self.best_model_path)
+            print(f"\nBest model saved to: {self.best_model_path}")
+        
+        # Final evaluation on validation set
         print(f"\n{'='*70}")
-        print("TRAINING COMPLETE")
+        print("FINAL EVALUATION ON VALIDATION SET")
         print(f"{'='*70}")
-        print(f"Best model saved at: {self.best_model_path}")
-        print(f"Best epoch: {best_epoch}")
-        print(f"Best validation balanced accuracy: {best_val_balanced_acc:.1%}")
-        print(f"Best TEST balanced accuracy: {best_test_balanced_acc:.1%} (held-out)")
-        
-        # Final evaluation with best model on test set
-        print("\n>>> Final evaluation with best model on HELD-OUT TEST SET:")
-        best_model = YOLO(str(self.best_model_path))
-        val_metrics, val_bal_acc = self._compute_metrics(best_model, val_imgs, val_labels)
-        test_metrics, test_bal_acc = self._compute_metrics(best_model, test_imgs, test_labels)
-        self._print_epoch_metrics(best_epoch, val_metrics, test_metrics, val_bal_acc, test_bal_acc, True)
+        self.evaluate(val_imgs, val_labels)
     
     def evaluate(self, images: List[np.ndarray], labels: List[str], model_path: Optional[str] = None):
         """Evaluate model on given images."""

@@ -14,8 +14,7 @@ from easyprod.scripts.verdis.belt import ALLOWED_CATEGORIES, POLY_POINTS
 
 MAX_SAMPLES_PER_CLASS = 350  # Max samples per category to balance dataset and reduce memory
 EPOCHS = 30  # Max epochs (early stopping will likely trigger before this)
-PATIENCE = 5  # Early stopping patience
-MIN_EPOCHS = 5  # Minimum epochs before early stopping can trigger
+PATIENCE = 5  # Early stopping patience (YOLO stops if no val improvement)
 BBOX = (min(p[0] for p in POLY_POINTS), min(p[1] for p in POLY_POINTS), max(p[0] for p in POLY_POINTS), max(p[1] for p in POLY_POINTS))
 
 def crop(img, pad=20):
@@ -158,12 +157,15 @@ if __name__ == "__main__":
         print("\n" + "="*70)
         print("=== CATEGORY CLASSIFIER ===")
         print("="*70)
-        cat_trainer.train(cat_imgs, cat_labels, epochs=EPOCHS, patience=PATIENCE, min_epochs=MIN_EPOCHS)
+        cat_trainer.train(cat_imgs, cat_labels, epochs=EPOCHS, patience=PATIENCE)
         
         print("\n" + "="*70)
         print("=== MOTION CLASSIFIER ===")
         print("="*70)
-        motion_trainer.train(motion_imgs, motion_labels, epochs=EPOCHS, patience=PATIENCE, min_epochs=MIN_EPOCHS)
+        motion_trainer.train(motion_imgs, motion_labels, epochs=EPOCHS, patience=PATIENCE)
+        
+        # Copy to production after training
+        copy_models_to_prod()
     elif sys.argv[1] == "eval":
         print("\n" + "="*70)
         print("=== CATEGORY EVALUATION ===")
