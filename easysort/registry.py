@@ -69,6 +69,7 @@ class RegistryConnector:
     def PUT_FILE(self, key: str | Path, local_path: str | Path) -> None: self.POST(key, Path(local_path).read_bytes())
     def GET_FILE(self, key: str | Path, local_path: str | Path) -> None: Path(local_path).write_bytes(self.GET(key))
     def EXISTS(self, key: str | Path) -> bool: return self._req("HEAD", key, ignore_errors=True).status_code == 200
+    def URL(self, key: str | Path) -> str: return self._url(key)
 
     def EXISTS_MULTIPLE(self, keys: list[str | Path]) -> list[bool]: 
         listed_keys = self.LIST()
@@ -322,18 +323,36 @@ class RegistryBase:
         # Potentially a EXPECT lazily generating missing results by returning list of bool, then using a specified func to generate results.
         pass
 
-    # def PUT_FOLDER(self, local_path: Path, prefix: str = "", validate: bool = True) -> None:
-    #     "Puts a folder into the registry. All files in the folder will have their relative path as the key. Example: /local/folder/my_data.jpg -> /prefix/my_data.jpg"
-    #     assert local_path.is_dir(), f"Local path {local_path} is not a directory"
-    #     new_files = [f.relative_to(local_path) for f in tqdm(local_path.rglob("*")) if f.is_file() and not f.name.startswith("._") and "hash_lookup" not in f.name]
-    #     bools = self.backend.EXISTS_MULTIPLE(new_files)
-    #     if validate:
-    #         # Check with user that the registry path is as expected
-    #     new_files = [prefix + str(file) for file in new_files]
-    #     print(len(new_files) - sum(bools), "out of", len(new_files), "files are missing")
-    #     for file, bool in tqdm(zip(new_files, bools), total=len(new_files)):
-    #         if bool: continue
-    #         self.backend.PUT_FILE(file, local_path / file)
+    def PUT_FOLDER(self, local_path: Path, prefix: str = "") -> None:
+        "Puts a folder into the registry. All files in the folder will have their relative path as the key. Example: /local/folder/my_data.jpg -> /prefix/my_data.jpg"
+        assert local_path.is_dir(), f"Local path {local_path} is not a directory"
+        new_files = [f.relative_to(local_path) for f in tqdm(local_path.rglob("*")) if f.is_file() and not f.name.startswith("._") and "hash_lookup" not in f.name]
+        bools = self.backend.EXISTS_MULTIPLE(new_files)
+        print("Files will look like this: ", *new_files[0:5], sep="\n")
+        print("Waiting 10 seconds. If this is wrong, exit the program!")
+        time.sleep(10)
+        new_files = [prefix + str(file) for file in new_files]
+        print(len(new_files) - sum(bools), "out of", len(new_files), "files are missing")
+        for file, bool in tqdm(zip(new_files, bools), total=len(new_files)):
+            if bool: continue
+            self.backend.PUT_FILE(file, local_path / file)
+
+    def PORT(self, id: str, old_type: T, new_type: T, porting_strategy: Callable[[T], T]) -> None:
+        assert is_dataclass(old_type), f"Old type {old_type} is not a dataclass, but a {type(old_type)}"
+        assert is_dataclass(new_type), f"New type {new_type} is not a dataclass, but a {type(new_type)}"
+        assert old_type in self.DefaultMarkers.list() or (any(f.name == "metadata" for f in fields(old_type)) and any(f.name == "id" for f in fields(old_type))), f"Old type {old_type} does not have a metaclass and/or id field, but the following fields: {fields(old_type)}"
+        assert new_type in self.DefaultMarkers.list() or (any(f.name == "metadata" for f in fields(new_type)) and any(f.name == "id" for f in fields(new_type))), f"New type {new_type} does not have a metaclass and/or id field, but the following fields: {fields(new_type)}"
+        assert id in self._get_hash_lookup(), f"Id {id} not found in hash lookup"
+        assert self._get_hash_lookup()[id] == self._hash(old_type), f"Id {id} does not match with the expected hash. Make sure you the pair you are trying to delete is correct."
+        files_with_old_type = self.LIST(suffix=[".json"], check_exists_with_type=old_type)
+        for file in tqdm(files_with_old_type, desc="Porting files"):
+            data = self.GET(file, old_type)
+            self.POST(file, porting_strategy(data), new_type)
+        assert len(files_with_old_type) == len(self.EXISTS_MULTIPLE(files_with_old_type, new_type)), f"Not all files were ported. {len(files_with_old_type) - sum(self.EXISTS_MULTIPLE(files_with_old_type, new_type))} files were not ported"
+        for file in files_with_old_type:
+            self.DELETE(file, old_type)
+        print(f"Ported {len(files_with_old_type)} files from {old_type} to {new_type}")
+        self._update_hash_lookup(id, self._hash(new_type))
 
 
 RegistryBase.DefaultTypes.RESULT_PEOPLE = make_dataclass("RESULT_PEOPLE", [("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA), ("frame_results", Dict[int, List["RegistryBase.BaseDefaultTypes.DEFAULT_DETECTION_DATACLASS"]])], bases=(RegistryBase.BaseDefaultTypes.BASECLASS,))
@@ -343,14 +362,9 @@ RegistryConnectorLocal = RegistryConnector(REGISTRY_LOCAL_IP)
 Registry = RegistryBase(RegistryConnectorLocal)
 
 if __name__ == "__main__":  # kept empty on purpose (avoid side-effects like SYNC during imports/tests)
-    # directory = Path("/Users/lucasvilsen/Desktop/registry")
-    # new_files = [f for f in tqdm(directory.rglob("*")) if f.is_file() and not f.name.startswith("._") and "hash_lookup" not in f.name]
-    # new_files_without_dir = [f.relative_to(directory) for f in new_files]
-    # bools = Registry.backend.EXISTS_MULTIPLE(new_files_without_dir)
-    # print(len(new_files_without_dir) - sum(bools), "out of", len(new_files), "files are missing")
-    # for file, file_without_dir, bool in tqdm(zip(new_files, new_files_without_dir, bools), total=len(new_files)):
-    #     if bool: continue
-    #     Registry.backend.PUT_FILE(file_without_dir, file)
+    # directory = Path("/Users/lucasvilsen/Dev/Easysort/registry")
+    # Registry.PUT_FOLDER(directory)
+
     if len(sys.argv) < 2:
         print("Usage: uv run easysort.registry sync|explore|uuid")
         sys.exit(1)

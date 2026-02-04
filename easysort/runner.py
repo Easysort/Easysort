@@ -144,8 +144,8 @@ def extract_person_crops_from_video(
     min_h: int = 200,
     pad: float = 0.08,
 ) -> list[PersonCrop]:
-    path = Registry._registry_path(video_path)
-    cap = cv2.VideoCapture(str(path))
+    url = Registry.backend.URL(video_path)
+    cap = cv2.VideoCapture(url)
     if not cap.isOpened(): return []
     out, frames, idxs, i = [], [], [], 0
     try:
