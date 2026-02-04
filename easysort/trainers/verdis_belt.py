@@ -51,8 +51,9 @@ def load_data(registry):
         gt_files = random.sample(gt_files, MAX_SAMPLES)
     
     cat_imgs, cat_labels, motion_imgs, motion_labels = [], [], [], []
+    errors = 0
     
-    for gt_file in tqdm(gt_files, desc="Loading samples"):
+    for i, gt_file in enumerate(tqdm(gt_files, desc="Loading samples")):
         # gt_file is like verdis/gadstrup/5/FOLDER/img_stem/hash.json
         # folder with images is verdis/gadstrup/5/FOLDER
         folder = gt_file.parent.parent
@@ -66,9 +67,18 @@ def load_data(registry):
                 cat_labels.append(gt.category.lower().replace(' ', '_'))
             motion_imgs.append(crop(np.array(registry.GET(imgs[len(imgs)//2], registry.DefaultMarkers.ORIGINAL_MARKER))))
             motion_labels.append("motion" if gt.motion else "no_motion")
-        except: pass
+        except Exception as e:
+            errors += 1
+            if errors <= 5:  # Print first 5 errors
+                print(f"\nError at {i}: {gt_file}: {e}")
+        
+        # Print memory usage every 500 samples
+        if i > 0 and i % 100 == 0:
+            import psutil
+            mem = psutil.Process().memory_info().rss / 1024**3
+            print(f"\n[{i}] Memory: {mem:.2f}GB, {len(cat_imgs)} cat imgs, {len(motion_imgs)} motion imgs", flush=True)
     
-    print(f"Loaded {len(cat_imgs)} category, {len(motion_imgs)} motion samples")
+    print(f"Loaded {len(cat_imgs)} category, {len(motion_imgs)} motion samples ({errors} errors)")
     return cat_imgs, cat_labels, motion_imgs, motion_labels
 
 def copy_models_to_prod():
