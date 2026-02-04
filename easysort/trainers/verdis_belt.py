@@ -12,7 +12,7 @@ from easysort.validators.verdis_belt import VerdisBeltGroundTruth
 from easysort.gpt_trainer import YoloTrainer
 from easyprod.scripts.verdis.belt import ALLOWED_CATEGORIES, POLY_POINTS
 
-MAX_SAMPLES_PER_CLASS = 400  # Max samples per category to balance dataset and reduce memory
+MAX_SAMPLES_PER_CLASS = 350  # Max samples per category to balance dataset and reduce memory
 EPOCHS = 30  # Max epochs (early stopping will likely trigger before this)
 PATIENCE = 5  # Early stopping patience
 MIN_EPOCHS = 5  # Minimum epochs before early stopping can trigger
