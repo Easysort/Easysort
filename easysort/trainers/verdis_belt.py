@@ -12,7 +12,7 @@ from easysort.validators.verdis_belt import VerdisBeltGroundTruth
 from easysort.gpt_trainer import YoloTrainer
 from easyprod.scripts.verdis.belt import ALLOWED_CATEGORIES, POLY_POINTS
 
-MAX_SAMPLES = 10000
+MAX_SAMPLES_PER_CLASS = 500  # Max samples per category to balance dataset and reduce memory
 EPOCHS = 30  # Max epochs (early stopping will likely trigger before this)
 PATIENCE = 5  # Early stopping patience
 MIN_EPOCHS = 5  # Minimum epochs before early stopping can trigger
@@ -24,8 +24,8 @@ def crop(img, pad=20):
     return img[max(0,y1-pad):min(h,y2+pad), max(0,x1-pad):min(w,x2+pad)]
 
 def load_data(registry):
-    """Load labeled data from registry."""
-    # List all files ONCE upfront (instead of per-folder which was ~2000 LIST calls)
+    """Load labeled data from registry with balanced sampling."""
+    # List all files ONCE upfront
     print("Listing all files from registry...")
     all_files = list(registry.backend.LIST("verdis/gadstrup/5"))
     print(f"Found {len(all_files)} total files")
@@ -34,11 +34,9 @@ def load_data(registry):
     folder_images: dict[Path, list[Path]] = defaultdict(list)
     for f in all_files:
         if f.suffix.lower() in (".jpg", ".png", ".jpeg"):
-            # folder is like verdis/gadstrup/5/YYYYMMDD_HHMMSS
             folder = f.parent
             folder_images[folder].append(f)
     
-    # Sort images in each folder
     for folder in folder_images:
         folder_images[folder] = sorted(folder_images[folder])[:3]
     
@@ -47,38 +45,78 @@ def load_data(registry):
     gt_files = [f for f in all_files if gt_hash in f.name]
     print(f"Found {len(gt_files)} ground truth files")
     
-    if len(gt_files) > MAX_SAMPLES: 
-        gt_files = random.sample(gt_files, MAX_SAMPLES)
+    # First pass: read labels and group by category (no image loading yet)
+    print("Reading labels and grouping by category...")
+    category_samples: dict[str, list[tuple]] = defaultdict(list)  # cat -> [(gt_file, gt, folder)]
     
-    cat_imgs, cat_labels, motion_imgs, motion_labels = [], [], [], []
-    errors = 0
-    
-    for i, gt_file in enumerate(tqdm(gt_files, desc="Loading samples")):
-        # gt_file is like verdis/gadstrup/5/FOLDER/img_stem/hash.json
-        # folder with images is verdis/gadstrup/5/FOLDER
+    for gt_file in tqdm(gt_files, desc="Reading labels"):
         folder = gt_file.parent.parent
         imgs = folder_images.get(folder, [])
         if not imgs: continue
         try:
             gt = registry.GET(imgs[0], VerdisBeltGroundTruth, throw_error=False)
             if not gt: continue
-            for p in imgs:
-                cat_imgs.append(crop(np.array(registry.GET(p, registry.DefaultMarkers.ORIGINAL_MARKER))))
-                cat_labels.append(gt.category.lower().replace(' ', '_'))
-            motion_imgs.append(crop(np.array(registry.GET(imgs[len(imgs)//2], registry.DefaultMarkers.ORIGINAL_MARKER))))
-            motion_labels.append("motion" if gt.motion else "no_motion")
+            cat = gt.category.lower().replace(' ', '_')
+            category_samples[cat].append((gt_file, gt, folder))
+        except: pass
+    
+    # Print distribution before balancing
+    print("\nCategory distribution (before balancing):")
+    for cat, samples in sorted(category_samples.items(), key=lambda x: -len(x[1])):
+        print(f"  {cat}: {len(samples)}")
+    
+    # Balance: sample up to MAX_SAMPLES_PER_CLASS from each category
+    balanced_samples = []
+    for cat, samples in category_samples.items():
+        if len(samples) > MAX_SAMPLES_PER_CLASS:
+            samples = random.sample(samples, MAX_SAMPLES_PER_CLASS)
+        balanced_samples.extend(samples)
+    
+    print(f"\nAfter balancing: {len(balanced_samples)} samples (max {MAX_SAMPLES_PER_CLASS}/class)")
+    random.shuffle(balanced_samples)
+    
+    # Second pass: load images
+    # - Category: each of 3 images is a separate sample
+    # - Motion: stack all 3 images horizontally → 1 sample per sequence (needs all frames to detect motion)
+    cat_imgs, cat_labels = [], []
+    motion_imgs, motion_labels = [], []
+    errors = 0
+    
+    for i, (gt_file, gt, folder) in enumerate(tqdm(balanced_samples, desc="Loading images")):
+        img_paths = folder_images.get(folder, [])
+        if len(img_paths) < 3: continue  # Need all 3 frames for motion
+        try:
+            cat = gt.category.lower().replace(' ', '_')
+            motion = "motion" if gt.motion else "no_motion"
+            
+            # Load all 3 images
+            loaded_imgs = []
+            for p in img_paths:
+                img = crop(np.array(registry.GET(p, registry.DefaultMarkers.ORIGINAL_MARKER)))
+                loaded_imgs.append(img)
+                # Category: each image is a separate sample
+                cat_imgs.append(img)
+                cat_labels.append(cat)
+            
+            # Motion: stack 3 images horizontally → model sees temporal sequence
+            stacked = np.concatenate(loaded_imgs, axis=1)  # Stack horizontally
+            motion_imgs.append(stacked)
+            motion_labels.append(motion)
+            
         except Exception as e:
             errors += 1
-            if errors <= 5:  # Print first 5 errors
+            if errors <= 5:
                 print(f"\nError at {i}: {gt_file}: {e}")
         
-        # Print memory usage every 500 samples
-        if i > 0 and i % 100 == 0:
+        if i > 0 and i % 200 == 0:
             import psutil
             mem = psutil.Process().memory_info().rss / 1024**3
-            print(f"\n[{i}] Memory: {mem:.2f}GB, {len(cat_imgs)} cat imgs, {len(motion_imgs)} motion imgs", flush=True)
+            print(f"\n[{i}/{len(balanced_samples)}] Memory: {mem:.2f}GB, {len(cat_imgs)} cat, {len(motion_imgs)} motion", flush=True)
     
-    print(f"Loaded {len(cat_imgs)} category, {len(motion_imgs)} motion samples ({errors} errors)")
+    print(f"\nLoaded {len(cat_imgs)} category images, {len(motion_imgs)} motion sequences ({errors} errors)")
+    print(f"Categories: {len(set(cat_labels))} classes")
+    print(f"Motion: { {l: motion_labels.count(l) for l in set(motion_labels)} }")
+    
     return cat_imgs, cat_labels, motion_imgs, motion_labels
 
 def copy_models_to_prod():
