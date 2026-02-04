@@ -2,6 +2,7 @@
 import numpy as np
 import random
 import sys
+from collections import defaultdict
 from tqdm import tqdm
 from pathlib import Path
 
@@ -24,15 +25,38 @@ def crop(img, pad=20):
 
 def load_data(registry):
     """Load labeled data from registry."""
+    # List all files ONCE upfront (instead of per-folder which was ~2000 LIST calls)
+    print("Listing all files from registry...")
+    all_files = list(registry.backend.LIST("verdis/gadstrup/5"))
+    print(f"Found {len(all_files)} total files")
+    
+    # Build lookup: folder -> list of image files
+    folder_images: dict[Path, list[Path]] = defaultdict(list)
+    for f in all_files:
+        if f.suffix.lower() in (".jpg", ".png", ".jpeg"):
+            # folder is like verdis/gadstrup/5/YYYYMMDD_HHMMSS
+            folder = f.parent
+            folder_images[folder].append(f)
+    
+    # Sort images in each folder
+    for folder in folder_images:
+        folder_images[folder] = sorted(folder_images[folder])[:3]
+    
+    # Find ground truth files
     gt_hash = registry._get_hash_lookup().get("5adf5d6f-539a-4533-9461-ff8b390fd9cf", "")
-    gt_files = [f for f in registry.backend.LIST("verdis/gadstrup/5") if gt_hash in f.name]
-    if len(gt_files) > MAX_SAMPLES: gt_files = random.sample(gt_files, MAX_SAMPLES)
+    gt_files = [f for f in all_files if gt_hash in f.name]
+    print(f"Found {len(gt_files)} ground truth files")
+    
+    if len(gt_files) > MAX_SAMPLES: 
+        gt_files = random.sample(gt_files, MAX_SAMPLES)
     
     cat_imgs, cat_labels, motion_imgs, motion_labels = [], [], [], []
     
-    for gt_file in tqdm(gt_files, desc="Loading"):
+    for gt_file in tqdm(gt_files, desc="Loading samples"):
+        # gt_file is like verdis/gadstrup/5/FOLDER/img_stem/hash.json
+        # folder with images is verdis/gadstrup/5/FOLDER
         folder = gt_file.parent.parent
-        imgs = sorted([f for f in registry.backend.LIST(str(folder)) if f.suffix.lower() in (".jpg", ".png", ".jpeg")])[:3]
+        imgs = folder_images.get(folder, [])
         if not imgs: continue
         try:
             gt = registry.GET(imgs[0], VerdisBeltGroundTruth, throw_error=False)
