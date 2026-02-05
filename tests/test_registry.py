@@ -7,28 +7,37 @@ from PIL import Image
 from easysort.helpers import current_timestamp
 from easysort.registry import RegistryBase, RegistryConnector
 from tests.helpers import minikeyvalue_server
+from contextlib import contextmanager
 
 
 class TestRegistry(unittest.TestCase):
+    _srv: contextmanager[str]
+    _base: str
+
     @classmethod
     def setUpClass(cls):
-        cls._srv = minikeyvalue_server()
+        host, port = "localhost", 3099
+        cls._srv = minikeyvalue_server(host, port)
         cls._base = cls._srv.__enter__()
+        assert host in cls._base, f"The base should contain the host {host}, but it is {cls._base}"
+        assert str(port) in cls._base, f"The base should contain the port {port}, but it is {cls._base}"
 
     @classmethod
     def tearDownClass(cls):
         cls._srv.__exit__(None, None, None)
 
     def setUp(self):
-        # Reset state: delete all keys, re-init hash_lookup
         connector = RegistryConnector(self._base)
-        for key in connector.LIST():
-            try: connector.DELETE(key)
-            except: pass
+        assert len(connector.LIST()) == 0, f"There should be no keys in the registry, but there is {len(connector.LIST())} for {connector.base}"
         connector.POST("hash_lookup.json", b"{}")
         self.registry = RegistryBase(connector)
         self.dummy_dataclass = make_dataclass("DummyDataclass", [("id", str), ("dummy", str), ("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA)])
         self.dummy_dataclass2 = make_dataclass("DummyDataclass2", [("id", str), ("dummy2", str), ("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA)])
+
+    def tearDown(self):
+        for key in self.registry.backend.LIST(): self.registry.backend.DELETE(key)
+        paths_left = self.registry.backend.LIST()
+        assert len(paths_left) == 0, f"There should be no keys in the registry, but there are paths left: {paths_left}"
 
     def test_GET_default_type(self):
         data = {"test": "test"}
@@ -36,15 +45,18 @@ class TestRegistry(unittest.TestCase):
         loaded_data = self.registry.GET(Path("test.json"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
         assert loaded_data == data, "The loaded data should be the same as the posted data"
 
-        result_people = self.registry.DefaultTypes.RESULT_PEOPLE(id=self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE), metadata=self.registry.BaseDefaultTypes.BASEMETADATA(model="test", created_at=current_timestamp()), \
+        result_people = self.registry.DefaultTypes.RESULT_PEOPLE(id=self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE), \
+            metadata=self.registry.BaseDefaultTypes.BASEMETADATA(model="test", created_at=current_timestamp()), \
             frame_results={0: [self.registry.BaseDefaultTypes.DEFAULT_DETECTION_DATACLASS(x1=0, y1=0, x2=100, y2=100, conf=0.9, cls="test")]})
         self.registry.POST(Path("test.json"), result_people, self.registry.DefaultTypes.RESULT_PEOPLE)
         loaded_result_people = self.registry.GET(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
         assert loaded_result_people == result_people, "The loaded result people should be the same as the posted result people"
+        self.registry.DELETE(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
+        assert not self.registry.EXISTS(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
 
     def test_GET_custom_type(self): pass # Potentially support other, custom suffixes
     def test_POST_custom_type(self): pass # Potentially support other, custom suffixes
-    
+
     def test_GET_bad_input_silent(self):
         self.registry.POST(Path("test.json"), {"test": "test"}, self.registry.DefaultMarkers.ORIGINAL_MARKER)
         loaded_result_people = self.registry.GET(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE, throw_error=False)
@@ -52,7 +64,7 @@ class TestRegistry(unittest.TestCase):
         loaded_result_people = self.registry.GET(Path("test.json"), self.registry.DefaultTypes.RESULT_WASTE, throw_error=False)
         assert loaded_result_people is None, "The loaded result people should be None"
 
-    def test_GET_bad_input(self): 
+    def test_GET_bad_input(self):
         self.assertRaises(AssertionError, self.registry.GET, Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
         self.assertRaises(AssertionError, self.registry.GET, Path("test.json"), {"test": "test"})
         self.assertRaises(AssertionError, self.registry.GET, Path("test.json"), "bad_type")
@@ -85,7 +97,7 @@ class TestRegistry(unittest.TestCase):
     def test_POST_GET_with_refs(self):
         # Setup: create original marker first
         self.registry.POST(Path("video.json"), {"src": "test"}, self.registry.DefaultMarkers.ORIGINAL_MARKER)
-        
+
         # Post result with refs (image + json metadata)
         ref_image = Image.new("RGB", (50, 50), color=(0, 255, 0))
         ref_json = {"extra": "metadata"}
@@ -93,9 +105,9 @@ class TestRegistry(unittest.TestCase):
             id=self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE),
             metadata=self.registry.BaseDefaultTypes.BASEMETADATA(model="test", created_at=current_timestamp()),
             frame_results={0: []})
-        self.registry.POST(Path("video.json"), result, self.registry.DefaultTypes.RESULT_PEOPLE, 
+        self.registry.POST(Path("video.json"), result, self.registry.DefaultTypes.RESULT_PEOPLE,
                           refs={Path("thumb.png"): ref_image, Path("meta.json"): ref_json})
-        
+
         # GET refs back
         loaded_image = self.registry.GET(Path("video.json"), self.registry.DefaultMarkers.REF_MARKER, ref=Path("thumb.png"))
         loaded_json = self.registry.GET(Path("video.json"), self.registry.DefaultMarkers.REF_MARKER, ref=Path("meta.json"))
@@ -113,7 +125,7 @@ class TestRegistry(unittest.TestCase):
             id=self.registry.get_id(self.registry.DefaultTypes.RESULT_PEOPLE),
             metadata=self.registry.BaseDefaultTypes.BASEMETADATA(model="m", created_at="t"), frame_results={})
         self.registry.POST(Path("test.json"), result, self.registry.DefaultTypes.RESULT_PEOPLE)
-        
+
         # Delete only the result type
         self.registry.DELETE(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
         assert not self.registry.EXISTS(Path("test.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
@@ -127,11 +139,12 @@ class TestRegistry(unittest.TestCase):
             metadata=self.registry.BaseDefaultTypes.BASEMETADATA(model="m", created_at="t"), frame_results={})
         self.registry.POST(Path("vid.json"), result, self.registry.DefaultTypes.RESULT_PEOPLE,
                           refs={Path("thumb.png"): Image.new("RGB", (10, 10))})
-        
+
         # Delete original marker - should delete everything
         self.registry.DELETE(Path("vid.json"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
         assert not self.registry.EXISTS(Path("vid.json"), self.registry.DefaultMarkers.ORIGINAL_MARKER)
-        self.assertRaises(AssertionError, self.registry.EXISTS, Path("vid.json"), self.registry.DefaultTypes.RESULT_PEOPLE) # Should fail as original marker is deleted
+        # Should fail as original marker is deleted
+        self.assertRaises(AssertionError, self.registry.EXISTS, Path("vid.json"), self.registry.DefaultTypes.RESULT_PEOPLE)
         assert not self.registry.backend.EXISTS(self.registry._get_ref_path(Path("vid.json"), Path("thumb.png")))
 
     def test_construct_path(self):
