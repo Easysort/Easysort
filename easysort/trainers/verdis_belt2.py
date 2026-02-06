@@ -5,7 +5,7 @@ from easysort.trainer import YoloTrainer
 from pathlib import Path
 
 if __name__ == "__main__":
-    CATEGORIES = ["Plastics", "Hard plastics", "Cardboard", "Paper", "Folie", "Empty"]
+    CATEGORIES = ["plastics", "hard_plastics", "cardboard", "paper", "folie", "empty"]
 
     registry = RegistryBase(base=REGISTRY_LOCAL_IP)
     dataloader = DataLoader(registry, classes=CATEGORIES, destination=Path("verdis_category_dataset_reworked"))
