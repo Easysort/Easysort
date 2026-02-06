@@ -32,7 +32,7 @@ if __name__ == "__main__":
     registry = RegistryBase(base=REGISTRY_LOCAL_IP)
     MOTION_CATEGORIES = ["motion", "no_motion"]
 
-    dataloader = DataLoader(registry, classes=MOTION_CATEGORIES, destination=Path("verdis_motion_dataset_reworked"), force_recreate=True)
+    dataloader = DataLoader(registry, classes=MOTION_CATEGORIES, destination=Path("verdis_motion_dataset_reworked"), force_recreate=True, prefix="verdis/gadstrup/5")
     dataloader.from_registry(VerdisBeltGroundTruth, _label_json_to_category_func=lambda x: x.motion, file_to_saved_img_func=file_to_saved_img_func)
     image = dataloader.sample_image()
     print(image.shape)
