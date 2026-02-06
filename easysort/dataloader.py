@@ -28,6 +28,11 @@ class DataLoader:
             for cls in self.classes:
                 print(f"  {split}/{cls}: {len(os.listdir(self.destination / split / cls))}")
 
+    def from_registry(self, _label_type: T): 
+
+        if DEBUG > 0: self.print_distribution(f"From registry {_label_type}")
+        pass
+
     def from_yolo_dataset(self, dataset_path: Path): 
         for split in ['train', 'val']:
             for cls in self.classes:

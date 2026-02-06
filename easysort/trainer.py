@@ -36,7 +36,8 @@ class YoloTrainer:
     def __init__(self, name: str, classes: List[str], model_path: str = "yolo11s-cls.pt", dataloader: DataLoader = None):
         self.name = name
         self.model = YOLO(model_path)
-        self.classes = classes
+        self.classes = sorted(classes)
+        print("Classes are: ", self.classes)
         self.dataset = dataloader.destination
 
     def train(self, epochs: int = 30, patience: int = 5, imgsz: int = 224, batch: int = 32):
