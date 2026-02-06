@@ -6,6 +6,7 @@ import shutil
 import random
 import cv2
 import numpy as np
+from tqdm import tqdm
 
 from easysort.registry import RegistryBase
 from easysort.helpers import T, DEBUG
@@ -15,6 +16,7 @@ class DataLoader:
         self.registry = registry
         self.classes = classes
         self.destination = destination or Path(uuid4())
+        self.destination.mkdir(parents=True, exist_ok=True)
         assert self.classes is not None, "Classes are required"
 
     def print_distribution(self, inf: str):
@@ -26,7 +28,7 @@ class DataLoader:
     def from_yolo_dataset(self, dataset_path: Path): 
         for split in ['train', 'val']:
             for cls in self.classes:
-                for file in (dataset_path / split / cls).glob("*.jpg"):
+                for file in tqdm(list((dataset_path / split / cls).glob("*.jpg")), desc=f"Copying {split} {cls}"):
                     if (self.destination / split / cls / file.name).exists(): continue
                     shutil.copy(file, self.destination / split / cls / file.name)
 
