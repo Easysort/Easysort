@@ -264,11 +264,15 @@ class RegistryBase:
 
     def LIST(self, prefix: Optional[str] = "", suffix: Optional[List[str] | str] = REGISTRY_REFERENCE_SUFFIXES, cond: Optional[Callable[[str], bool]] = None, return_all: bool = False, check_exists_with_type: T = None) -> list[Path]:
         files = self.backend.LIST(prefix)
+        print("Number of files: ", len(files))
         files = [file for file in tqdm(files) if (file.suffix in list(suffix) if suffix else True) and not file.name.startswith("._")]
+        print("Number of files after suffix filter: ", len(files))
         cond_files = [file for file in tqdm(files, desc="Filtering files") if cond(file)] if cond else files
+        print("Number of files after cond filter: ", len(cond_files))
         if check_exists_with_type: 
             exists_bools = self.EXISTS_MULTIPLE(cond_files, check_exists_with_type)
-            cond_files = [file for file, exists in zip(cond_files, exists_bools) if not exists]
+            print("Number of files after check_exists_with_type filter: ", sum(exists_bools), "out of", len(cond_files))
+            cond_files = [file for file, exists in zip(cond_files, exists_bools) if exists] # Files that exist
         return [files, cond_files] if return_all else cond_files
 
 

@@ -39,20 +39,22 @@ class DataLoader: # TODO: Work for other than .jpg files
         """
         if DEBUG > 0: print(f"Loading data from registry with prefix {prefix} and check_exists_with_type {_label_type}")
         files = self.registry.LIST(prefix = prefix, check_exists_with_type = _label_type)
+        if DEBUG > 0: print(f"Found {len(files)} annotated files looking like this: {files[0]}")
         all_dataset_file_names = [(Path(root) / fname).name for root, _, files in os.walk(self.destination) for fname in files]
         missing_files = [file for file in files if registry_file_to_local_file_path(file).name not in all_dataset_file_names]
-        print(f"Found {len(missing_files)} missing files out of {len(files)} files")
+        print(f"Found {len(missing_files)} missing files out of {len(files)} annotated files")
 
 
         for file in tqdm(missing_files, desc="From registry"):
             qa_result = self.registry.GET(file, _label_type)
             category = _label_json_to_category_func(qa_result)
             train_split = "train" if random.random() < 0.8 else "val"
-            (self.destination / train_split / category).mkdir(parents=True, exist_ok=True)
-            if file_to_saved_img_func: file_to_saved_img_func(self.registry, file, self.destination / train_split / category)
+            save_path = self.destination / train_split / str(category)
+            save_path.mkdir(parents=True, exist_ok=True)
+            if file_to_saved_img_func: file_to_saved_img_func(self.registry, file, save_path)
             else: 
                 img = self.registry.GET(file, self.registry.DefaultMarkers.ORIGINAL_MARKER)
-                cv2.imwrite(self.destination / train_split / category / file.name, img)
+                cv2.imwrite(save_path / file.name, img)
 
         if DEBUG > 0: self.print_distribution(f"From registry {_label_type}")
 

@@ -4,6 +4,7 @@ from easysort.dataloader import DataLoader
 from easysort.trainer import YoloTrainer
 from pathlib import Path
 import cv2
+import numpy as np
 from uuid import uuid4
 from dataclasses import dataclass, field
 from easysort.helpers import current_timestamp
@@ -23,7 +24,7 @@ def file_to_saved_img_func(registry: RegistryBase, file: Path, expected_save_pat
     assert len(neighboring_files) == 3, "Expected 3 neighboring files"
     img1 = registry.GET(neighboring_files[0], registry.DefaultMarkers.ORIGINAL_MARKER)
     img3 = registry.GET(neighboring_files[2], registry.DefaultMarkers.ORIGINAL_MARKER)
-    diff_img = img3 - img1
+    diff_img = np.array(img3) - np.array(img1)
     cv2.imwrite(expected_save_path / file.name, diff_img)
     
 
@@ -33,7 +34,9 @@ if __name__ == "__main__":
     MOTION_CATEGORIES = ["motion", "no_motion"]
 
     dataloader = DataLoader(registry, classes=MOTION_CATEGORIES, destination=Path("verdis_motion_dataset_reworked"), force_recreate=True)
-    dataloader.from_registry(VerdisBeltGroundTruth, _label_json_to_category_func=lambda x: x.motion, file_to_saved_img_func=file_to_saved_img_func, prefix="verdis/gadstrup/5")
+    print("here")
+    dataloader.from_registry(VerdisBeltGroundTruth, _label_json_to_category_func=lambda x: "motion" if x.motion else "no_motion", file_to_saved_img_func=file_to_saved_img_func, prefix="verdis/gadstrup/5")
+    print("here")
     image = dataloader.sample_image()
     print(image.shape)
 
