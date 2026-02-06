@@ -37,6 +37,7 @@ class DataLoader: # TODO: Work for other than .jpg files
 
 
         """
+        if DEBUG > 0: print(f"Loading data from registry with prefix {prefix} and check_exists_with_type {_label_type}")
         files = self.registry.LIST(prefix = prefix, check_exists_with_type = _label_type)
         all_dataset_file_names = [(Path(root) / fname).name for root, _, files in os.walk(self.destination) for fname in files]
         missing_files = [file for file in files if registry_file_to_local_file_path(file).name not in all_dataset_file_names]
