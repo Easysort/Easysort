@@ -73,7 +73,7 @@ REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES = {
 }
 
 def current_timestamp() -> str: return datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
-def registry_file_to_local_file_path(registry_file: Path) -> Path: return registry_file.replace("/", "_")
+def registry_file_to_local_file_path(registry_file: Path) -> Path: return Path(str(registry_file).replace("/", "_"))
 
 
 
