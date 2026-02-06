@@ -1,5 +1,5 @@
 import openai, time, fcntl, functools
-from easysort.helpers import OPENAI_API_KEY, T
+from easysort.helpers import OPENAI_API_KEY, T, REGISTRY_LOCAL_IP
 from typing import List, Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -11,7 +11,7 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 from easysort.sampler import Crop, Sampler
-from easysort import Registry
+from easysort.registry import RegistryBase, RegistryConnector
 import cv2
 
 VPN_LOCK_FILE = Path("/tmp/verdis_vpn.lock")
@@ -144,7 +144,8 @@ def extract_person_crops_from_video(
     min_h: int = 200,
     pad: float = 0.08,
 ) -> list[PersonCrop]:
-    url = Registry.backend.URL(video_path)
+    registry = ... # TODO: Get registry from context
+    url = registry.backend.URL(video_path)
     cap = cv2.VideoCapture(url)
     if not cap.isOpened(): return []
     out, frames, idxs, i = [], [], [], 0
@@ -198,25 +199,32 @@ class RunnerJob:
     folder: str
     suffix: List[str] = [".mp4"]
     result_type: type
+    registry: RegistryBase
     interval_mins: int = 5
 
+    def __init__(self, registry: RegistryBase): self.registry = registry
     def process(self, paths: List[Path], runner: Runner) -> List: raise NotImplementedError
 
 class PusherJob:
     folder: str
+    registry: RegistryBase
+
+    def __init__(self, registry: RegistryBase): self.registry = registry
     def push(self): raise NotImplementedError
 
 class ContinuousRunner:
     def __init__(self, run_job: RunnerJob, push_job: PusherJob):
-        self.run_job = run_job
-        self.push_job = push_job
+        print("Creating RegistryConnector from ContinuousRunner")
+        self.registry = RegistryBase(base=REGISTRY_LOCAL_IP)  
+        self.run_job = run_job(self.registry)
+        self.push_job = push_job(self.registry)
         self.runner = Runner()
 
     def run(self):
         print(f"Starting ContinuousRunner for {self.run_job.folder} (interval: {self.run_job.interval_mins}min)")
         while True:
             print(f"\n{'='*50}\nScanning for missing results...")
-            all_files, missing = Registry.LIST(self.run_job.folder, suffix=self.run_job.suffix, return_all=True, check_exists_with_type=self.run_job.result_type)
+            all_files, missing = self.registry.LIST(self.run_job.folder, suffix=self.run_job.suffix, return_all=True, check_exists_with_type=self.run_job.result_type)
             print(f"Found {len(missing)} missing / {len(all_files)} total")
             print("Waiting for VPN lock...")
             if missing:

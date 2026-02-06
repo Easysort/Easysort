@@ -5,14 +5,16 @@ from easysort.runner import Runner
 from flask import Flask, request, jsonify
 from pathlib import Path
 from dataclasses import dataclass, field
-from easyprod.scripts.verdis.belt import ALLOWED_CATEGORIES, BeltRunnerJob, POLY_POINTS
+from easyprod.scripts.verdis.belt import ALLOWED_CATEGORIES, BeltRunnerJob, POLY_POINTS, predict_category, predict_motion, crop_belt
 from collections import Counter
 import base64, io, random, json, gc
+import numpy as np
 from tqdm import tqdm
 
 waste_type_belt_prompt = f"Classify waste on belt. Categories: {ALLOWED_CATEGORIES}"
 
 CACHE_FILE = Path("verdis_belt_ai_cache.json")
+GT_CACHE_FILE = Path("verdis_belt_gt_cache.json")
 
 @dataclass
 class VerdisBeltGroundTruth:
@@ -27,26 +29,41 @@ class VerdisBeltValidator:
     port = 8080
 
     def __init__(self, registry: RegistryBase, review_mode: bool = False, run_ai: bool = False, 
-                 datetime_from: str | None = None, datetime_to: str | None = None):
+                 datetime_from: str | None = None, datetime_to: str | None = None, force_reload: bool = False,
+                 sample_category: str | None = None):
         self.registry, self.app = registry, Flask(__name__)
         self._idx = 0
         self._review_mode = review_mode
         self._run_ai = run_ai
         self._datetime_from = datetime_from  # Format: "YYYYMMDD_HHMMSS" or "YYYYMMDD"
         self._datetime_to = datetime_to
-        self._motion_detector = BeltRunnerJob()
+        self._force_reload = force_reload
+        self._sample_category = sample_category.lower().replace(" ", "_") if sample_category else None
+        self._motion_detector = BeltRunnerJob(self.registry)
         self._setup_routes()
         
         # Load data and initialize folders
         self._ai_cache: dict[str, str] = {}  # folder_path -> category
         self._gt_cache: dict[str, dict] = {}  # folder_path -> {category, motion}
         self._load_and_display_distributions()
-        self._folders = self._get_review_folders() if review_mode else self._get_prioritized_folders()
         
+        # Determine which folders to show
         if review_mode:
+            self._folders = self._get_review_folders()
             print(f"\n*** REVIEW MODE: Reviewing {len(self._folders)} existing ground truths ***\n")
-        if datetime_from or datetime_to:
-            print(f"\n*** DATE RANGE MODE: {datetime_from or 'start'} to {datetime_to or 'end'} ***\n")
+        elif datetime_from or datetime_to:
+            # Date range mode: show ALL folders in range, sorted chronologically (oldest first)
+            self._folders = sorted(self._all_folders, key=lambda f: self._folder_datetime.get(f, ("", "")))
+            print(f"\n*** DATE RANGE MODE: {datetime_from or 'start'} to {datetime_to or 'end'} ({len(self._folders)} folders, oldest first) ***\n")
+        else:
+            # Normal mode: show unlabeled folders, sorted chronologically (oldest first)
+            self._folders = self._get_unlabeled_folders_sorted()
+        
+        # Apply sample filter if specified (keeps chronological order)
+        if self._sample_category:
+            before_count = len(self._folders)
+            self._folders = [f for f in self._folders if self._ai_cache.get(str(f), "").lower().replace(" ", "_") == self._sample_category]
+            print(f"\n*** SAMPLE MODE: Filtered to {len(self._folders)} folders with AI category '{self._sample_category}' (from {before_count}) ***\n")
 
     def _load_cache(self) -> dict[str, str]:
         """Load AI results cache from local JSON file."""
@@ -60,6 +77,19 @@ class VerdisBeltValidator:
     def _save_cache(self):
         """Save AI results cache to local JSON file."""
         CACHE_FILE.write_text(json.dumps(self._ai_cache, indent=2))
+
+    def _load_gt_cache(self) -> dict[str, dict]:
+        """Load ground truth cache from local JSON file."""
+        if not self._force_reload and GT_CACHE_FILE.exists():
+            try:
+                return json.loads(GT_CACHE_FILE.read_text())
+            except:
+                pass
+        return {}
+
+    def _save_gt_cache(self):
+        """Save ground truth cache to local JSON file."""
+        GT_CACHE_FILE.write_text(json.dumps(self._gt_cache, indent=2))
 
     def _extract_datetime_from_image(self, img_path: Path) -> tuple[str, str] | None:
         """Extract date (YYYYMMDD) and time (HHMMSS) from image filename."""
@@ -186,8 +216,8 @@ class VerdisBeltValidator:
                 self._folder_datetime[chosen_folder] = folder_datetime_all[chosen_folder]
             
             skipped_count = len(all_folder_imgs) - len(self._folder_to_img)
-            self._all_folders = sorted(self._folder_to_img.keys())
-            print(f"Filtered to {len(self._all_folders)} folders (1 per 15-min slot, skipped {skipped_count})")
+            self._all_folders = sorted(self._folder_to_img.keys(), key=lambda f: self._folder_datetime.get(f, ("", "")))
+            print(f"Filtered to {len(self._all_folders)} folders (1 per 15-min slot, skipped {skipped_count}, oldest first)")
         
         # Load cache
         self._ai_cache = self._load_cache()
@@ -265,22 +295,41 @@ class VerdisBeltValidator:
         
         # Load ground truth - GT stored at folder/image_stem/hash.json, so use parent.parent
         # Load ALL ground truths (not just 15-minute filtered) for distribution display
-        self._gt_cache = {}
-        all_gt_cache = {}  # For distribution display (all GTs)
-        for gt_file in tqdm(gt_files, desc="Loading ground truth"):
+        cached_gt = self._load_gt_cache()
+        cached_folders = set(cached_gt.keys())
+        
+        # Find folders with GT files that are not in cache
+        gt_folder_to_file: dict[str, Path] = {}
+        for gt_file in gt_files:
+            img_folder = str(gt_file.parent.parent)
+            if img_folder not in gt_folder_to_file:
+                gt_folder_to_file[img_folder] = gt_file
+        
+        new_gt_folders = [f for f in gt_folder_to_file.keys() if f not in cached_folders]
+        print(f"GT Cache: {len(cached_folders)} cached, {len(new_gt_folders)} new to fetch")
+        
+        # Fetch only new GT from registry
+        all_gt_cache = dict(cached_gt)  # Start with cached values
+        for folder_str in tqdm(new_gt_folders, desc="Fetching new ground truth"):
             try:
-                img_folder = gt_file.parent.parent
+                img_folder = Path(folder_str)
                 # Get any image in this folder to retrieve GT
                 imgs = sorted([f for f in self._files if f.parent == img_folder and f.suffix.lower() in (".jpg", ".png", ".jpeg")])
                 if imgs:
                     gt = self.registry.GET(imgs[0], VerdisBeltGroundTruth, throw_error=False)
                     if gt:
-                        all_gt_cache[str(img_folder)] = {"category": gt.category, "motion": gt.motion}
-                        # Also add to main cache if in 15-minute filtered set
-                        if img_folder in self._folder_to_img:
-                            self._gt_cache[str(img_folder)] = {"category": gt.category, "motion": gt.motion}
+                        all_gt_cache[folder_str] = {"category": gt.category, "motion": gt.motion}
             except:
                 pass
+        
+        # Build main cache (15-minute filtered) and save
+        self._gt_cache = {k: v for k, v in all_gt_cache.items() if Path(k) in self._folder_to_img}
+        
+        # Save all GT to cache file
+        old_gt_cache = self._gt_cache
+        self._gt_cache = all_gt_cache  # Temporarily set to all for saving
+        self._save_gt_cache()
+        self._gt_cache = old_gt_cache  # Restore filtered version
         
         gt_categories = Counter(v["category"] for v in all_gt_cache.values())
         gt_motion = Counter("motion" if v["motion"] else "no_motion" for v in all_gt_cache.values())
@@ -414,63 +463,19 @@ class VerdisBeltValidator:
             print("  No data found")
         print(f"{'='*50}\n")
 
-    def _get_prioritized_folders(self) -> list[Path]:
-        """Get unlabeled folders, prioritized by what categories need more labels, but shuffled for variety."""
-        # Find already labeled folders
+    def _get_unlabeled_folders_sorted(self) -> list[Path]:
+        """Get unlabeled folders, sorted chronologically (oldest first)."""
         labeled_folders = set(self._gt_cache.keys())
         unlabeled = [f for f in self._all_folders if str(f) not in labeled_folders]
+        # Sort by datetime (oldest first)
+        unlabeled = sorted(unlabeled, key=lambda f: self._folder_datetime.get(f, ("", "")))
         
-        # Split into folders with AI results and without
-        with_ai = [f for f in unlabeled if str(f) in self._ai_cache]
-        without_ai = [f for f in unlabeled if str(f) not in self._ai_cache]
+        # Count categories for info
+        with_ai = sum(1 for f in unlabeled if str(f) in self._ai_cache)
+        without_ai = len(unlabeled) - with_ai
+        print(f"Folders: {len(labeled_folders)} labeled, {len(unlabeled)} unlabeled ({with_ai} with AI, {without_ai} without AI), sorted oldest first")
         
-        # Calculate target distribution (equal per category)
-        gt_categories = Counter(v["category"] for v in self._gt_cache.values())
-        total_labeled = len(self._gt_cache)
-        target_per_cat = max(1, (total_labeled + len(with_ai)) // len(self.categories))
-        
-        # Calculate how many more we need per category
-        needed = {cat: max(0, target_per_cat - gt_categories.get(cat, 0)) for cat in self.categories}
-        
-        # Group folders by category and shuffle within each group
-        by_category: dict[str, list[Path]] = {cat: [] for cat in self.categories}
-        by_category["unknown"] = []
-        for folder in with_ai:
-            cat = self._ai_cache.get(str(folder), "unknown")
-            if cat in by_category:
-                by_category[cat].append(folder)
-            else:
-                by_category["unknown"].append(folder)
-        
-        # Shuffle within each category
-        for cat_folders in by_category.values():
-            random.shuffle(cat_folders)
-        
-        # Interleave categories, weighted by need (take more from categories that need more labels)
-        # Sort categories by need (highest first)
-        sorted_cats = sorted(self.categories, key=lambda c: -needed.get(c, 0))
-        
-        result = []
-        while any(by_category[cat] for cat in sorted_cats):
-            for cat in sorted_cats:
-                if by_category[cat]:
-                    # Take 1-3 items based on relative need
-                    take = min(len(by_category[cat]), max(1, needed.get(cat, 0) // 10 + 1))
-                    for _ in range(take):
-                        if by_category[cat]:
-                            result.append(by_category[cat].pop(0))
-        
-        # Add any unknown category folders
-        result.extend(by_category.get("unknown", []))
-        
-        # Shuffle folders without AI results and add at the end
-        random.shuffle(without_ai)
-        result.extend(without_ai)
-        
-        print(f"Folders: {len(labeled_folders)} labeled, {len(with_ai)} with AI (prioritized+shuffled), {len(without_ai)} without AI (shuffled)")
-        print(f"Category needs: {dict(sorted(needed.items(), key=lambda x: -x[1]))}")
-        
-        return result
+        return unlabeled
 
     def _get_review_folders(self) -> list[Path]:
         """Get labeled folders for review mode."""
@@ -526,9 +531,27 @@ class VerdisBeltValidator:
         if motion_result is None:
             motion_result = self._motion_detector._motion_detection(images)
         
+        # Run YOLO predictions (local models)
+        yolo_category = None
+        yolo_motion = None
+        try:
+            # Load images as numpy arrays for YOLO
+            pil_img = self.registry.GET(first, self.registry.DefaultMarkers.ORIGINAL_MARKER)
+            img_array = np.array(pil_img)
+            yolo_category = predict_category(img_array)
+            
+            # For motion, load all images in the folder
+            pil_imgs = [self.registry.GET(img, self.registry.DefaultMarkers.ORIGINAL_MARKER) for img in images]
+            img_arrays = [np.array(img) for img in pil_imgs]
+            yolo_motion = predict_motion(img_arrays)
+        except Exception as e:
+            print(f"YOLO prediction error for {folder.name}: {e}")
+        
         return {
             "category": category,
-            "motion": motion_result.motion_detected if motion_result else False
+            "motion": motion_result.motion_detected if motion_result else False,
+            "yolo_category": yolo_category,
+            "yolo_motion": yolo_motion
         }
 
     def _save(self, folder: Path, category: str, motion: bool):
@@ -536,8 +559,15 @@ class VerdisBeltValidator:
         if images:
             gt = VerdisBeltGroundTruth(category=category, motion=motion)
             self.registry.POST(images[0], gt, VerdisBeltGroundTruth, overwrite=True)
-            # Update ground truth cache
+            # Update ground truth cache (both in-memory and file)
             self._gt_cache[str(folder)] = {"category": category, "motion": motion}
+            # Also update the full cache file (always read existing, ignore force_reload here)
+            try:
+                all_gt = json.loads(GT_CACHE_FILE.read_text()) if GT_CACHE_FILE.exists() else {}
+            except:
+                all_gt = {}
+            all_gt[str(folder)] = {"category": category, "motion": motion}
+            GT_CACHE_FILE.write_text(json.dumps(all_gt, indent=2))
             print(f"Saved: {folder.name} -> category={category}, motion={motion}")
 
     def _setup_routes(self):
@@ -577,14 +607,27 @@ class VerdisBeltValidator:
 
         @self.app.route("/accept", methods=["POST"])
         def accept():
-            """Accept AI prediction as ground truth."""
+            """Accept GPT prediction as ground truth."""
             data = request.json
             pred = data.get("prediction", {})
             if pred.get("category"):
                 self._save(Path(data["folder"]), pred["category"], pred.get("motion", False))
                 self._idx += 1
                 return jsonify({"ok": True})
-            return jsonify({"ok": False, "error": "No AI prediction to accept"})
+            return jsonify({"ok": False, "error": "No GPT prediction to accept"})
+
+        @self.app.route("/accept_yolo", methods=["POST"])
+        def accept_yolo():
+            """Accept YOLO prediction as ground truth."""
+            data = request.json
+            pred = data.get("prediction", {})
+            if pred.get("yolo_category"):
+                # Use YOLO's motion prediction if available, fall back to GPT motion
+                motion = pred.get("yolo_motion") if pred.get("yolo_motion") is not None else pred.get("motion", False)
+                self._save(Path(data["folder"]), pred["yolo_category"], motion)
+                self._idx += 1
+                return jsonify({"ok": True})
+            return jsonify({"ok": False, "error": "No YOLO prediction to accept"})
 
         @self.app.route("/skip", methods=["POST"])
         def skip(): self._idx += 1; return jsonify({"ok": True})
@@ -607,16 +650,20 @@ body{font-family:system-ui;background:#1a1a1a;color:#fff;height:100vh;display:fl
 #frame-indicator{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px}
 #frame-indicator span{width:10px;height:10px;border-radius:50%;background:#555}
 #frame-indicator span.active{background:#fff}
-#info-overlay{position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.7);padding:8px 12px;border-radius:4px;font-size:12px;display:none}
-#info-overlay.show{display:block}
+#info-overlay{position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.85);padding:10px 14px;border-radius:6px;font-size:13px;display:block}
 #info-overlay .gt{color:#4f8}
-#info-overlay .ai{color:#4af}
+#info-overlay .gpt{color:#4af}
+#info-overlay .yolo{color:#fa0}
+#info-overlay .label{color:#888;font-size:11px}
 #bar{padding:12px;background:#222;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap}
 .btn{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:500}
 .cat{background:#333;color:#888}.cat:hover{background:#555;color:#fff}
-.cat.match{background:#0d4a6d;color:#fff;outline:3px solid #0af;outline-offset:-1px}
+.cat.gpt-match{background:#0d4a6d;color:#fff;outline:3px solid #0af;outline-offset:-1px}
+.cat.yolo-match{background:#6d4a0d;color:#fff;outline:3px solid #fa0;outline-offset:-1px}
+.cat.both-match{background:#3d5a3d;color:#fff;outline:3px solid #8f8;outline-offset:-1px}
 .cat.gt-match{background:#0d6d4a;color:#fff;outline:3px solid #0f8;outline-offset:-1px}
-.accept{background:#2d5a2d;color:#fff}.accept:hover{background:#3d6a3d}
+.accept-gpt{background:#2d4a6d;color:#fff}.accept-gpt:hover{background:#3d5a7d}
+.accept-yolo{background:#6d4a2d;color:#fff}.accept-yolo:hover{background:#7d5a3d}
 .skip{background:#666}.back{background:#555}
 .motion{background:#3a5a3a}.motion.active{background:#4a8a4a;border:2px solid #6f6}
 .no-motion{background:#5a3a3a}.no-motion.active{background:#8a4a4a;border:2px solid #f66}
@@ -624,12 +671,14 @@ body{font-family:system-ui;background:#1a1a1a;color:#fff;height:100vh;display:fl
 #done{display:none;font-size:24px;text-align:center;padding:48px}
 kbd{background:#333;padding:2px 6px;border-radius:3px;font-size:11px;margin-right:4px}
 .review-banner{background:#553;color:#ff8;padding:4px 12px;text-align:center;font-size:12px}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
 </style></head><body>
 <div id="review-banner" class="review-banner" style="display:none">REVIEW MODE - Checking existing ground truths</div>
 <div id="images"><div id="frame-indicator"></div><div id="info-overlay"></div></div>
 <div id="bar">
   <button class="btn back" onclick="back()"><kbd>B</kbd>Back</button>
-  <button class="btn accept" id="btn-accept" onclick="accept()"><kbd>A</kbd>Accept AI</button>
+  <button class="btn accept-gpt" id="btn-accept-gpt" onclick="acceptGpt()"><kbd>A</kbd>Accept GPT</button>
+  <button class="btn accept-yolo" id="btn-accept-yolo" onclick="acceptYolo()"><kbd>Y</kbd>Accept YOLO</button>
   <span id="cats"></span>
   <button class="btn skip" onclick="skip()"><kbd>S</kbd>Skip</button>
   <span id="motion-btns">
@@ -669,30 +718,45 @@ function render(data){
   // Show review banner if in review mode
   document.getElementById('review-banner').style.display=data.review_mode?'block':'none';
   
-  // Build overlay HTML (always create element, just hide when not needed)
-  const showOverlay=data.review_mode&&data.ground_truth;
-  const overlayHtml=`<div id="info-overlay"${showOverlay?' class="show"':''}>${showOverlay?`<div class="gt">GT: ${data.ground_truth.category} (${data.ground_truth.motion?'moving':'still'})</div><div class="ai">AI: ${data.prediction.category||'none'} (${data.prediction.motion?'moving':'still'})</div>`:''}</div>`;
+  // Build overlay HTML showing GPT and YOLO predictions
+  const pred = data.prediction;
+  const gt = data.ground_truth;
+  let overlayHtml = '<div id="info-overlay">';
+  if(gt) {
+    overlayHtml += `<div class="label">Ground Truth:</div><div class="gt">${gt.category} (${gt.motion?'moving':'still'})</div>`;
+  }
+  overlayHtml += `<div class="label" style="margin-top:6px">GPT:</div><div class="gpt">${pred.category||'none'} (${pred.motion?'moving':'still'})</div>`;
+  overlayHtml += `<div class="label" style="margin-top:6px">YOLO:</div><div class="yolo">${pred.yolo_category||'none'} (${pred.yolo_motion===true?'moving':pred.yolo_motion===false?'still':'?'})</div>`;
+  // Show agreement status
+  const agree = pred.category && pred.yolo_category && pred.category === pred.yolo_category;
+  overlayHtml += `<div style="margin-top:8px;color:${agree?'#8f8':'#f88'};font-size:11px">${agree?'✓ Models agree':'✗ Models disagree'}</div>`;
+  overlayHtml += '</div>';
   
   document.getElementById('images').innerHTML=data.images.map((i,idx)=>`<img src="data:image/jpeg;base64,${i.b64}" class="${idx===0?'active':''}">`).join('')+
     `<div id="frame-indicator">${data.images.map((_,i)=>`<span class="${i===0?'active':''}"></span>`).join('')}</div>`+overlayHtml;
   currentFolder=data.folder;
-  currentMotion=data.prediction.motion;
+  currentMotion=pred.yolo_motion!==null?pred.yolo_motion:pred.motion;
   currentFrame=0;
   updateMotionBtns();
   document.getElementById('progress').textContent=`${data.idx+1}/${data.total}`;
   
   // Highlight matching categories
-  console.log('AI prediction category:',data.prediction.category);
+  const gptCat = pred.category;
+  const yoloCat = pred.yolo_category;
   document.querySelectorAll('.cat').forEach(b=>{
-    const isMatch=b.dataset.cat===data.prediction.category;
-    console.log('Button:',b.dataset.cat,'isMatch:',isMatch);
-    b.classList.remove('match','gt-match');
-    if(isMatch)b.classList.add('match');
-    if(data.ground_truth&&b.dataset.cat===data.ground_truth.category)b.classList.add('gt-match');
+    const cat = b.dataset.cat;
+    b.classList.remove('gpt-match','yolo-match','both-match','gt-match');
+    const isGpt = cat === gptCat;
+    const isYolo = cat === yoloCat;
+    if(isGpt && isYolo) b.classList.add('both-match');
+    else if(isGpt) b.classList.add('gpt-match');
+    else if(isYolo) b.classList.add('yolo-match');
+    if(gt && cat === gt.category) b.classList.add('gt-match');
   });
   
-  // Disable accept button if no AI prediction
-  document.getElementById('btn-accept').disabled=!data.prediction.category;
+  // Enable/disable accept buttons based on predictions
+  document.getElementById('btn-accept-gpt').disabled = !pred.category;
+  document.getElementById('btn-accept-yolo').disabled = !pred.yolo_category;
   
   startLoop();
 }
@@ -702,14 +766,16 @@ async function load(){
   render(data);
 }
 async function label(cat){await fetch('/label',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder:currentFolder,category:cat,motion:currentMotion})});await load()}
-async function accept(){if(!currentPrediction||!currentPrediction.category)return;await fetch('/accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder:currentFolder,prediction:currentPrediction})});await load()}
+async function acceptGpt(){if(!currentPrediction||!currentPrediction.category)return;await fetch('/accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder:currentFolder,prediction:currentPrediction})});await load()}
+async function acceptYolo(){if(!currentPrediction||!currentPrediction.yolo_category)return;await fetch('/accept_yolo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder:currentFolder,prediction:currentPrediction})});await load()}
 async function skip(){await fetch('/skip',{method:'POST'});await load()}
 async function back(){await fetch('/back',{method:'POST'});await load()}
 
 document.getElementById('cats').innerHTML=CATS.map((c,i)=>`<button class="btn cat" data-cat="${c}" onclick="label('${c}')"><kbd>${i+1}</kbd>${c}</button>`).join('');
 document.addEventListener('keydown',e=>{
   if(e.key>='1'&&e.key<='9'&&CATS[+e.key-1])label(CATS[+e.key-1]);
-  else if(e.key.toLowerCase()==='a')accept();
+  else if(e.key.toLowerCase()==='a')acceptGpt();
+  else if(e.key.toLowerCase()==='y')acceptYolo();
   else if(e.key.toLowerCase()==='s')skip();
   else if(e.key.toLowerCase()==='b')back();
   else if(e.key.toLowerCase()==='m')setMotion(true);
@@ -722,32 +788,42 @@ if __name__ == "__main__":
     import sys
     review_mode = "--review" in sys.argv or "-r" in sys.argv
     run_ai = "--run-ai" in sys.argv
+    force_reload = "--force-reload" in sys.argv
     
-    # Parse datetime range arguments
+    # Parse arguments with values
     datetime_from = None
     datetime_to = None
+    sample_category = None
     for i, arg in enumerate(sys.argv):
         if arg == "--from" and i + 1 < len(sys.argv):
             datetime_from = sys.argv[i + 1]
         elif arg == "--to" and i + 1 < len(sys.argv):
             datetime_to = sys.argv[i + 1]
+        elif arg == "--sample" and i + 1 < len(sys.argv):
+            sample_category = sys.argv[i + 1]
     
     if "--help" in sys.argv or "-h" in sys.argv:
         print("Usage: python verdis_belt.py [OPTIONS]")
         print("\nOptions:")
         print("  --review, -r              Review existing ground truths")
         print("  --run-ai                  Run AI on folders missing results")
+        print("  --force-reload            Force reload caches from registry (ignore local cache)")
+        print("  --sample CATEGORY         Filter to folders with AI detection of CATEGORY")
         print("  --from DATETIME           Start of date range (format: YYYYMMDD or YYYYMMDD_HHMMSS)")
         print("  --to DATETIME             End of date range (format: YYYYMMDD or YYYYMMDD_HHMMSS)")
         print("  --help, -h                Show this help message")
+        print(f"\nAvailable categories: {ALLOWED_CATEGORIES}")
         print("\nExamples:")
+        print("  python verdis_belt.py --sample hard_plastics")
+        print("  python verdis_belt.py --sample \"hard plastics\"")
         print("  python verdis_belt.py --from 20260128 --to 20260128")
-        print("  python verdis_belt.py --from 20260128_100000 --to 20260128_120000")
+        print("  python verdis_belt.py --force-reload")
         print("\nNote: When using --from/--to, ALL folders in the range are shown (no 15-min filtering)")
         sys.exit(0)
     
-    registry = RegistryBase(RegistryConnector(REGISTRY_LOCAL_IP))
+    registry = RegistryBase(base=REGISTRY_LOCAL_IP)
     registry.add_id(VerdisBeltGroundTruth, "5adf5d6f-539a-4533-9461-ff8b390fd9cf")
     validator = VerdisBeltValidator(registry, review_mode=review_mode, run_ai=run_ai, 
-                                    datetime_from=datetime_from, datetime_to=datetime_to)
+                                    datetime_from=datetime_from, datetime_to=datetime_to,
+                                    force_reload=force_reload, sample_category=sample_category)
     validator.run()

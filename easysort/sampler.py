@@ -6,8 +6,8 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 from dataclasses import dataclass
-from easysort.helpers import REGISTRY_PATH
-from easysort.registry import Registry
+from easysort.helpers import REGISTRY_LOCAL_IP
+from easysort.registry import RegistryBase
 
 @dataclass
 class Crop:
@@ -128,6 +128,7 @@ def create_crop(image: np.ndarray) -> Crop|Polygon|None:
     return None
 
 if __name__ == "__main__":
+    Registry = RegistryBase(base=REGISTRY_LOCAL_IP)  
     image = cv2.imread("tmp/114221.mp4_79.jpg")
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     crop = create_crop(image)

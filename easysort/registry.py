@@ -6,7 +6,7 @@
 # - Data registry and compute on same machine. Once that is no longer true, GET should return bytes, not path.
 
 from httpx import request
-from easysort.helpers import T, SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET, REGISTRY_REFERENCE_SUFFIXES, REGISTRY_LOCAL_IP, REGISTRY_TAILSCALE_IP, \
+from easysort.helpers import T, SUPABASE_URL, SUPABASE_KEY, SUPABASE_DATA_REGISTRY_BUCKET, REGISTRY_REFERENCE_SUFFIXES, \
     REGISTRY_REFERENCE_TYPES_MAPPING_TO_BYTES, REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES, REGISTRY_REFERENCE_SUFFIXES_MAPPING_TO_TYPE
 from supabase import create_client, Client
 
@@ -28,10 +28,10 @@ import sys
 
 
 class RegistryConnector:
-    def __init__(self, base: str = REGISTRY_LOCAL_IP, *, timeout: float = 30):
-        if len(REGISTRY_LOCAL_IP) == 0: print("Warning: REGISTRY_LOCAL_IP is not set, using default 'localhost:3001'")
-        base = REGISTRY_LOCAL_IP if len(REGISTRY_LOCAL_IP) > 0 else "localhost:3001"
-        base = (base or "").rstrip("/")
+    def __init__(self, base: str | None = None, *, timeout: float = 30):
+        if base is None: print("Warning: REGISTRY_LOCAL_IP is not set, using default 'localhost:3099'")
+        base = (base or "localhost:3099").rstrip("/")
+        print("Registry Connector initialized with base:", base)
         if not base: raise ValueError("Missing REGISTRY_LOCAL_IP / base URL (e.g. http://localhost:3000)")
         self.base = base if base.startswith(("http://", "https://")) else "http://" + base
         self.timeout = timeout
@@ -124,8 +124,13 @@ class RegistryBase:
         @classmethod
         def list(cls): return [_type for _, _type in vars(cls).items() if is_dataclass(_type)]
 
-    def __init__(self, registry_connector: RegistryConnector): 
+    def __init__(self, registry_connector: RegistryConnector | None = None, base: str | None = None): 
+        if registry_connector is None and base is None: raise ValueError("Either registry_connector or base must be provided")
+        if registry_connector is None: 
+            print("Creating RegistryConnector with base:", base)
+            registry_connector = RegistryConnector(base)
         self.backend = registry_connector
+        print("RegistryConnector created with base:", self.backend.base)
         self._hash_lookup_path = "hash_lookup.json"
         for _type in self.DefaultTypes.list() + self.DefaultMarkers.list(): self._update_hash_lookup(self.get_id(_type), self._hash(_type))
 
@@ -244,7 +249,7 @@ class RegistryBase:
         if refs is None: return
         for ref_path, ref_data in refs.items(): self.backend.POST(self._get_ref_path(original_key, ref_path), REGISTRY_REFERENCE_TYPES_MAPPING_TO_BYTES[ref_path.suffix](ref_data), allow_overwrite=overwrite)
 
-    def DELETE(self, key: Path, _type: T) -> None:
+    def DELETE(self, key: Path, _type: T) -> None: # Maybe we shouldnt have this, only a periodic cleanup function?
         "Deletes the data excluding references. If _type is ORIGINAL_MARKER, then everything related to this key will be deleted including references."
         if _type is not self.DefaultMarkers.ORIGINAL_MARKER: self.backend.DELETE(self._construct_path(key, _type))
         else:
@@ -319,6 +324,15 @@ class RegistryBase:
         set_file_list, paths = set(self.LIST()), self._construct_many_paths(keys, _type)
         return [path in set_file_list for path in tqdm(paths)]
 
+    def BACKUP(self, local_path: Path) -> None:
+        assert local_path.is_dir(), f"Local path {local_path} is not a directory"
+        files = self.LIST()
+        bools = self.backend.EXISTS_MULTIPLE(files)
+        missing_files = [file for file, exists in zip(files, bools) if not exists]
+        print(len(missing_files), "out of", len(files), "files are missing")
+        for file in tqdm(missing_files, desc="Backing up files"):
+            self.backend.GET_FILE(file, local_path / file)
+
     def EXPECT(self):
         # Potentially a EXPECT lazily generating missing results by returning list of bool, then using a specified func to generate results.
         pass
@@ -358,17 +372,15 @@ class RegistryBase:
 RegistryBase.DefaultTypes.RESULT_PEOPLE = make_dataclass("RESULT_PEOPLE", [("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA), ("frame_results", Dict[int, List["RegistryBase.BaseDefaultTypes.DEFAULT_DETECTION_DATACLASS"]])], bases=(RegistryBase.BaseDefaultTypes.BASECLASS,))
 RegistryBase.DefaultTypes.RESULT_WASTE = make_dataclass("RESULT_WASTE", [("metadata", RegistryBase.BaseDefaultTypes.BASEMETADATA), ("frame_results", Dict[int, List["RegistryBase.BaseDefaultTypes.DEFAULT_WASTE_DATACLASS"]])], bases=(RegistryBase.BaseDefaultTypes.BASECLASS,))
 
-RegistryConnectorLocal = RegistryConnector(REGISTRY_LOCAL_IP)
-Registry = RegistryBase(RegistryConnectorLocal)
-
-if __name__ == "__main__":  # kept empty on purpose (avoid side-effects like SYNC during imports/tests)
-    # directory = Path("/Users/lucasvilsen/Dev/Easysort/registry")
-    # Registry.PUT_FOLDER(directory)
-
+if __name__ == "__main__":
+    from easysort.helpers import REGISTRY_LOCAL_IP
+    RegistryConnectorLocal = RegistryConnector(REGISTRY_LOCAL_IP)
+    Registry = RegistryBase(RegistryConnectorLocal)  
     if len(sys.argv) < 2:
-        print("Usage: uv run easysort.registry sync|explore|uuid")
+        print("Usage: uv run easysort.registry sync|explore|uuid|put_folder <folder>")
         sys.exit(1)
     command = sys.argv[1]
     if command == "sync": Registry.SYNC()
     elif command == "explore": raise NotImplementedError("Explore not implemented") # Will be a HTML viewer of contents (AWS style)
     elif command == "uuid": print(uuid4())
+    elif command == "put_folder": Registry.PUT_FOLDER(Path(sys.argv[2]))

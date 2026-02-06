@@ -36,8 +36,30 @@ class GPTTrainer:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             results = list(tqdm(executor.map(process_single, image_paths), total=len(image_paths), desc="OpenAI calls"))
         return results
-    
+
 class YoloTrainer:
+    # FIXED 
+    def __init__(self, name: str, classes: List[str], model_path: str = "yolo11s-cls.pt"):
+        self.name = name
+        self.model = YOLO(model_path)
+        self.classes = classes
+
+    def train(self, images: List[np.ndarray], labels: List[str], epochs: int = 30, patience: int = 5):
+        self.model.train(
+            data=str(self.dataset),
+            epochs=epochs,
+            patience=patience,
+            imgsz=224,
+            batch=32,
+            project=f"{self.name}_model",
+            name="train",
+            exist_ok=True,
+            verbose=True,
+            plots=True,
+        )
+
+    
+class YoloTrainer2:
     def __init__(self, name: str, classes: List[str]):
         self.name = name
         self.classes = classes
@@ -194,10 +216,17 @@ class YoloTrainer:
             path = self.dataset / 'val' / label / f"{i:06d}.jpg"
             cv2.imwrite(str(path), self._to_bgr(img))
         
-        # Free memory - images are now saved to disk
-        del train_imgs, val_imgs
+        # Free train images only (keep val for final evaluation)
+        del train_imgs
         gc.collect()
-        print("Freed image memory before training")
+        print("Freed train image memory before training")
+        
+        # Remove previous run weights so class count matches current dataset (avoids "requires 7 classes, not 6")
+        weights_dir = Path(f"{self.name}_model/train/weights")
+        if weights_dir.exists():
+            for f in weights_dir.glob("*.pt"):
+                f.unlink()
+                print(f"Removed old weights: {f}")
         
         # Train with YOLO's built-in early stopping
         print(f"\n{'='*70}")

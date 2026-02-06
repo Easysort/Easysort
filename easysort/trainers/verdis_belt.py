@@ -12,6 +12,8 @@ from easysort.validators.verdis_belt import VerdisBeltGroundTruth
 from easysort.gpt_trainer import YoloTrainer
 from easyprod.scripts.verdis.belt import ALLOWED_CATEGORIES, POLY_POINTS
 
+## TODO: Fix this trainer
+
 MAX_SAMPLES_PER_CLASS = 350  # Max samples per category to balance dataset and reduce memory
 EPOCHS = 30  # Max epochs (early stopping will likely trigger before this)
 PATIENCE = 5  # Early stopping patience (YOLO stops if no val improvement)
@@ -151,7 +153,7 @@ def copy_models_to_prod():
 if __name__ == "__main__":
     import gc
     
-    registry = RegistryBase(RegistryConnector(REGISTRY_LOCAL_IP))
+    registry = RegistryBase(base=REGISTRY_LOCAL_IP)
     if len(sys.argv) < 2 or sys.argv[1] == "copy":
         copy_models_to_prod()
         sys.exit(0)
