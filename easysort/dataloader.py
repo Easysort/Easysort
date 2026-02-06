@@ -26,7 +26,7 @@ class DataLoader:
         print(f"{inf}: Distribution in {self.destination} is:")
         for split in ['train', 'val']:
             for cls in self.classes:
-                print(f"  {cls}: {len(os.listdir(self.destination / split / cls))}")
+                print(f"  {split}/{cls}: {len(os.listdir(self.destination / split / cls))}")
 
     def from_yolo_dataset(self, dataset_path: Path): 
         for split in ['train', 'val']:

@@ -13,7 +13,7 @@ if __name__ == "__main__":
     image = dataloader.sample_image()
     print(image.shape)
 
-    trainer = YoloTrainer("verdis_category_reworked", CATEGORIES)
+    trainer = YoloTrainer("verdis_category_reworked", CATEGORIES, dataloader=dataloader)
     trainer.train(epochs=30, patience=5, imgsz=224, batch=32)
 
     trainer.eval()
