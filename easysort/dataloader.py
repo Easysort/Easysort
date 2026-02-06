@@ -17,7 +17,7 @@ class DataLoader: # TODO: Work for other than .jpg files
         self.registry = registry
         self.classes = classes
         self.destination = destination or Path(uuid4())
-        if force_recreate: shutil.rmtree(self.destination)
+        if force_recreate and self.destination.exists(): shutil.rmtree(self.destination)
         self.destination.mkdir(parents=True, exist_ok=True)
         for split in ['train', 'val']:
             for cls in self.classes:
