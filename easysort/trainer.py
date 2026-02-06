@@ -39,9 +39,9 @@ class YoloTrainer:
         self.classes = classes
         self.dataset = dataloader.destination
 
-    def train(self, dataset: Path, epochs: int = 30, patience: int = 5, imgsz: int = 224, batch: int = 32):
+    def train(self, epochs: int = 30, patience: int = 5, imgsz: int = 224, batch: int = 32):
         self.model.train(
-            data=str(dataset),
+            data=str(self.dataset),
             epochs=epochs,
             patience=patience,
             imgsz=imgsz,

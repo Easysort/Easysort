@@ -8,13 +8,13 @@ if __name__ == "__main__":
     CATEGORIES = ["Plastics", "Hard plastics", "Cardboard", "Paper", "Folie", "Empty"]
 
     registry = RegistryBase(base=REGISTRY_LOCAL_IP)
-    dataloader = DataLoader(registry, classes=CATEGORIES)
+    dataloader = DataLoader(registry, classes=CATEGORIES, destination=Path("verdis_category_dataset_reworked"))
     dataloader.from_yolo_dataset(Path("verdis_category_dataset"))
     image = dataloader.sample_image()
     print(image.shape)
 
-    trainer = YoloTrainer("verdis_category", CATEGORIES)
-    trainer.train(Path("verdis_category_dataset"), epochs=30, patience=5, imgsz=224, batch=32)
+    trainer = YoloTrainer("verdis_category_reworked", CATEGORIES)
+    trainer.train(epochs=30, patience=5, imgsz=224, batch=32)
 
     trainer.eval()
     
