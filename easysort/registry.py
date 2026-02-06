@@ -387,12 +387,10 @@ if __name__ == "__main__":
     path = registry_path / sub_path
     folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
     print(len(folders), "folders found")
-    folders = random.sample(folders, 100)
+    folders = random.sample(folders, 1000)
     for folder in tqdm(folders, desc="Uploading folders"):
         all_files = list((path / folders[0]).rglob("*.*"))
         for file in all_files:
-            print("Uploading file: ", file, "to", Path(file).relative_to(registry_path))
-            assert False
             Registry.backend.POST(Path(file).relative_to(registry_path), file.read_bytes())
     
 
