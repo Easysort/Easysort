@@ -73,7 +73,7 @@ class RegistryConnector:
 
     def EXISTS_MULTIPLE(self, keys: list[str | Path]) -> list[bool]: 
         listed_keys = self.LIST()
-        return [Path(key) in listed_keys for key in keys]
+        return [Path(key) in listed_keys for key in tqdm(keys, desc="Checking if keys exist")]
 
     @staticmethod
     def _keys(r) -> list[Path]:
