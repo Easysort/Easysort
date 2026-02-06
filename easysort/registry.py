@@ -378,8 +378,24 @@ RegistryBase.DefaultTypes.RESULT_WASTE = make_dataclass("RESULT_WASTE", [("metad
 
 if __name__ == "__main__":
     from easysort.helpers import REGISTRY_LOCAL_IP
-    RegistryConnectorLocal = RegistryConnector(REGISTRY_LOCAL_IP)
-    Registry = RegistryBase(RegistryConnectorLocal)  
+    import random
+    Registry = RegistryBase(base=REGISTRY_LOCAL_IP)  
+
+    # Choose 100 random folders to upload:
+    registry_path = Path("/home/easysort/registry")
+    sub_path = Path("verdis/gadstrup/5")
+    path = registry_path / sub_path
+    folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+    print(len(folders), "folders found")
+    folders = random.sample(folders, 100)
+    for folder in tqdm(folders, desc="Uploading folders"):
+        all_files = list((path / folders[0]).rglob("*.*"))
+        for file in all_files:
+            print("Uploading file: ", file, "to", Path(file).relative_to(registry_path))
+            assert False
+            Registry.backend.POST(Path(file).relative_to(registry_path), file.read_bytes())
+    
+
     if len(sys.argv) < 2:
         print("Usage: uv run easysort.registry sync|explore|uuid|put_folder <folder>")
         sys.exit(1)
