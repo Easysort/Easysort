@@ -10,9 +10,9 @@ from typing import Callable
 from tqdm import tqdm
 
 from easysort.registry import RegistryBase
-from easysort.helpers import T, DEBUG
+from easysort.helpers import T, DEBUG, registry_file_to_local_file_path
 
-class DataLoader:
+class DataLoader: # TODO: Work for other than .jpg files
     def __init__(self, registry: RegistryBase, classes: List[str] = None, destination: Path = None, force_recreate: bool = False): 
         self.registry = registry
         self.classes = classes
@@ -30,10 +30,30 @@ class DataLoader:
             for cls in self.classes:
                 print(f"  {split}/{cls}: {len(os.listdir(self.destination / split / cls))}")
 
-    def from_registry(self, _label_type: T): 
+    def from_registry(self, _label_type: T, _label_json_to_category_func: Callable = None, file_to_saved_img_func: Callable = None, prefix: str = ""):
+        """
+        file_to_saved_img_func: Function that takes in the original filepath with the type and then does whatever to save the image(s) to the correct destination.
+         - This is useful when needed e.g. to take in 3 diff images but only 1 saved label for the category (verdis motion).
+
+
+        """
+        files = self.registry.LIST(prefix = prefix, check_exists_with_type = _label_type)
+        all_dataset_file_names = [(Path(root) / fname).name for root, _, files in os.walk(self.destination) for fname in files]
+        missing_files = [file for file in files if registry_file_to_local_file_path(file).name not in all_dataset_file_names]
+        print(f"Found {len(missing_files)} missing files out of {len(files)} files")
+
+
+        for file in tqdm(missing_files, desc="From registry"):
+            qa_result = self.registry.GET(file, _label_type)
+            category = _label_json_to_category_func(qa_result)
+            train_split = "train" if random.random() < 0.8 else "val"
+            (self.destination / train_split / category).mkdir(parents=True, exist_ok=True)
+            if file_to_saved_img_func: file_to_saved_img_func(self.registry, file, self.destination / train_split / category)
+            else: 
+                img = self.registry.GET(file, self.registry.DefaultMarkers.ORIGINAL_MARKER)
+                cv2.imwrite(self.destination / train_split / category / file.name, img)
 
         if DEBUG > 0: self.print_distribution(f"From registry {_label_type}")
-        pass
 
     def from_yolo_dataset(self, dataset_path: Path, convert_function: Callable = None): 
         for split in ['train', 'val']:

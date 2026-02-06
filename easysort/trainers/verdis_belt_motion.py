@@ -2,25 +2,19 @@ from easysort.registry import RegistryBase
 from easysort.helpers import REGISTRY_LOCAL_IP
 from easysort.dataloader import DataLoader
 from easysort.trainer import YoloTrainer
+from easysort.validators.verdis_belt import VerdisBeltGroundTruth
 from pathlib import Path
-import numpy as np
 import cv2
+from uuid import uuid4
 
 
-def convert_to_motion_imgs(img: np.ndarray) -> np.ndarray:
-    print("Input size: ", img.shape)
-    num_imgs = img.shape[0] / 545
-    print("Number of images: ", num_imgs)
-    img_1 = img[0:545, :]
-    img_2 = img[545:1090, :]
-    img_3 = img[1090:1635, :]
-    print("Image 1 shape: ", img_1.shape)
-    print("Image 2 shape: ", img_2.shape)
-    print("Image 3 shape: ", img_3.shape)
-    # save img 1 and 3
-    cv2.imwrite("img_1.jpg", img_1)
-    cv2.imwrite("img_3.jpg", img_3)
-    assert False, "stop here"
+def file_to_saved_img_func(registry: RegistryBase, file: Path, expected_save_path: Path):
+    neighboring_files = sorted([f for f in registry.backend.LIST(file.parent) if f.suffix.lower() in (".jpg", ".png", ".jpeg")])
+    assert len(neighboring_files) == 3, "Expected 3 neighboring files"
+    img1 = registry.GET(neighboring_files[0], registry.DefaultMarkers.ORIGINAL_MARKER)
+    img3 = registry.GET(neighboring_files[2], registry.DefaultMarkers.ORIGINAL_MARKER)
+    diff_img = img3 - img1
+    cv2.imwrite(expected_save_path / file.name, diff_img)
     
 
 if __name__ == "__main__":
@@ -29,7 +23,7 @@ if __name__ == "__main__":
     MOTION_CATEGORIES = ["motion", "no_motion"]
 
     dataloader = DataLoader(registry, classes=MOTION_CATEGORIES, destination=Path("verdis_motion_dataset_reworked"), force_recreate=True)
-    dataloader.from_yolo_dataset(Path("verdis_motion_dataset"), convert_function=convert_to_motion_imgs)
+    dataloader.from_registry(VerdisBeltGroundTruth, _label_json_to_category_func=lambda x: x.motion, file_to_saved_img_func=file_to_saved_img_func)
     image = dataloader.sample_image()
     print(image.shape)
 

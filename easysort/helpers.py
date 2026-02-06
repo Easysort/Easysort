@@ -73,6 +73,9 @@ REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES = {
 }
 
 def current_timestamp() -> str: return datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
+def registry_file_to_local_file_path(registry_file: Path) -> Path: return registry_file.replace("/", "_")
+
+
 
 class Concat:
   _ARGO_FACTORS = {"roskilde": (1.0, 0.6, 0.2), "jyllinge": (1.0, 0.6, 0.2)}  # objects, weight, co2
