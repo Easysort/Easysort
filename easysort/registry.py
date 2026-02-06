@@ -391,6 +391,7 @@ if __name__ == "__main__":
     for folder in tqdm(folders, desc="Uploading folders"):
         all_files = list((path / folders[0]).rglob("*.*"))
         for file in all_files:
+            if Registry.backend.EXISTS(Path(file).relative_to(registry_path)): continue
             Registry.backend.POST(Path(file).relative_to(registry_path), file.read_bytes())
     
 
