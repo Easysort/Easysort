@@ -17,6 +17,9 @@ class DataLoader:
         self.classes = classes
         self.destination = destination or Path(uuid4())
         self.destination.mkdir(parents=True, exist_ok=True)
+        for split in ['train', 'val']:
+            for cls in self.classes:
+                (self.destination / split / cls).mkdir(parents=True, exist_ok=True)
         assert self.classes is not None, "Classes are required"
 
     def print_distribution(self, inf: str):
