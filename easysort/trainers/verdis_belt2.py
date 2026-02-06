@@ -3,8 +3,12 @@ from easysort.helpers import REGISTRY_LOCAL_IP
 from easysort.dataloader import DataLoader
 from easysort.trainer import YoloTrainer
 from pathlib import Path
+import numpy as np
+import cv2
+
 
 if __name__ == "__main__":
+    # Train category model
     CATEGORIES = ["plastics", "hard_plastics", "cardboard", "paper", "folie", "empty"]
 
     registry = RegistryBase(base=REGISTRY_LOCAL_IP)
@@ -17,4 +21,3 @@ if __name__ == "__main__":
     trainer.train(epochs=10, patience=5, imgsz=224, batch=32)
 
     trainer.eval()
-    
