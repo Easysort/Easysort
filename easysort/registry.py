@@ -341,7 +341,7 @@ class RegistryBase:
         # Potentially a EXPECT lazily generating missing results by returning list of bool, then using a specified func to generate results.
         pass
 
-    def PUT_FOLDER(self, local_path: Path, prefix: str = "") -> None:
+    def PUT_FOLDER(self, local_path: Path, prefix: str = "") -> None: # Super slow for some reason (at uploading)
         "Puts a folder into the registry. All files in the folder will have their relative path as the key. Example: /local/folder/my_data.jpg -> /prefix/my_data.jpg"
         assert local_path.is_dir(), f"Local path {local_path} is not a directory"
         new_files = [f.relative_to(local_path) for f in tqdm(local_path.rglob("*")) if f.is_file() and not f.name.startswith("._") and "hash_lookup" not in f.name]
@@ -387,7 +387,7 @@ if __name__ == "__main__":
     path = registry_path / sub_path
     folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
     print(len(folders), "folders found")
-    folders = random.sample(folders, 1000)
+    folders = random.sample(folders, 3000)
     for folder in tqdm(folders, desc="Uploading folders"):
         all_files = list((path / folders[0]).rglob("*.*"))
         for file in all_files:
