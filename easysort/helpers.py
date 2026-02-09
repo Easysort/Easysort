@@ -152,7 +152,8 @@ class Concat:
 
   @staticmethod
   def weekly(videos: list[str | Path], class_sorting_func: Callable[[Path], str], result_type: Any, out_prefix: str = "argo/results", filter_personal: bool | None = None) -> list[Path]:
-    from easysort.registry import Registry
+    from easysort import RegistryBase, REGISTRY_LOCAL_IP
+    Registry = RegistryBase(base=REGISTRY_LOCAL_IP)
     groups: dict[tuple[int, int], dict[str, list[tuple[datetime.datetime, Any]]]] = {}
     for v in videos:
       v = Path(v); r = Registry.GET(v, result_type, throw_error=False)
