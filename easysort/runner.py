@@ -14,6 +14,7 @@ from easysort.sampler import Crop, Sampler
 from easysort.registry import RegistryBase, RegistryConnector
 import cv2
 
+registry = RegistryBase(base=REGISTRY_LOCAL_IP)
 VPN_LOCK_FILE = Path("/tmp/verdis_vpn.lock")
 
 @contextmanager
@@ -144,7 +145,6 @@ def extract_person_crops_from_video(
     min_h: int = 200,
     pad: float = 0.08,
 ) -> list[PersonCrop]:
-    registry = ... # TODO: Get registry from context
     url = registry.backend.URL(video_path)
     cap = cv2.VideoCapture(url)
     if not cap.isOpened(): return []
