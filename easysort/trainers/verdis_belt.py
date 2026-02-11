@@ -5,16 +5,7 @@ from easysort.trainer import YoloTrainer
 from pathlib import Path
 import numpy as np
 import cv2
-from easysort.trainers.verdis_belt_motion import VerdisBeltGroundTruth
-
-POLY_POINTS = [(1418, 1512), (1019, 1502), (900, 704), (873, 76), (1000, 78), (1099, 747), (1406, 1510)]
-BBOX = (min(p[0] for p in POLY_POINTS), min(p[1] for p in POLY_POINTS), max(p[0] for p in POLY_POINTS), max(p[1] for p in POLY_POINTS))
-
-def crop_belt(img: np.ndarray, pad: int = 20) -> np.ndarray:
-    """Crop image to belt bounding box."""
-    x1, y1, x2, y2 = BBOX
-    h, w = img.shape[:2]
-    return img[max(0,y1-pad):min(h,y2+pad), max(0,x1-pad):min(w,x2+pad)]
+from easysort.trainers.verdis_belt_motion import VerdisBeltGroundTruth, crop_belt
 
 def file_to_saved_img_func(registry: RegistryBase, file: Path, expected_save_path: Path):
     img = np.array(registry.GET(file, registry.DefaultMarkers.ORIGINAL_MARKER))
