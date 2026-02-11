@@ -225,7 +225,7 @@ class ContinuousRunner:
         while True:
             print(f"\n{'='*50}\nScanning for missing results...")
             all_files, exists_with_type = self.registry.LIST(self.run_job.folder, suffix=self.run_job.suffix, return_all=True, check_exists_with_type=self.run_job.result_type)
-            missing = [file for file, exists in zip(all_files, exists_with_type) if not exists]
+            missing = [file for file in tqdm(all_files, desc="Checking if files exist") if file not in exists_with_type]
             print(f"Found {len(missing)} missing / {len(all_files)} total")
             print("Waiting for VPN lock...")
             if missing:
