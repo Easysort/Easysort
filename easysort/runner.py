@@ -224,7 +224,8 @@ class ContinuousRunner:
         print(f"Starting ContinuousRunner for {self.run_job.folder} (interval: {self.run_job.interval_mins}min)")
         while True:
             print(f"\n{'='*50}\nScanning for missing results...")
-            all_files, missing = self.registry.LIST(self.run_job.folder, suffix=self.run_job.suffix, return_all=True, check_exists_with_type=self.run_job.result_type)
+            all_files, exists_with_type = self.registry.LIST(self.run_job.folder, suffix=self.run_job.suffix, return_all=True, check_exists_with_type=self.run_job.result_type)
+            missing = [file for file, exists in zip(all_files, exists_with_type) if not exists]
             print(f"Found {len(missing)} missing / {len(all_files)} total")
             print("Waiting for VPN lock...")
             if missing:
