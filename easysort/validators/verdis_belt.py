@@ -5,7 +5,8 @@ from easysort.runner import Runner
 from flask import Flask, request, jsonify
 from pathlib import Path
 from dataclasses import dataclass, field
-from easyprod.scripts.verdis.belt import ALLOWED_CATEGORIES, BeltRunnerJob, POLY_POINTS, predict_category, predict_motion, crop_belt
+from easyprod.scripts.verdis.belt import ALLOWED_CATEGORIES, BeltRunnerJob, predict_category, predict_motion
+from easysort.trainers.verdis_belt_motion import POLY_POINTS, VerdisBeltGroundTruth
 from collections import Counter
 import base64, io, random, json, gc
 import numpy as np
