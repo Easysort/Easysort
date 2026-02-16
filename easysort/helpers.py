@@ -78,7 +78,7 @@ def registry_file_to_local_file_path(registry_file: Path) -> Path: return Path(s
 
 
 class Concat:
-  _ARGO_FACTORS = {"roskilde": (1.0, 0.6, 0.2), "jyllinge": (1.0, 0.6, 0.2)}  # objects, weight, co2
+  _ARGO_FACTORS = {"roskilde": (1.0, 0.6, 0.2), "jyllinge": (1.0, 0.6, 0.2), "koege": (1.0, 0.6, 0.2)}  # objects, weight, co2
   _ARGO_CATS = ["køkkenting", "fritid_&_have", "møbler", "boligting", "legetøj", "andet"]
   _DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
   _HOURS = tuple(f"{i}-{i+3}" for i in range(0, 24, 3))
@@ -102,7 +102,10 @@ class Concat:
   @staticmethod
   def _loc_id(loc_key: str) -> str:
     l = loc_key.lower()
-    return "roskilde" if "roskilde" in l else ("jyllinge" if "jyllinge" in l else l)
+    for loc, _ in Concat._ARGO_FACTORS.items():
+      if loc in l: return loc
+    print("WARNING: Unknown location:", loc_key)
+    return l
 
   @staticmethod
   def _summary(items: list[tuple[datetime.datetime, Any]], loc_key: str, seed: str, filter_personal: bool | None = None) -> dict:

@@ -381,18 +381,18 @@ if __name__ == "__main__":
     import random
     Registry = RegistryBase(base=REGISTRY_LOCAL_IP)  
 
-    # Choose 100 random folders to upload:
-    registry_path = Path("/home/easysort/registry")
-    sub_path = Path("verdis/gadstrup/5")
-    path = registry_path / sub_path
-    folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
-    print(len(folders), "folders found")
-    folders = random.sample(folders, 3000)
-    for folder in tqdm(folders, desc="Uploading folders"):
-        all_files = list((path / folders[0]).rglob("*.*"))
-        for file in all_files:
-            if Registry.backend.EXISTS(Path(file).relative_to(registry_path)): continue
-            Registry.backend.POST(Path(file).relative_to(registry_path), file.read_bytes())
+    # # Choose 100 random folders to upload:
+    # registry_path = Path("/home/easysort/registry")
+    # sub_path = Path("verdis/gadstrup/5")
+    # path = registry_path / sub_path
+    # folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+    # print(len(folders), "folders found")
+    # folders = random.sample(folders, 3000)
+    # for folder in tqdm(folders, desc="Uploading folders"):
+    #     all_files = list((path / folders[0]).rglob("*.*"))
+    #     for file in all_files:
+    #         if Registry.backend.EXISTS(Path(file).relative_to(registry_path)): continue
+    #         Registry.backend.POST(Path(file).relative_to(registry_path), file.read_bytes())
     
 
     if len(sys.argv) < 2:
