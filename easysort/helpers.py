@@ -173,7 +173,8 @@ class Concat:
 
   @staticmethod
   def monthly(videos: list[str | Path], class_sorting_func: Callable[[Path], str], result_type: Any, out_prefix: str = "argo/results", filter_personal: bool | None = None) -> list[Path]:
-    from easysort.registry import Registry
+    from easysort import RegistryBase, REGISTRY_LOCAL_IP
+    Registry = RegistryBase(base=REGISTRY_LOCAL_IP)
     suffix = "_personal" if filter_personal else ""
     rx = re.compile(rf"^week_(\d+)_(\d+){suffix}(?:_force)?\.json$", re.I)
     best: dict[tuple[int, int], Path] = {}
