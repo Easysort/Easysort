@@ -227,6 +227,7 @@ class ContinuousRunner:
         while True:
             print(f"\n{'='*50}\nScanning for missing results...")
             for run_job in self.run_jobs:
+                print(f"Checking {run_job.folder} for missing results...")
                 all_files, exists_with_type = self.registry.LIST(run_job.folder, suffix=run_job.suffix, return_all=True, check_exists_with_type=run_job.result_type)
                 missing = [file for file in tqdm(all_files, desc="Checking if files exist") if file not in exists_with_type]
                 print(f"Found {len(missing)} missing / {len(all_files)} total")
@@ -236,6 +237,5 @@ class ContinuousRunner:
                     # Always run the pusher so it can recover from previous push failures.
                     self.push_jobs[0].push()
                 print(f"Sleeping {run_job.interval_mins} minutes...")
-                time.sleep(run_job.interval_mins * 60)
             print(f"Sleeping {self.run_jobs[0].interval_mins} minutes...")
             time.sleep(self.run_jobs[0].interval_mins * 60)
