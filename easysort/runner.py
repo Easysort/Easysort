@@ -213,24 +213,29 @@ class PusherJob:
     def push(self): raise NotImplementedError
 
 class ContinuousRunner:
-    def __init__(self, run_job: RunnerJob, push_job: PusherJob):
+    def __init__(self, run_jobs: List[RunnerJob], push_jobs: List[PusherJob]):
         print("Creating RegistryConnector from ContinuousRunner")
         self.registry = RegistryBase(base=REGISTRY_LOCAL_IP)  
-        self.run_job = run_job(self.registry)
-        self.push_job = push_job(self.registry)
+        self.run_jobs = [run_job(self.registry) for run_job in run_jobs]
+        self.push_jobs = [push_job(self.registry) for push_job in push_jobs]
         self.runner = Runner()
+        if any(run_job.interval_mins < self.run_jobs[0].interval_mins for run_job in self.run_jobs):
+            raise ValueError("Run job 0 must have the lowest interval")
 
     def run(self):
-        print(f"Starting ContinuousRunner for {self.run_job.folder} (interval: {self.run_job.interval_mins}min)")
+        print(f"Starting ContinuousRunner for {self.run_jobs[0].folder} (interval: {self.run_jobs[0].interval_mins}min)")
         while True:
             print(f"\n{'='*50}\nScanning for missing results...")
-            all_files, exists_with_type = self.registry.LIST(self.run_job.folder, suffix=self.run_job.suffix, return_all=True, check_exists_with_type=self.run_job.result_type)
-            missing = [file for file in tqdm(all_files, desc="Checking if files exist") if file not in exists_with_type]
-            print(f"Found {len(missing)} missing / {len(all_files)} total")
-            print("Waiting for VPN lock...")
-            if missing:
-                self.run_job.process(missing, self.runner)
-                # Always run the pusher so it can recover from previous push failures.
-                self.push_job.push()
-            print(f"Sleeping {self.run_job.interval_mins} minutes...")
-            time.sleep(self.run_job.interval_mins * 60)
+            for run_job in self.run_jobs:
+                all_files, exists_with_type = self.registry.LIST(run_job.folder, suffix=run_job.suffix, return_all=True, check_exists_with_type=run_job.result_type)
+                missing = [file for file in tqdm(all_files, desc="Checking if files exist") if file not in exists_with_type]
+                print(f"Found {len(missing)} missing / {len(all_files)} total")
+                print("Waiting for VPN lock...")
+                if missing:
+                    run_job.process(missing, self.runner)
+                    # Always run the pusher so it can recover from previous push failures.
+                    self.push_jobs[0].push()
+                print(f"Sleeping {run_job.interval_mins} minutes...")
+                time.sleep(run_job.interval_mins * 60)
+            print(f"Sleeping {self.run_jobs[0].interval_mins} minutes...")
+            time.sleep(self.run_jobs[0].interval_mins * 60)
