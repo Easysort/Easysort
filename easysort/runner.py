@@ -236,6 +236,5 @@ class ContinuousRunner:
                     run_job.process(missing, self.runner)
                     # Always run the pusher so it can recover from previous push failures.
                     self.push_jobs[0].push()
-                print(f"Sleeping {run_job.interval_mins} minutes...")
             print(f"Sleeping {self.run_jobs[0].interval_mins} minutes...")
             time.sleep(self.run_jobs[0].interval_mins * 60)
