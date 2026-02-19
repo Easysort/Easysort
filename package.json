@@ -1,0 +1,28 @@
+{
+  "name": "easysort",
+  "version": "1.0.0",
+  "description": "<div align=\"center\">",
+  "homepage": "https://github.com/Apros7/ReUseSortingBot#readme",
+  "bugs": {
+    "url": "https://github.com/Apros7/ReUseSortingBot/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Apros7/ReUseSortingBot.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@slidev/cli": "^52.12.0",
+    "@slidev/theme-default": "^0.25.0"
+  }
+}
