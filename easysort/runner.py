@@ -226,7 +226,7 @@ class ContinuousRunner:
         print(f"Starting ContinuousRunner for {self.run_jobs[0].folder} (interval: {self.run_jobs[0].interval_mins}min)")
         while True:
             print(f"\n{'='*50}\nScanning for missing results...")
-            for run_job in self.run_jobs:
+            for run_job, push_job in zip(self.run_jobs, self.push_jobs):
                 print(f"Checking {run_job.folder} for missing results...")
                 all_files, exists_with_type = self.registry.LIST(run_job.folder, suffix=run_job.suffix, return_all=True, check_exists_with_type=run_job.result_type)
                 missing = [file for file in tqdm(all_files, desc="Checking if files exist") if file not in exists_with_type]
@@ -235,6 +235,6 @@ class ContinuousRunner:
                 if missing:
                     run_job.process(missing, self.runner)
                     # Always run the pusher so it can recover from previous push failures.
-                    self.push_jobs[0].push()
+                    push_job.push()
             print(f"Sleeping {self.run_jobs[0].interval_mins} minutes...")
             time.sleep(self.run_jobs[0].interval_mins * 60)
