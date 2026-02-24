@@ -1,4 +1,4 @@
-import openai, time, fcntl, functools
+import openai, time, fcntl, functools, logging, traceback
 from easysort.helpers import OPENAI_API_KEY, T, REGISTRY_LOCAL_IP
 from typing import List, Callable
 from contextlib import contextmanager
@@ -213,28 +213,45 @@ class PusherJob:
     def push(self): raise NotImplementedError
 
 class ContinuousRunner:
-    def __init__(self, run_jobs: List[RunnerJob], push_jobs: List[PusherJob]):
+    def __init__(self, run_jobs: List[RunnerJob], push_jobs: List[PusherJob], max_retries: int = 3, error_log_path: str = "continuous_runner_errors.log"):
         print("Creating RegistryConnector from ContinuousRunner")
         self.registry = RegistryBase(base=REGISTRY_LOCAL_IP)  
         self.run_jobs = [run_job(self.registry) for run_job in run_jobs]
         self.push_jobs = [push_job(self.registry) for push_job in push_jobs]
         self.runner = Runner()
+        self.max_retries = max_retries
         if any(run_job.interval_mins < self.run_jobs[0].interval_mins for run_job in self.run_jobs):
             raise ValueError("Run job 0 must have the lowest interval")
 
+        self._error_logger = logging.getLogger(f"ContinuousRunner.{self.run_jobs[0].folder}")
+        self._error_logger.setLevel(logging.ERROR)
+        handler = logging.FileHandler(error_log_path)
+        handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+        self._error_logger.addHandler(handler)
+
     def run(self):
         print(f"Starting ContinuousRunner for {self.run_jobs[0].folder} (interval: {self.run_jobs[0].interval_mins}min)")
+        consecutive_failures = 0
         while True:
-            print(f"\n{'='*50}\nScanning for missing results...")
-            for run_job, push_job in zip(self.run_jobs, self.push_jobs):
-                print(f"Checking {run_job.folder} for missing results...")
-                all_files, exists_with_type = self.registry.LIST(run_job.folder, suffix=run_job.suffix, return_all=True, check_exists_with_type=run_job.result_type)
-                missing = [file for file in tqdm(all_files, desc="Checking if files exist") if file not in exists_with_type]
-                print(f"Found {len(missing)} missing / {len(all_files)} total")
-                print("Waiting for VPN lock...")
-                if missing:
-                    run_job.process(missing, self.runner)
-                    # Always run the pusher so it can recover from previous push failures.
-                    push_job.push()
+            try:
+                print(f"\n{'='*50}\nScanning for missing results...")
+                for run_job, push_job in zip(self.run_jobs, self.push_jobs):
+                    print(f"Checking {run_job.folder} for missing results...")
+                    all_files, exists_with_type = self.registry.LIST(run_job.folder, suffix=run_job.suffix, return_all=True, check_exists_with_type=run_job.result_type)
+                    missing = [file for file in tqdm(all_files, desc="Checking if files exist") if file not in exists_with_type]
+                    print(f"Found {len(missing)} missing / {len(all_files)} total")
+                    print("Waiting for VPN lock...")
+                    if missing:
+                        run_job.process(missing, self.runner)
+                        push_job.push()
+                consecutive_failures = 0
+            except Exception as e:
+                consecutive_failures += 1
+                tb = traceback.format_exc()
+                self._error_logger.error(f"Iteration failed ({consecutive_failures}/{self.max_retries})\n{tb}")
+                print(f"[ERROR] Iteration failed ({consecutive_failures}/{self.max_retries}): {e}")
+                if consecutive_failures >= self.max_retries:
+                    self._error_logger.error(f"Giving up after {self.max_retries} consecutive failures")
+                    raise RuntimeError(f"ContinuousRunner stopped after {self.max_retries} consecutive failures") from e
             print(f"Sleeping {self.run_jobs[0].interval_mins} minutes...")
             time.sleep(self.run_jobs[0].interval_mins * 60)

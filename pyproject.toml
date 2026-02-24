@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 dependencies = [
     "dacite>=1.8.1",
     "aiohttp>=3.13.2",
+    "fastapi>=0.115.0",
     "flask>=3.1.2",
     "gdown>=5.2.0",
     "ollama>=0.6.1",
@@ -25,6 +26,7 @@ dependencies = [
     "torchreid>=0.2.5",
     "tqdm>=4.67.1",
     "ultralytics>=8.3.227",
+    "uvicorn[standard]>=0.32.0",
     "raylib>=5.5.0.4",
 ]
 [tool.uv]
