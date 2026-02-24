@@ -313,10 +313,9 @@ class RegistryBase:
                 continue
             year, month, day, hour, minute, second = file.split("/")[-5], file.split("/")[-4], file.split("/")[-3], file.split("/")[-1][:2], file.split("/")[-1][2:4], file.split("/")[-1][4:6]
             timestamp = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-            if timestamp < datetime.datetime.now() - datetime.timedelta(weeks=4): files_to_delete.append(file)
+            if timestamp < datetime.datetime.now() - datetime.timedelta(weeks=2): files_to_delete.append(file)
 
         print(f"Deleting {len(files_to_delete)} files" if len(files_to_delete) > 0 else "No files to delete")
-        return
         if len(files_to_delete) == 0: return
         for i in tqdm(range(0, len(files_to_delete), 100), desc="Deleting files"):
             supabase_client.storage.from_(SUPABASE_DATA_REGISTRY_BUCKET).remove(files_to_delete[i:i+100])
