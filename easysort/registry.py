@@ -311,8 +311,13 @@ class RegistryBase:
             if len(file.split("/")) < 6: 
                 print("Skipping file: ", file, "because it has less than 6 parts")
                 continue
-            year, month, day, hour, minute, second = file.split("/")[-5], file.split("/")[-4], file.split("/")[-3], file.split("/")[-1][:2], file.split("/")[-1][2:4], file.split("/")[-1][4:6]
-            timestamp = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+            try:
+                year, month, day = file.split("/")[-5], file.split("/")[-4], file.split("/")[-3]
+                hour, minute, second = file.split("/")[-1][:2], file.split("/")[-1][2:4], file.split("/")[-1][4:6]
+                timestamp = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+            except (ValueError, IndexError):
+                files_to_delete.append(file)
+                continue
             if timestamp < datetime.datetime.now() - datetime.timedelta(weeks=2): files_to_delete.append(file)
 
         print(f"Deleting {len(files_to_delete)} files" if len(files_to_delete) > 0 else "No files to delete")
