@@ -359,23 +359,26 @@ class RegistryBase:
             if bool: continue
             self.backend.PUT_FILE(file, local_path / file)
 
-    def PORT(self, id: str, old_type: T, new_type: T, porting_strategy: Optional[Callable[[T], T]] = None, allow_delete: bool = False) -> None:
-        assert is_dataclass(old_type), f"Old type {old_type} is not a dataclass, but a {type(old_type)}"
+    def PORT(self, id: str, old_hash: str, new_type: T, porting_strategy: Optional[Callable[[T], T]] = None, allow_delete: bool = False) -> None:
         assert is_dataclass(new_type), f"New type {new_type} is not a dataclass, but a {type(new_type)}"
-        assert old_type in self.DefaultMarkers.list() or (any(f.name == "metadata" for f in fields(old_type)) and any(f.name == "id" for f in fields(old_type))), f"Old type {old_type} does not have a metaclass and/or id field, but the following fields: {fields(old_type)}"
         assert new_type in self.DefaultMarkers.list() or (any(f.name == "metadata" for f in fields(new_type)) and any(f.name == "id" for f in fields(new_type))), f"New type {new_type} does not have a metaclass and/or id field, but the following fields: {fields(new_type)}"
         assert id in self._get_hash_lookup(), f"Id {id} not found in hash lookup"
-        assert self._get_hash_lookup()[id] == self._hash(old_type), f"Id {id} does not match with the expected hash. Make sure you the pair you are trying to delete is correct."
-        files_with_old_type = self.LIST(suffix=[".json"], check_exists_with_type=old_type)
+        assert self._get_hash_lookup()[id] == old_hash, f"Id {id} does not match old_hash {old_hash}. Fetch the current hash with Registry.get_id(your_type) or Registry._get_hash_lookup()[id]."
+        files = [f for f in self.backend.LIST() if f.name == f"{old_hash}.json"]
+        print(f"Found {len(files)} entries with old hash")
         if porting_strategy:
-            for file in tqdm(files_with_old_type, desc="Porting files"):
-                data = self.GET(file, old_type)
-                self.POST(file, porting_strategy(data), new_type)
-            assert len(files_with_old_type) == len(self.EXISTS_MULTIPLE(files_with_old_type, new_type)), f"Not all files were ported. {len(files_with_old_type) - sum(self.EXISTS_MULTIPLE(files_with_old_type, new_type))} files were not ported"
-        assert allow_delete, f"Refusing to delete {len(files_with_old_type)} old entries for {old_type.__name__}. Pass allow_delete=True to confirm."
-        for file in tqdm(files_with_old_type, desc="Deleting old entries"):
-            self.DELETE(file, old_type)
-        print(f"{'Ported' if porting_strategy else 'Deleted'} {len(files_with_old_type)} files from {old_type} to {new_type}")
+            new_hash = self._hash(new_type)
+            for file in tqdm(files, desc="Porting files"):
+                data = self._convert_int_keys(json.loads(self.backend.GET(file)))
+                ported = porting_strategy(from_dict(data_class=new_type, data=data, config=Config(check_types=False)))
+                new_file = file.parent / f"{new_hash}.json"
+                self.backend.POST(new_file, REGISTRY_REFERENCE_TYPES_MAPPING_TO_BYTES[".json"](asdict(ported)))
+                self.backend.POST(new_file.with_suffix(".schema.json"), REGISTRY_REFERENCE_TYPES_MAPPING_TO_BYTES[".json"]({f.name: str(f.type) for f in fields(new_type)}))
+        assert allow_delete, f"Refusing to delete {len(files)} old entries. Pass allow_delete=True to confirm."
+        for file in tqdm(files, desc="Deleting old entries"):
+            self.backend.DELETE(file)
+            self.backend.DELETE(file.with_suffix(".schema.json"), ignore_errors=True)
+        print(f"{'Ported' if porting_strategy else 'Deleted'} {len(files)} entries")
         self._update_hash_lookup(id, self._hash(new_type))
 
 

@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 import json
 import calendar, random, re
+import cv2
 
 T = TypeVar("T")
 load_dotenv()
@@ -75,7 +76,14 @@ REGISTRY_REFERENCE_TYPES_MAPPING_FROM_BYTES = {
 def current_timestamp() -> str: return datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
 def registry_file_to_local_file_path(registry_file: Path) -> Path: return Path(str(registry_file).replace("/", "_"))
 
-
+def unpack_video(video_capture: cv2.VideoCapture) -> list[np.ndarray]:
+  frames = []
+  while True:
+    ret, frame = video_capture.read()
+    if not ret: break
+    frames.append(frame)
+  video_capture.release()
+  return frames
 
 class Concat:
   _ARGO_FACTORS = {"roskilde": (1.0, 0.6, 0.2), "jyllinge": (1.0, 0.6, 0.2), "koege": (1.0, 0.6, 0.2)}  # objects, weight, co2

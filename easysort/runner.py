@@ -65,6 +65,7 @@ class PersonCrop:
     frame_idx: int
     direction: str
     image: np.ndarray
+    box: tuple = (0, 0, 0, 0)  # (x1, y1, x2, y2) in cropped-frame space
 
 
 def box_inside_ratio(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
@@ -131,7 +132,7 @@ def extract_person_crops(
                 h, w = im.shape[:2]
                 px, py = int((x2 - x1) * pad), int((y2 - y1) * pad)
                 cx1, cy1, cx2, cy2 = max(0, x1 - px), max(0, y1 - py), min(w, x2 + px), min(h, y2 + py)
-                if cx2 > cx1 and cy2 > cy1: out.append(PersonCrop(s + bi, d, im[cy1:cy2, cx1:cx2]))
+                if cx2 > cx1 and cy2 > cy1: out.append(PersonCrop(s + bi, d, im[cy1:cy2, cx1:cx2], (cx1, cy1, cx2, cy2)))
     return out
 
 
@@ -156,7 +157,7 @@ def extract_person_crops_from_video(
             if crop is not None: frame = frame[crop.y:crop.y + crop.h, crop.x:crop.x + crop.w]
             frames.append(frame); idxs.append(i); i += 1
             if len(frames) < batch: continue
-            out += [PersonCrop(idxs[c.frame_idx], c.direction, c.image) for c in extract_person_crops(frames, None, model_path=model_path, batch=batch, min_w=min_w, min_h=min_h, min_in_crop=0.0, pad=pad)]
+            out += [PersonCrop(idxs[c.frame_idx], c.direction, c.image, c.box) for c in extract_person_crops(frames, None, model_path=model_path, batch=batch, min_w=min_w, min_h=min_h, min_in_crop=0.0, pad=pad)]
             frames.clear(); idxs.clear()
         if frames:
             out += [PersonCrop(idxs[c.frame_idx], c.direction, c.image) for c in extract_person_crops(frames, None, model_path=model_path, batch=len(frames), min_w=min_w, min_h=min_h, min_in_crop=0.0, pad=pad)]
