@@ -1,5 +1,5 @@
 import openai, time, fcntl, functools, logging, traceback
-from easysort.helpers import OPENAI_API_KEY, T, REGISTRY_LOCAL_IP
+from easysort.helpers import OPENROUTER_API_KEY, T, REGISTRY_LOCAL_IP
 from typing import List, Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -30,22 +30,21 @@ def vpn_lock(): # TODO: Make a better solution to this lock
 
 
 class Runner:
-    def __init__(self, model: str = "gpt-5-mini-2025-08-07"):
-        self.openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        self.openai_client.models.list() # breaks if api key is invalid
+    def __init__(self, model: str = "openai/gpt-4.1-mini"):
+        self.openrouter_client = openai.OpenAI(api_key=OPENROUTER_API_KEY, base_url="https://openrouter.ai/api/v1")
         self.model = model
-    
+
     def gpt(self, videos_missing_results: List[List[np.ndarray]], output_schema: T, task_prompt: str = "", model: str = "", max_workers: int = 10) -> List[T]:
         schema = {k: v for k, v in output_schema.__annotations__.items() if k not in ("id", "metadata")}
         model = model or self.model
         def process_single(image_arrays):
             images_b64 = [base64.b64encode(cv2.imencode('.jpg', img_array)[1].tobytes()).decode("utf-8") for img_array in image_arrays]
-            full_prompt = f"{task_prompt}\nReturn only a json with the following keys and types: {schema}"
+            full_prompt = f"{task_prompt}"# Return only a json with the following keys and types: {schema}"
             content = [{"type": "text", "text": full_prompt}] + [{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}} for img_b64 in images_b64]
-            response = self.openai_client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], response_format={"type": "json_object"}, timeout=90,)
+            response = self.openrouter_client.chat.completions.create(model=model, messages=[{"role": "user", "content": content}], response_format={"type": "json_object"}, timeout=90,)
             return output_schema(**json.loads(response.choices[0].message.content))
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            results = list(tqdm(executor.map(process_single, videos_missing_results), total=len(videos_missing_results), desc="OpenAI calls"))
+            results = list(tqdm(executor.map(process_single, videos_missing_results), total=len(videos_missing_results), desc="OpenRouter calls"))
         return results
     
     def yolo(self, videos_missing_results: List[List[np.ndarray]], crop_index_func: Callable[[Path], Crop], classes: List[int], model_path: str = "yolov8m.pt"):
