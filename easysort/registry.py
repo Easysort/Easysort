@@ -329,6 +329,7 @@ class RegistryBase:
     def EXISTS(self, key: Path, _type: T) -> bool: return self.backend.EXISTS(self._construct_path(key, _type))
 
     def EXISTS_MULTIPLE(self, keys: list[Path], _type: T) -> list[bool]: 
+        if len(keys) == 0: return []
         set_file_list, paths = set(self.LIST()), self._construct_many_paths(keys, _type)
         return [path in set_file_list for path in tqdm(paths)]
 
