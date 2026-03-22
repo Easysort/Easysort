@@ -30,7 +30,7 @@ def vpn_lock(): # TODO: Make a better solution to this lock
 
 
 class Runner:
-    def __init__(self, model: str = "openai/gpt-4.1-mini"):
+    def __init__(self, model: str = "google/gemini-3.1-flash-lite-preview"):
         self.openrouter_client = openai.OpenAI(api_key=OPENROUTER_API_KEY, base_url="https://openrouter.ai/api/v1")
         self.model = model
 
