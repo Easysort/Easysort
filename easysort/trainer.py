@@ -10,7 +10,7 @@ import cv2
 from tqdm import tqdm
 from easysort.helpers import OPENAI_API_KEY
 
-MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
+MODELS_DIR = Path(__file__).resolve().parent.parent / "easyprod" / "models"
 
 
 class GPTTrainer:
@@ -62,7 +62,12 @@ class Trainer:
   def model(self):
     if self._model is None:
       s = self.schema
-      path = str(s.weights_path) if s.weights_path.exists() else s.base_model
+      if s.weights_path.exists():
+        path = str(s.weights_path)
+        print(f"[Trainer/{s.name}] Loading fine-tuned weights: {s.weights_path}")
+      else:
+        path = s.base_model
+        print(f"[Trainer/{s.name}] WARNING: Weights not found at {s.weights_path}, falling back to base model: {s.base_model}")
       self._model = _load_model(s.task, path)
     return self._model
 
