@@ -51,6 +51,15 @@ class Runner:
                     return None
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             results = list(tqdm(executor.map(process_single, videos_missing_results), total=len(videos_missing_results), desc="OpenRouter calls"))
+        failed_idxs = [i for i, r in enumerate(results) if r is None]
+        if failed_idxs:
+            print(f"Retrying {len(failed_idxs)} failed calls...")
+            with ThreadPoolExecutor(max_workers=min(max_workers, len(failed_idxs))) as executor:
+                retry_results = list(executor.map(process_single, [videos_missing_results[i] for i in failed_idxs]))
+            for idx, r in zip(failed_idxs, retry_results):
+                if r is not None: results[idx] = r
+            still_failed = sum(1 for i in failed_idxs if results[i] is None)
+            if still_failed: print(f"  {still_failed} calls still failed after retry")
         return results
     
     def yolo(self, videos_missing_results: List[List[np.ndarray]], crop_index_func: Callable[[Path], Crop], classes: List[int], model_path: str = "yolov8m.pt"):
