@@ -1,4 +1,5 @@
 import openai, time, fcntl, functools, logging, traceback
+from datetime import datetime, timedelta
 from easysort.helpers import OPENROUTER_API_KEY, T, REGISTRY_LOCAL_IP
 from typing import List, Callable
 from contextlib import contextmanager
@@ -240,11 +241,15 @@ class ContinuousRunner:
         while True:
             try:
                 print(f"\n{'='*50}\nScanning for missing results...")
+                two_weeks_ago = (datetime.now() - timedelta(weeks=2)).strftime("%Y%m%d")
+                _is_recent = lambda f: f.name[:8] >= two_weeks_ago if len(f.name) >= 8 and f.name[:8].isdigit() else True
                 for run_job, push_job in zip(self.run_jobs, self.push_jobs):
                     print(f"Checking {run_job.folder} for missing results...")
-                    all_files, exists_with_type = self.registry.LIST(run_job.folder, suffix=run_job.suffix, return_all=True, check_exists_with_type=run_job.result_type)
-                    missing = [file for file in tqdm(all_files, desc="Checking if files exist") if file not in exists_with_type]
-                    print(f"Found {len(missing)} missing / {len(all_files)} total")
+                    all_files, exists_with_type = self.registry.LIST(run_job.folder, suffix=run_job.suffix, cond=_is_recent, return_all=True, check_exists_with_type=run_job.result_type)
+                    exists_set = set(exists_with_type)
+                    recent_files = [f for f in all_files if _is_recent(f)]
+                    missing = [file for file in recent_files if file not in exists_set]
+                    print(f"Found {len(missing)} missing / {len(recent_files)} recent / {len(all_files)} total")
                     print("Waiting for VPN lock...")
                     if missing:
                         run_job.process(missing, self.runner)
