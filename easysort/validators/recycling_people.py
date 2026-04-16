@@ -88,7 +88,14 @@ class RecyclingPeopleValidator:
     print("Initializing recycling people validator index...")
     self.registry.add_id(RecyclingPeopleGT, RECYCLING_PEOPLE_GT_ID)
     self.registry.add_id(RECYCLING_YOLO_RESULT, RECYCLING_YOLO_RESULT_ID)
-    videos_by_camera = list_recycling_videos_by_camera(self.registry, self._config, check_exists_with_type=RECYCLING_YOLO_RESULT)
+    check_exists_with_type = RECYCLING_YOLO_RESULT if self._config.proposal_source == "yolo_only" else None
+    if check_exists_with_type is None:
+      print("Validator indexing raw videos for selected cameras; YOLO proposals will be used only when available.")
+    videos_by_camera = list_recycling_videos_by_camera(
+      self.registry,
+      self._config,
+      check_exists_with_type=check_exists_with_type,
+    )
     total_videos = sum(len(videos) for videos in videos_by_camera.values())
     print(f"Using cache file: {self._cache_path}")
     print(f"Checking existing human labels across {total_videos} videos...")
