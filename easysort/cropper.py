@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import sys
+import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -9,10 +9,12 @@ from pathlib import Path
 import cv2
 
 from easysort.helpers import Concat
-from easysort.registry import RegistryBase
 from easysort.helpers import REGISTRY_LOCAL_IP
-from easysort.sampler import DEVICE_TO_CROP, Crop
-from easyprod.scripts.argo.argo import CROPS as ARGO_CROPS
+from easysort.registry import RegistryBase
+from easysort.sampler import Crop
+
+
+CONFIGS_DIR = Path(__file__).resolve().parents[1] / "easyprod" / "products" / "recycling" / "configs"
 
 
 def latest_mp4(videos: list[Path]) -> Path | None:
@@ -27,6 +29,74 @@ def device_from_key(p: Path) -> str:
   if len(p.parts) >= 2:
     return p.parts[1]
   return p.parts[0] if p.parts else "unknown"
+
+
+def registry_prefix_from_key(p: Path) -> str:
+  return p.parts[0] if p.parts else ""
+
+
+def crop_to_dict(crop: Crop) -> dict[str, int]:
+  return {"x": crop.x, "y": crop.y, "w": crop.w, "h": crop.h}
+
+
+def load_recycling_crop_configs(config_dir: Path = CONFIGS_DIR) -> list[tuple[Path, dict]]:
+  configs: list[tuple[Path, dict]] = []
+  for path in sorted(config_dir.glob("*.json")):
+    try:
+      config_json = json.loads(path.read_text())
+    except json.JSONDecodeError:
+      continue
+    if isinstance(config_json, dict) and isinstance(config_json.get("crops"), dict):
+      configs.append((path, config_json))
+  return configs
+
+
+def _config_priority(path: Path, config_json: dict, registry_prefix: str) -> tuple[int, int, str]:
+  if registry_prefix and path.stem == registry_prefix:
+    prefix_rank = 0
+  elif registry_prefix and config_json.get("registry_prefix") == registry_prefix:
+    prefix_rank = 1
+  else:
+    prefix_rank = 2
+  validation_rank = 1 if "cameras" in config_json else 0
+  return prefix_rank, validation_rank, path.name
+
+
+def find_recycling_crop_config(
+  device_name: str,
+  registry_prefix: str,
+  config_dir: Path = CONFIGS_DIR,
+) -> tuple[Path | None, Crop | None]:
+  configs = load_recycling_crop_configs(config_dir)
+  exact_matches: list[tuple[tuple[int, int, str], Path, dict]] = []
+  fallback_matches: list[tuple[tuple[int, int, str], Path, dict]] = []
+  for path, config_json in configs:
+    priority = _config_priority(path, config_json, registry_prefix)
+    if device_name in config_json["crops"]:
+      exact_matches.append((priority, path, config_json))
+    elif priority[0] < 2:
+      fallback_matches.append((priority, path, config_json))
+  matches = sorted(exact_matches or fallback_matches, key=lambda item: item[0])
+  if not matches:
+    return None, None
+  _, path, config_json = matches[0]
+  crop_json = config_json["crops"].get(device_name)
+  return path, (Crop(**crop_json) if crop_json else None)
+
+
+def overwrite_crop_in_config(config_path: Path, device_name: str, crop: Crop) -> None:
+  config_json = json.loads(config_path.read_text())
+  config_json.setdefault("crops", {})[device_name] = crop_to_dict(crop)
+  config_path.write_text(json.dumps(config_json, indent=2) + "\n")
+
+
+def should_overwrite_crop(device_name: str, config_path: Path, crop: Crop) -> bool:
+  prompt = f"Overwrite crop for {device_name} in {config_path.name} with {json.dumps(crop_to_dict(crop))}? [y/N]: "
+  try:
+    answer = input(prompt).strip().lower()
+  except EOFError:
+    return False
+  return answer in {"y", "yes", "ok"}
 
 
 def list_videos(registry: RegistryBase, prefix: str, device_filter: str | None, latest_only: bool) -> list[Path]:
@@ -57,7 +127,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   Registry = RegistryBase(base=REGISTRY_LOCAL_IP)
-  print("Keys: n=next video, a=next device, q=quit | click 2x to set crop")
+  print("Keys: n=next video, a=next device, q=quit | click 2x to set crop, then confirm in terminal to save")
   videos = list_videos(Registry, args.prefix, args.device, latest_only=not args.all)
   if not videos:
     raise SystemExit("No videos found")
@@ -69,7 +139,8 @@ if __name__ == "__main__":
   for device_name, device_videos in by_device.items():
     skip_device = False
     for video_key in device_videos:
-      crop = ARGO_CROPS.get(device_name) or DEVICE_TO_CROP.get(device_name)
+      config_path, crop = find_recycling_crop_config(device_name, registry_prefix_from_key(video_key))
+      original_crop = crop
       with tempfile.TemporaryDirectory() as tmp:
         local = Path(tmp) / video_key.name
         Registry.backend.GET_FILE(video_key, local)
@@ -83,6 +154,7 @@ if __name__ == "__main__":
         win = f"{device_name} | {video_key}"
         cv2.namedWindow(win, cv2.WINDOW_NORMAL)
         state = {"p1": None, "crop": crop}
+        action = None
 
         def click(ev, x, y, *_):
           if ev != cv2.EVENT_LBUTTONDOWN:
@@ -124,9 +196,11 @@ if __name__ == "__main__":
             if k == ord("q"):
               raise SystemExit
             if k == ord("n"):
+              action = "next_video"
               advance = True
               break
             if k == ord("a"):
+              action = "next_device"
               skip_device = True
               advance = True
               break
@@ -138,6 +212,15 @@ if __name__ == "__main__":
               break
         cap.release()
         cv2.destroyWindow(win)
+      updated_crop = state["crop"]
+      if config_path and updated_crop and updated_crop != original_crop:
+        if should_overwrite_crop(device_name, config_path, updated_crop):
+          overwrite_crop_in_config(config_path, device_name, updated_crop)
+          print(f"Saved crop for {device_name} to {config_path.name}")
+        else:
+          print(f"Skipped saving crop for {device_name}")
+      elif action and updated_crop and not config_path:
+        print(f"No recycling config found for {device_name}; crop not saved")
       if skip_device:
         break
   cv2.destroyAllWindows()

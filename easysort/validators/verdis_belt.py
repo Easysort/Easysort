@@ -31,7 +31,7 @@ class VerdisBeltValidator:
 
     def __init__(self, registry: RegistryBase, review_mode: bool = False, run_ai: bool = False, 
                  datetime_from: str | None = None, datetime_to: str | None = None, force_reload: bool = False,
-                 sample_category: str | None = None):
+                 sample_category: str | None = None, sample_interval: int = 15):
         self.registry, self.app = registry, Flask(__name__)
         self._idx = 0
         self._review_mode = review_mode
@@ -40,6 +40,7 @@ class VerdisBeltValidator:
         self._datetime_to = datetime_to
         self._force_reload = force_reload
         self._sample_category = sample_category.lower().replace(" ", "_") if sample_category else None
+        self._sample_interval = sample_interval
         self._motion_detector = BeltRunnerJob(self.registry)
         self._setup_routes()
         
@@ -186,24 +187,13 @@ class VerdisBeltValidator:
             self._all_folders = sorted(self._folder_to_img.keys(), key=lambda f: folder_datetime_all[f])
             print(f"Date range filter: {len(self._all_folders)} folders in range (all folders, no 15-min filtering)")
         else:
-            # NORMAL MODE: Group by quarter-hour slot, pick one per slot
-            def get_quarter_slot(time_str: str) -> int:
-                """Return quarter slot (0-3) for a time string HHMMSS."""
-                minutes = int(time_str[2:4])
-                if minutes < 15:
-                    return 0
-                elif minutes < 30:
-                    return 1
-                elif minutes < 45:
-                    return 2
-                else:
-                    return 3
-            
+            # NORMAL MODE: Group by time slot, pick one per slot
+            interval = self._sample_interval
             slots: dict[str, list[tuple[Path, str]]] = {}  # slot_key -> [(folder, time_str), ...]
             for folder, (date_str, time_str) in folder_datetime_all.items():
-                hour = time_str[:2]
-                quarter = get_quarter_slot(time_str)
-                slot_key = f"{date_str}-{hour}-{quarter}"
+                total_minutes = int(time_str[:2]) * 60 + int(time_str[2:4])
+                slot_idx = total_minutes // interval
+                slot_key = f"{date_str}-{slot_idx}"
                 slots.setdefault(slot_key, []).append((folder, time_str))
             
             # For each slot, pick the folder closest to the quarter-hour mark
@@ -218,7 +208,7 @@ class VerdisBeltValidator:
             
             skipped_count = len(all_folder_imgs) - len(self._folder_to_img)
             self._all_folders = sorted(self._folder_to_img.keys(), key=lambda f: self._folder_datetime.get(f, ("", "")))
-            print(f"Filtered to {len(self._all_folders)} folders (1 per 15-min slot, skipped {skipped_count}, oldest first)")
+            print(f"Filtered to {len(self._all_folders)} folders (1 per {interval}-min slot, skipped {skipped_count}, oldest first)")
         
         # Load cache
         self._ai_cache = self._load_cache()
@@ -338,7 +328,7 @@ class VerdisBeltValidator:
         self._print_distribution("LABELED DATA DISTRIBUTION (Ground Truth - All)", gt_categories, len(all_gt_cache), len(gt_files), gt_motion)
         
         # Also show filtered GT count
-        print(f"  ({len(self._gt_cache)} of these are in 15-minute filtered set)")
+        print(f"  ({len(self._gt_cache)} of these are in {self._sample_interval}-minute filtered set)")
 
     def _run_ai_on_missing(self, folders: list[Path]):
         """Run AI classification on folders missing results, following vejebod.py procedure."""
@@ -795,6 +785,7 @@ if __name__ == "__main__":
     datetime_from = None
     datetime_to = None
     sample_category = None
+    sample_interval = 15
     for i, arg in enumerate(sys.argv):
         if arg == "--from" and i + 1 < len(sys.argv):
             datetime_from = sys.argv[i + 1]
@@ -802,6 +793,8 @@ if __name__ == "__main__":
             datetime_to = sys.argv[i + 1]
         elif arg == "--sample" and i + 1 < len(sys.argv):
             sample_category = sys.argv[i + 1]
+        elif arg == "--time" and i + 1 < len(sys.argv):
+            sample_interval = int(sys.argv[i + 1])
     
     if "--help" in sys.argv or "-h" in sys.argv:
         print("Usage: python verdis_belt.py [OPTIONS]")
@@ -810,6 +803,7 @@ if __name__ == "__main__":
         print("  --run-ai                  Run AI on folders missing results")
         print("  --force-reload            Force reload caches from registry (ignore local cache)")
         print("  --sample CATEGORY         Filter to folders with AI detection of CATEGORY")
+        print("  --time MINUTES            Sampling interval in minutes (default: 15)")
         print("  --from DATETIME           Start of date range (format: YYYYMMDD or YYYYMMDD_HHMMSS)")
         print("  --to DATETIME             End of date range (format: YYYYMMDD or YYYYMMDD_HHMMSS)")
         print("  --help, -h                Show this help message")
@@ -818,13 +812,15 @@ if __name__ == "__main__":
         print("  python verdis_belt.py --sample hard_plastics")
         print("  python verdis_belt.py --sample \"hard plastics\"")
         print("  python verdis_belt.py --from 20260128 --to 20260128")
+        print("  python verdis_belt.py --time 60")
         print("  python verdis_belt.py --force-reload")
-        print("\nNote: When using --from/--to, ALL folders in the range are shown (no 15-min filtering)")
+        print("\nNote: When using --from/--to, ALL folders in the range are shown (no time-slot filtering)")
         sys.exit(0)
     
     registry = RegistryBase(base=REGISTRY_LOCAL_IP)
     registry.add_id(VerdisBeltGroundTruth, "5adf5d6f-539a-4533-9461-ff8b390fd9cf")
     validator = VerdisBeltValidator(registry, review_mode=review_mode, run_ai=run_ai, 
                                     datetime_from=datetime_from, datetime_to=datetime_to,
-                                    force_reload=force_reload, sample_category=sample_category)
+                                    force_reload=force_reload, sample_category=sample_category,
+                                    sample_interval=sample_interval)
     validator.run()

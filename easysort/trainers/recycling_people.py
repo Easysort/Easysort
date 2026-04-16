@@ -1,20 +1,23 @@
 from pathlib import Path
 from typing import Dict, List
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import random
-import json
 import cv2
 import numpy as np
+from PIL import Image
 from tqdm import tqdm
 
 from easysort.trainer import ModelSchema, Trainer, MODELS_DIR
 from easysort.registry import RegistryBase
 from easysort.helpers import REGISTRY_LOCAL_IP, current_timestamp, unpack_video
-from easysort.sampler import Crop
 from easysort.runner import Runner, extract_person_crops_from_video, PersonCrop
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DEPLOYMENT_FOLDER = "argo"
+from easyprod.products.recycling.people_validation import (
+  RECYCLING_PEOPLE_GT_ID,
+  RecyclingPeopleGT,
+  camera_from_path,
+  list_recycling_videos_by_camera,
+  load_people_validation_config,
+)
 
 SCHEMA = ModelSchema(
   name="recycling_people",
@@ -25,44 +28,19 @@ SCHEMA = ModelSchema(
   imgsz=640,
 )
 
-RECYCLING_PEOPLE_GT_ID = "c3a7f1e2-8b4d-4e6a-9f5c-2d1b0a3e8c7f"
-
-@dataclass
-class RecyclingPeopleGT:
-  frame_bboxes: Dict[int, List[List[int]]]
-  id: str = field(default_factory=lambda: RECYCLING_PEOPLE_GT_ID)
-  metadata: RegistryBase.BaseDefaultTypes.BASEMETADATA = field(
-    default_factory=lambda: RegistryBase.BaseDefaultTypes.BASEMETADATA(model="yolo11n-pose+gpt", created_at=current_timestamp())
-  )
-
-
 @dataclass
 class PersonCheck:
   has_person: bool
 
 
-def _load_config(config_name: str = "kk"):
-  config_path = PROJECT_ROOT / "easyprod" / "products" / "recycling" / "configs" / f"{config_name}.json"
-  config = json.loads(config_path.read_text())
-  crops = {k: Crop(**v) for k, v in config["crops"].items()}
-  return crops, config.get("min_w", 80), config.get("min_h", 200)
+def _save_dataset_image(frame_bgr: np.ndarray, destination: Path):
+  rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+  Image.fromarray(rgb).save(destination, format="JPEG", quality=95)
 
 
-def _camera(path: Path) -> str:
-  return path.parts[-6] if len(path.parts) >= 6 else ""
-
-
-def list_videos_balanced(registry: RegistryBase, n_per_camera: int = 50) -> Dict[str, List[Path]]:
-  crops, *_ = _load_config()
-  cameras = list(crops.keys())
-  all_videos = registry.LIST(DEPLOYMENT_FOLDER, suffix=[".mp4"])
-
-  by_camera: Dict[str, List[Path]] = {cam: [] for cam in cameras}
-  for v in all_videos:
-    cam = _camera(v)
-    if cam in by_camera:
-      by_camera[cam].append(v)
-
+def list_videos_balanced(registry: RegistryBase, n_per_camera: int = 50, config_name: str | None = None) -> Dict[str, List[Path]]:
+  config = load_people_validation_config(config_name)
+  by_camera = list_recycling_videos_by_camera(registry, config)
   counts = {cam: len(vs) for cam, vs in by_camera.items()}
   print(f"Videos per camera: {counts}")
   min_avail = min((len(vs) for vs in by_camera.values() if vs), default=0)
@@ -70,7 +48,8 @@ def list_videos_balanced(registry: RegistryBase, n_per_camera: int = 50) -> Dict
     print("No videos found for any camera")
     return {}
   n = min(n_per_camera, min_avail)
-  print(f"Sampling {n} videos per camera ({n * len(cameras)} total)")
+  sampled_cameras = sum(1 for vs in by_camera.values() if vs)
+  print(f"Sampling {n} videos per camera ({n * sampled_cameras} total)")
   return {cam: random.sample(vs, n) for cam, vs in by_camera.items() if vs}
 
 
@@ -100,14 +79,14 @@ def _show_results(video_name: str, crops: List[PersonCrop], confirmations: List[
   return key == ord("q")
 
 
-def label_videos(registry: RegistryBase, n_per_camera: int = 50) -> int:
-  crops, min_w, min_h = _load_config()
+def label_videos(registry: RegistryBase, n_per_camera: int = 50, config_name: str | None = None) -> int:
+  config = load_people_validation_config(config_name)
+  min_w, min_h = config.min_w, config.min_h
   gpt_runner = Runner()
-  videos_by_camera = list_videos_balanced(registry, n_per_camera)
+  videos_by_camera = list_videos_balanced(registry, n_per_camera, config_name=config_name)
   labeled, skip_show = 0, False
 
   for camera, videos in videos_by_camera.items():
-    crop = crops[camera]
     print(f"\n--- {camera}: {len(videos)} videos ---")
 
     for video_path in tqdm(videos, desc=f"Labeling {camera}"):
@@ -115,10 +94,17 @@ def label_videos(registry: RegistryBase, n_per_camera: int = 50) -> int:
         labeled += 1
         continue
 
-      person_crops = extract_person_crops_from_video(video_path, crop, min_w=min_w, min_h=min_h, pad=0.08)
+      person_crops = extract_person_crops_from_video(video_path, None, min_w=min_w, min_h=min_h, pad=0.08)
 
       if not person_crops:
-        registry.POST(video_path, RecyclingPeopleGT(frame_bboxes={}), RecyclingPeopleGT)
+        registry.POST(
+          video_path,
+          RecyclingPeopleGT(
+            frame_bboxes={},
+            metadata=RegistryBase.BaseDefaultTypes.BASEMETADATA(model="yolo11n-pose+gpt", created_at=current_timestamp()),
+          ),
+          RecyclingPeopleGT,
+        )
         print(f"  {video_path.name}: no people detected")
         labeled += 1
         continue
@@ -137,23 +123,30 @@ def label_videos(registry: RegistryBase, n_per_camera: int = 50) -> int:
       if not skip_show:
         skip_show = _show_results(video_path.name, person_crops, confirmations)
 
-      registry.POST(video_path, RecyclingPeopleGT(frame_bboxes=frame_bboxes), RecyclingPeopleGT)
+      registry.POST(
+        video_path,
+        RecyclingPeopleGT(
+          frame_bboxes=frame_bboxes,
+          metadata=RegistryBase.BaseDefaultTypes.BASEMETADATA(model="yolo11n-pose+gpt", created_at=current_timestamp()),
+        ),
+        RecyclingPeopleGT,
+      )
       labeled += 1
 
   print(f"\nLabeled {labeled} videos total")
   return labeled
 
 
-def build_dataset(registry: RegistryBase, destination: Path) -> Path:
-  crops, *_ = _load_config()
-  cameras = list(crops.keys())
+def build_dataset(registry: RegistryBase, destination: Path, config_name: str | None = None) -> Path:
+  config = load_people_validation_config(config_name)
+  cameras = list(config.cameras)
   images_dir, labels_dir = destination / "images", destination / "labels"
   for split in ["train", "val"]:
     (images_dir / split).mkdir(parents=True, exist_ok=True)
     (labels_dir / split).mkdir(parents=True, exist_ok=True)
 
-  all_videos = registry.LIST(DEPLOYMENT_FOLDER, suffix=[".mp4"], check_exists_with_type=RecyclingPeopleGT)
-  gt_videos = [v for v in all_videos if _camera(v) in cameras]
+  all_videos = registry.LIST(config.registry_prefix, suffix=[".mp4"], check_exists_with_type=RecyclingPeopleGT)
+  gt_videos = [Path(v) for v in all_videos if camera_from_path(v) in cameras]
   print(f"Found {len(gt_videos)} labeled videos")
 
   for video_path in tqdm(gt_videos, desc="Building dataset"):
@@ -161,12 +154,7 @@ def build_dataset(registry: RegistryBase, destination: Path) -> Path:
     if gt is None or not gt.frame_bboxes:
       continue
 
-    crop = crops.get(_camera(video_path))
-    if crop is None:
-      continue
-
     frames = unpack_video(cv2.VideoCapture(registry.backend.URL(video_path)))
-    frames = [f[crop.y:crop.y + crop.h, crop.x:crop.x + crop.w] for f in frames]
 
     for frame_idx, bboxes in gt.frame_bboxes.items():
       if frame_idx >= len(frames):
@@ -175,8 +163,8 @@ def build_dataset(registry: RegistryBase, destination: Path) -> Path:
       h, w = frame.shape[:2]
 
       split = "train" if random.random() < 0.8 else "val"
-      name = f"{_camera(video_path)}_{video_path.stem}_{frame_idx}"
-      cv2.imwrite(str(images_dir / split / f"{name}.jpg"), frame)
+      name = f"{camera_from_path(video_path)}_{video_path.stem}_{frame_idx}"
+      _save_dataset_image(frame, images_dir / split / f"{name}.jpg")
 
       lines = []
       for x1, y1, x2, y2 in bboxes:

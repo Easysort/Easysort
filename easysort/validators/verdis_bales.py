@@ -1,15 +1,36 @@
-"""Verdis Bales Validator - annotate center points around bales."""
+"""Verdis Bales Validator - visualize bale motion estimation like inference.
+
+Shows the same template-matching pipeline as production (easyprod/scripts/verdis/bales.py)
+with a 4-panel debug view: Image A, Image B, binary motion, and movement arrows.
+Navigate through consecutive 2-minute intervals for a given date.
+"""
+
+import re, base64, sys
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import List, Any
+
+import cv2
+import numpy as np
+from flask import Flask, jsonify
 
 from easysort.registry import RegistryBase, RegistryConnector
 from easysort.helpers import REGISTRY_LOCAL_IP, current_timestamp
-from flask import Flask, request, jsonify
-from pathlib import Path
-from dataclasses import dataclass, field
-from typing import List, Tuple, Dict, Optional, Any
-from tqdm import tqdm
-import base64, io, random, json
 
-CACHE_FILE = Path("verdis_bales_gt_cache.json")
+PREFIX = "verdis/gadstrup/9"
+POLYGON = [
+  (1486, 729), (1705, 795), (1895, 841), (1950, 850),
+  (1970, 740), (1731, 688), (1564, 634), (1356, 564), (1319, 668),
+]
+PIXELS_PER_BALE = 140
+PATCH_RAD = 30
+MAX_SEGMENTS = 12
+TOP_N = 4
+SEG_COLORS = [
+  (0, 255, 0), (0, 0, 255), (255, 0, 0), (0, 255, 255),
+  (255, 0, 255), (255, 255, 0), (128, 0, 255), (0, 128, 255),
+]
 
 
 @dataclass
@@ -18,284 +39,330 @@ class VerdisBalesGroundTruth:
   id: str = field(default_factory=lambda: "a5f6a27e-fc7c-41e3-b335-07e90f8f1320")
   metadata: Any = field(
     default_factory=lambda: RegistryBase.BaseDefaultTypes.BASEMETADATA(
-      model="human",
-      created_at=current_timestamp(),
+      model="human", created_at=current_timestamp(),
     )
   )
 
 
+# --- Template matching motion estimation (mirrors production easyprod/scripts/verdis/bales.py) ---
+
+def _poly_mask(shape, pts):
+  m = np.zeros(shape[:2], dtype=np.uint8)
+  if pts:
+    cv2.fillPoly(m, [np.array(pts, dtype=np.int32)], 255)
+  return m
+
+
+def _seg_centers(h, w, poly):
+  mask = _poly_mask((h, w), poly) if poly else np.ones((h, w), dtype=np.uint8) * 255
+  ys, xs = np.where(mask > 0)
+  if len(ys) == 0:
+    return []
+  ymin, ymax = int(ys.min()), int(ys.max())
+  xmin, xmax = int(xs.min()), int(xs.max())
+  sp = PATCH_RAD * 2
+  cands = []
+  for y in range(max(ymin + PATCH_RAD, PATCH_RAD), min(ymax, h - PATCH_RAD) + 1, sp):
+    for x in range(max(xmin + PATCH_RAD, PATCH_RAD), min(xmax, w - PATCH_RAD) + 1, sp):
+      if mask[y, x] > 0:
+        cands.append((x, y))
+  if not cands:
+    idx = np.linspace(0, len(ys) - 1, min(MAX_SEGMENTS, len(ys)), dtype=int)
+    return [(int(xs[i]), int(ys[i])) for i in idx]
+  if len(cands) <= MAX_SEGMENTS:
+    return cands
+  idx = np.linspace(0, len(cands) - 1, MAX_SEGMENTS, dtype=int)
+  return [cands[i] for i in idx]
+
+
+def _match_patch(patch, img_b, poly=None):
+  ph, pw = patch.shape[:2]
+  if ph == 0 or pw == 0:
+    return None
+  h, w = img_b.shape[:2]
+  if w < pw or h < ph:
+    return None
+  res = cv2.matchTemplate(img_b, patch, cv2.TM_CCOEFF_NORMED)
+  if poly:
+    pts = np.array(poly, dtype=np.int32).copy()
+    pts[:, 0] -= pw // 2
+    pts[:, 1] -= ph // 2
+    rm = np.zeros(res.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(rm, [pts], 255)
+    res = np.where(rm > 0, res, -1.0)
+  _, mv, _, (bx, by) = cv2.minMaxLoc(res)
+  return (bx + pw // 2, by + ph // 2, mv) if mv >= 0.2 else None
+
+
+def estimate_bales_detailed(img_a, img_b, poly=POLYGON):
+  """Template-match bale estimation with detailed match info.
+  Returns (bales, all_matches, kept_matches) where each match is
+  (cx_a, cy_a, cx_b, cy_b, conf, dx, dy) in full image coords.
+  Keeps top N rightward (dx>0) matches by magnitude."""
+  if img_b.shape[:2] != img_a.shape[:2]:
+    img_b = cv2.resize(img_b, (img_a.shape[1], img_a.shape[0]))
+  h, w = img_a.shape[:2]
+  ga = cv2.cvtColor(img_a, cv2.COLOR_RGB2GRAY) if img_a.ndim == 3 else img_a
+  gb = cv2.cvtColor(img_b, cv2.COLOR_RGB2GRAY) if img_b.ndim == 3 else img_b
+  ox, oy, lp = 0, 0, poly
+  if poly:
+    pts = np.array(poly, dtype=np.int32)
+    x1 = max(0, int(pts[:, 0].min()) - PATCH_RAD)
+    y1 = max(0, int(pts[:, 1].min()) - PATCH_RAD)
+    x2 = min(w, int(pts[:, 0].max()) + PATCH_RAD)
+    y2 = min(h, int(pts[:, 1].max()) + PATCH_RAD)
+    ga, gb = ga[y1:y2, x1:x2], gb[y1:y2, x1:x2]
+    lp = [(px - x1, py - y1) for px, py in poly]
+    ox, oy = x1, y1
+    h, w = ga.shape[:2]
+  centers = _seg_centers(h, w, lp)
+  if not centers:
+    return 0.0, [], []
+  all_m = []
+  for cx, cy in centers:
+    r1, r2 = max(0, cy - PATCH_RAD), min(h, cy + PATCH_RAD)
+    c1, c2 = max(0, cx - PATCH_RAD), min(w, cx + PATCH_RAD)
+    patch = ga[r1:r2, c1:c2]
+    if patch.size == 0:
+      continue
+    m = _match_patch(patch, gb, lp)
+    if m is None:
+      continue
+    dx, dy = m[0] - cx, m[1] - cy
+    if float(np.hypot(dx, dy)) < 1.0:
+      continue
+    all_m.append((cx + ox, cy + oy, int(m[0]) + ox, int(m[1]) + oy, m[2], dx, dy))
+  if not all_m:
+    return 0.0, all_m, []
+
+  rightward = [m for m in all_m if m[5] > 0]
+  pool = rightward if rightward else all_m
+  ranked = sorted(pool, key=lambda m: np.hypot(m[5], m[6]), reverse=True)
+  kept = ranked[:TOP_N]
+
+  mags = [float(np.hypot(m[5], m[6])) for m in kept]
+  med = float(np.median(mags))
+  if med > 0:
+    filt = [m for m, mg in zip(kept, mags) if 0.5 * med <= mg <= 1.5 * med]
+    if filt:
+      kept = filt
+  adx = float(np.mean([m[5] for m in kept]))
+  ady = float(np.mean([m[6] for m in kept]))
+  return float(np.hypot(adx, ady)) / PIXELS_PER_BALE, all_m, kept
+
+
+# --- Visualization ---
+
+def _put_centered(img, text, cx, cy, scale, color, thickness):
+  (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, thickness)
+  cv2.putText(img, text, (cx - tw // 2, cy + th // 2), cv2.FONT_HERSHEY_SIMPLEX, scale, color, thickness, cv2.LINE_AA)
+
+
+def render_grid(img_a, img_b, poly=POLYGON):
+  """Build 4-panel viz: [Image A | Image B] / [Motion | Movement]. Returns (jpeg_bytes, info_dict)."""
+  bales, all_m, kept = estimate_bales_detailed(img_a, img_b, poly)
+  h, w = img_a.shape[:2]
+  a = cv2.cvtColor(img_a, cv2.COLOR_RGB2BGR)
+  b = cv2.cvtColor(img_b, cv2.COLOR_RGB2BGR)
+
+  for i, (xa, ya, xb, yb, cf, dx, dy) in enumerate(kept):
+    c = SEG_COLORS[i % len(SEG_COLORS)]
+    cv2.rectangle(a, (xa - PATCH_RAD, ya - PATCH_RAD), (xa + PATCH_RAD, ya + PATCH_RAD), c, 3)
+    cv2.rectangle(b, (xb - PATCH_RAD, yb - PATCH_RAD), (xb + PATCH_RAD, yb + PATCH_RAD), c, 3)
+    cv2.arrowedLine(a, (xa, ya), (xa + int(dx), ya + int(dy)), c, 2, tipLength=0.2)
+
+  if poly:
+    pp = np.array(poly, dtype=np.int32)
+    cv2.polylines(a, [pp], True, (0, 255, 255), 2)
+    cv2.polylines(b, [pp], True, (0, 255, 255), 2)
+
+  diff = cv2.absdiff(img_a, img_b)
+  gd = cv2.cvtColor(diff, cv2.COLOR_RGB2GRAY) if diff.ndim == 3 else diff
+  _, mb = cv2.threshold(gd, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+  if poly:
+    mb = mb * (_poly_mask(mb.shape, poly) > 0)
+  md = cv2.cvtColor(mb, cv2.COLOR_GRAY2BGR)
+
+  pnl = np.full((h, w, 3), 40, dtype=np.uint8)
+  info = {"bales": round(bales, 4), "kept": len(kept), "total_segs": len(all_m)}
+
+  if kept:
+    adx = float(np.mean([m[5] for m in kept]))
+    ady = float(np.mean([m[6] for m in kept]))
+    amag = float(np.hypot(adx, ady))
+    acf = float(np.mean([m[4] for m in kept]))
+    info.update({"avg_conf": round(acf, 2), "avg_mag": round(amag, 1)})
+
+    mx, my = w // 4, h // 2
+    sc = min(w * 0.3, h * 0.3) / max(amag, 1.0)
+    ux, uy = adx / max(amag, 1e-6), ady / max(amag, 1e-6)
+    al = min(amag * sc, min(w, h) * 0.35)
+    cv2.arrowedLine(pnl,
+      (int(mx - ux * al * 0.4), int(my - uy * al * 0.4)),
+      (int(mx + ux * al * 0.6), int(my + uy * al * 0.6)),
+      (0, 255, 0), 6, tipLength=0.25)
+    _put_centered(pnl, f"{int(round(amag))} px", mx, my + 60, 2.0, (0, 255, 0), 4)
+    _put_centered(pnl, f"~{bales:.2f} bales", mx, my + 130, 1.5, (0, 200, 255), 3)
+    _put_centered(pnl, f"{len(kept)}/{len(all_m)} segs, conf {acf:.2f}", mx, my - int(al * 0.5) - 10, 0.7, (200, 200, 200), 1)
+
+    rx, n = w // 2 + 10, len(kept)
+    rows = (n + 1) // 2
+    ch_s, cw_s = h // max(rows, 1), (w // 2 - 20) // 2
+    for i, (xa, ya, xb, yb, cf, dx, dy) in enumerate(kept):
+      row, col = i // 2, i % 2
+      ax, ay = rx + col * cw_s + 15, row * ch_s + ch_s // 2
+      mg = float(np.hypot(dx, dy))
+      sdx, sdy = dx / max(mg, 1e-6), dy / max(mg, 1e-6)
+      sl = min(cw_s * 0.3, 40)
+      clr = SEG_COLORS[i % len(SEG_COLORS)]
+      cv2.arrowedLine(pnl, (ax, ay), (int(ax + sdx * sl), int(ay + sdy * sl)), clr, 2, tipLength=0.3)
+      cv2.putText(pnl, f"{int(round(mg))}px c={cf:.2f}", (int(ax + sdx * sl) + 5, ay + 5),
+                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, clr, 1, cv2.LINE_AA)
+  else:
+    _put_centered(pnl, "No motion detected", w // 2, h // 2, 1.5, (0, 0, 255), 3)
+
+  cv2.putText(a, "Image A (prev)", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2, cv2.LINE_AA)
+  cv2.putText(b, "Image B (curr)", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2, cv2.LINE_AA)
+  cv2.putText(md, "Motion", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2, cv2.LINE_AA)
+  cv2.putText(pnl, "Movement", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (200, 200, 200), 2, cv2.LINE_AA)
+
+  ht = min(a.shape[0], b.shape[0])
+  a = cv2.resize(a, (int(a.shape[1] * ht / a.shape[0]), ht))
+  b = cv2.resize(b, (int(b.shape[1] * ht / b.shape[0]), ht))
+  top = np.hstack([a, b])
+  hw = top.shape[1] // 2
+  bottom = np.hstack([cv2.resize(md, (hw, ht)), cv2.resize(pnl, (hw, ht))])
+  grid = np.vstack([top, bottom])
+
+  sc = min(1800 / grid.shape[1], 1000 / grid.shape[0], 1.0)
+  if sc < 1.0:
+    grid = cv2.resize(grid, (int(grid.shape[1] * sc), int(grid.shape[0] * sc)))
+  _, buf = cv2.imencode('.jpg', grid, [cv2.IMWRITE_JPEG_QUALITY, 85])
+  return buf.tobytes(), info
+
+
+# --- Validator ---
+
 class VerdisBalesValidator:
-  prefix = "verdis/gadstrup/4"
+  prefix = PREFIX
   port = 8080
 
-  def __init__(self, registry: RegistryBase, review_mode: bool = False, force_reload: bool = False, all_images: bool = False):
-    self.registry, self.app = registry, Flask(__name__)
-    self._idx = 0
-    self._review_mode = review_mode
-    self._force_reload = force_reload
-    self._all_images = all_images
+  def __init__(self, registry: RegistryBase, date: str | None = None, time_from: str | None = None, time_to: str | None = None):
+    self.registry = registry
+    self.app = Flask(__name__)
+    self._date = date or datetime.now().strftime("%Y%m%d")
+    self._time_from = time_from
+    self._time_to = time_to
+    self._pairs: list[tuple[Path, Path]] = []
+    self._bale_cache: dict[int, dict] = {}
+    self._img_cache: tuple[Path | None, np.ndarray | None] = (None, None)
+    self._load_data()
     self._setup_routes()
 
-    self._gt_cache: Dict[str, List[List[float]]] = {}
-    self._load_and_display_distributions()
+  @staticmethod
+  def _normalize_time(t: str) -> str:
+    """Normalize a time string (HHMMSS or HH:MM:SS) to bare HHMMSS for comparison."""
+    return t.replace(":", "")
 
-    if review_mode:
-      self._folders = self._get_review_folders()
-      print(f"\n*** REVIEW MODE: Reviewing {len(self._folders)} existing ground truths ***\n")
-    elif all_images:
-      self._folders = sorted(self._all_folders, key=lambda f: self._folder_datetime.get(f, ("", "")))
-      print(f"\n*** ALL IMAGES MODE: Showing {len(self._folders)} folders (no 15-min filtering) ***\n")
-    else:
-      self._folders = self._get_unlabeled_folders_sorted()
+  def _in_time_range(self, hhmmss: str) -> bool:
+    if self._time_from and hhmmss < self._normalize_time(self._time_from):
+      return False
+    if self._time_to and hhmmss > self._normalize_time(self._time_to):
+      return False
+    return True
 
-  def _load_gt_cache(self) -> Dict[str, List[List[float]]]:
-    if not self._force_reload and CACHE_FILE.exists():
-      try:
-        return json.loads(CACHE_FILE.read_text())
-      except:
-        pass
-    return {}
-
-  def _save_gt_cache(self):
-    CACHE_FILE.write_text(json.dumps(self._gt_cache, indent=2))
-
-  def _extract_datetime_from_image(self, img_path: Path) -> Optional[Tuple[str, str]]:
-    name = img_path.stem
-    parts = name.split("_")
-    for i, part in enumerate(parts):
-      if len(part) == 8 and part.isdigit():
-        if i + 1 < len(parts) and len(parts[i + 1]) >= 6 and parts[i + 1][:6].isdigit():
-          return part, parts[i + 1][:6]
-    return None
-
-  def _load_and_display_distributions(self):
+  def _load_data(self):
     files = self.registry.backend.LIST(self.prefix)
-    self._files = files
-
-    hash_lookup = self.registry._get_hash_lookup()
-    gt_hash = hash_lookup.get(self.registry.get_id(VerdisBalesGroundTruth), "")
-    gt_files = [f for f in files if gt_hash and gt_hash in f.name]
-
-    print(f"\nFound {len(gt_files)} ground truth files")
-
-    all_folder_imgs: Dict[Path, List[Path]] = {}
+    folders: dict[Path, list[Path]] = {}
     for f in files:
       if f.suffix.lower() in (".jpg", ".png", ".jpeg"):
-        all_folder_imgs.setdefault(f.parent, []).append(f)
-    for folder in all_folder_imgs:
-      all_folder_imgs[folder] = sorted(all_folder_imgs[folder])
+        folders.setdefault(f.parent, []).append(f)
 
-    folder_datetime_all: Dict[Path, Tuple[str, str]] = {}
-    folder_first_img: Dict[Path, Path] = {}
-    for folder, imgs in all_folder_imgs.items():
-      if not imgs:
-        continue
-      dt = self._extract_datetime_from_image(imgs[0])
-      if dt is None:
-        for img in imgs[1:3]:
-          dt = self._extract_datetime_from_image(img)
-          if dt:
-            break
-      if dt:
-        folder_datetime_all[folder] = dt
-        folder_first_img[folder] = imgs[0]
+    sorted_f = sorted(f for f in folders if self._date in f.name)
+    print(f"Date {self._date}: {len(sorted_f)} folders")
 
-    self._folder_to_img = {}
-    self._folder_to_all_imgs = {}
-    self._folder_datetime: Dict[Path, Tuple[str, str]] = {}
+    self._folder_img: dict[Path, Path] = {}
+    self._folder_time: dict[Path, str] = {}
+    for folder in sorted_f:
+      self._folder_img[folder] = sorted(folders[folder])[0]
+      if m := re.search(r"\d{8}_(\d{6})", folder.name):
+        t = m.group(1)
+        self._folder_time[folder] = f"{t[:2]}:{t[2:4]}:{t[4:6]}"
+      else:
+        self._folder_time[folder] = folder.name
 
-    if self._all_images:
-      for folder, imgs in all_folder_imgs.items():
-        if folder in folder_first_img:
-          self._folder_to_img[folder] = folder_first_img[folder]
-          self._folder_to_all_imgs[folder] = imgs
-          if folder in folder_datetime_all:
-            self._folder_datetime[folder] = folder_datetime_all[folder]
-      self._all_folders = sorted(self._folder_to_img.keys(), key=lambda f: self._folder_datetime.get(f, ("", "")))
-      print(f"All images mode: {len(self._all_folders)} folders (no 15-min filtering)")
+    if self._time_from or self._time_to:
+      sorted_f = [f for f in sorted_f if (m := re.search(r"\d{8}_(\d{6})", f.name)) and self._in_time_range(m.group(1))]
+      interval = f"{self._time_from or '...'} - {self._time_to or '...'}"
+      print(f"Time interval {interval}: {len(sorted_f)} folders after filter")
+
+    for i in range(len(sorted_f) - 1):
+      self._pairs.append((sorted_f[i], sorted_f[i + 1]))
+    print(f"Built {len(self._pairs)} consecutive pairs")
+
+  def _get_rgb(self, folder: Path) -> np.ndarray | None:
+    path = self._folder_img.get(folder)
+    if not path:
+      return None
+    return np.array(self.registry.GET(path, self.registry.DefaultMarkers.ORIGINAL_MARKER))
+
+  def _get_pair_images(self, idx: int) -> tuple[np.ndarray | None, np.ndarray | None]:
+    fa, fb = self._pairs[idx]
+    if self._img_cache[0] == fa and self._img_cache[1] is not None:
+      img_a = self._img_cache[1]
     else:
-
-      def get_quarter_slot(time_str: str) -> int:
-        minutes = int(time_str[2:4])
-        if minutes < 15:
-          return 0
-        if minutes < 30:
-          return 1
-        if minutes < 45:
-          return 2
-        return 3
-
-      slots: Dict[str, List[Tuple[Path, str]]] = {}
-      for folder, (date_str, time_str) in folder_datetime_all.items():
-        hour = time_str[:2]
-        quarter = get_quarter_slot(time_str)
-        slot_key = f"{date_str}-{hour}-{quarter}"
-        slots.setdefault(slot_key, []).append((folder, time_str))
-
-      for slot_key, folder_times in slots.items():
-        folder_times.sort(key=lambda x: x[1])
-        chosen_folder, chosen_time = folder_times[0]
-
-        self._folder_to_img[chosen_folder] = folder_first_img[chosen_folder]
-        self._folder_to_all_imgs[chosen_folder] = all_folder_imgs[chosen_folder]
-        self._folder_datetime[chosen_folder] = folder_datetime_all[chosen_folder]
-
-      skipped_count = len(all_folder_imgs) - len(self._folder_to_img)
-      self._all_folders = sorted(self._folder_to_img.keys(), key=lambda f: self._folder_datetime.get(f, ("", "")))
-      print(f"Filtered to {len(self._all_folders)} folders (1 per 15-min slot, skipped {skipped_count}, oldest first)")
-
-    cached_gt = self._load_gt_cache()
-    for folder_key, points in list(cached_gt.items()):
-      if points and len(points[0]) == 4:
-        cached_gt[folder_key] = [[(p[0] + p[2]) / 2, (p[1] + p[3]) / 2] for p in points]
-    cached_folders = set(cached_gt.keys())
-
-    gt_folder_to_file: Dict[str, Path] = {}
-    for gt_file in gt_files:
-      img_folder = str(gt_file.parent.parent)
-      if img_folder not in gt_folder_to_file:
-        gt_folder_to_file[img_folder] = gt_file
-
-    new_gt_folders = [f for f in gt_folder_to_file.keys() if f not in cached_folders]
-    print(f"GT Cache: {len(cached_folders)} cached, {len(new_gt_folders)} new to fetch")
-
-    all_gt_cache = dict(cached_gt)
-    for folder_str in tqdm(new_gt_folders, desc="Fetching new ground truth"):
-      try:
-        img_folder = Path(folder_str)
-        imgs = sorted([f for f in self._files if f.parent == img_folder and f.suffix.lower() in (".jpg", ".png", ".jpeg")])
-        if imgs:
-          gt = self.registry.GET(imgs[0], VerdisBalesGroundTruth, throw_error=False)
-          if gt:
-            points = gt.points
-            if points and len(points[0]) == 4:
-              all_gt_cache[folder_str] = [[(p[0] + p[2]) / 2, (p[1] + p[3]) / 2] for p in points]
-            else:
-              all_gt_cache[folder_str] = points
-      except:
-        pass
-
-    self._gt_cache = {k: v for k, v in all_gt_cache.items() if Path(k) in self._folder_to_img}
-
-    old_gt_cache = self._gt_cache
-    self._gt_cache = all_gt_cache
-    self._save_gt_cache()
-    self._gt_cache = old_gt_cache
-
-    labeled_count = len(all_gt_cache)
-    point_counts = [len(v) for v in all_gt_cache.values()]
-    avg_points = sum(point_counts) / len(point_counts) if point_counts else 0
-
-    print(f"\n{'=' * 50}")
-    print("LABELED DATA DISTRIBUTION")
-    print(f"{'=' * 50}")
-    print(f"Total labeled folders: {labeled_count}/{len(gt_files)}")
-    print(f"Total points annotated: {sum(point_counts)}")
-    print(f"Average points per image: {avg_points:.1f}")
-    print(f"{'=' * 50}\n")
-    print(f"  ({len(self._gt_cache)} of these are in 15-minute filtered set)")
-
-  def _get_unlabeled_folders_sorted(self) -> List[Path]:
-    labeled_folders = set(self._gt_cache.keys())
-    unlabeled = [f for f in self._all_folders if str(f) not in labeled_folders]
-    unlabeled = sorted(unlabeled, key=lambda f: self._folder_datetime.get(f, ("", "")))
-
-    print(f"Folders: {len(labeled_folders)} labeled, {len(unlabeled)} unlabeled, sorted oldest first")
-
-    return unlabeled
-
-  def _get_review_folders(self) -> List[Path]:
-    labeled = [f for f in self._all_folders if str(f) in self._gt_cache]
-    random.shuffle(labeled)
-    return labeled
-
-  def _get_images(self, folder: Path) -> List[Path]:
-    files = self.registry.backend.LIST(str(folder))
-    images = sorted([f for f in files if f.suffix.lower() in (".jpg", ".png", ".jpeg")])
-    return images[:1]
-
-  def _image_b64(self, key: Path) -> str:
-    data = self.registry.GET(key, self.registry.DefaultMarkers.ORIGINAL_MARKER)
-    if data is None:
-      raise ValueError(f"Missing image data for {key}")
-    buf = io.BytesIO()
-    data.save(buf, format="JPEG")
-    return base64.b64encode(buf.getvalue()).decode()
-
-  def _get_image_size(self, key: Path) -> Tuple[int, int]:
-    data = self.registry.GET(key, self.registry.DefaultMarkers.ORIGINAL_MARKER)
-    if data is None:
-      raise ValueError(f"Missing image data for {key}")
-    return data.size
-
-  def _save(self, folder: Path, points: List[List[float]]):
-    images = self._get_images(folder)
-    if images:
-      gt = VerdisBalesGroundTruth(points=points)
-      self.registry.POST(images[0], gt, VerdisBalesGroundTruth, overwrite=True)
-      self._gt_cache[str(folder)] = points
-      try:
-        all_gt = json.loads(CACHE_FILE.read_text()) if CACHE_FILE.exists() else {}
-      except:
-        all_gt = {}
-      all_gt[str(folder)] = points
-      CACHE_FILE.write_text(json.dumps(all_gt, indent=2))
-      print(f"Saved: {folder.name} -> {len(points)} points")
+      img_a = self._get_rgb(fa)
+    img_b = self._get_rgb(fb)
+    if img_b is not None:
+      self._img_cache = (fb, img_b)
+    return img_a, img_b
 
   def _setup_routes(self):
     @self.app.route("/")
     def index():
       return HTML
 
-    @self.app.route("/next")
-    def next_item():
-      while self._idx < len(self._folders):
-        folder = self._folders[self._idx]
-        images = self._get_images(folder)
-        if not images:
-          self._idx += 1
-          continue
-        try:
-          img_data = [{"key": str(img), "b64": self._image_b64(img), "size": self._get_image_size(img)} for img in images]
-          existing_points = self._gt_cache.get(str(folder), [])
-          response = {
-            "done": False,
-            "folder": str(folder),
-            "idx": self._idx,
-            "total": len(self._folders),
-            "images": img_data,
-            "points": existing_points,
-            "review_mode": self._review_mode,
-          }
-          return jsonify(response)
-        except Exception as e:
-          print(f"Skipping {folder.name}: {e}")
-          self._idx += 1
-      return jsonify({"done": True, "total": len(self._folders)})
+    @self.app.route("/summary")
+    def summary():
+      items = []
+      for i, (fa, fb) in enumerate(self._pairs):
+        cached = self._bale_cache.get(i, {})
+        items.append({
+          "idx": i,
+          "time_a": self._folder_time.get(fa, ""),
+          "time_b": self._folder_time.get(fb, ""),
+          "bales": cached.get("bales"),
+        })
+      resp = {"pairs": items, "total": len(self._pairs), "date": self._date}
+      if self._time_from or self._time_to:
+        resp["time_from"] = self._time_from or ""
+        resp["time_to"] = self._time_to or ""
+      return jsonify(resp)
 
-    @self.app.route("/save", methods=["POST"])
-    def save():
-      data = request.get_json(silent=True) or {}
-      folder = data.get("folder")
-      points = data.get("points")
-      if not folder or points is None:
-        return jsonify({"ok": False, "error": "Missing folder or points"}), 400
-      self._save(Path(folder), points)
-      self._idx += 1
-      return jsonify({"ok": True})
-
-    @self.app.route("/skip", methods=["POST"])
-    def skip():
-      self._idx += 1
-      return jsonify({"ok": True})
-
-    @self.app.route("/back", methods=["POST"])
-    def back():
-      self._idx = max(0, self._idx - 1)
-      return jsonify({"ok": True})
+    @self.app.route("/pair/<int:idx>")
+    def pair(idx):
+      if idx < 0 or idx >= len(self._pairs):
+        return jsonify({"error": "Invalid index"}), 400
+      fa, fb = self._pairs[idx]
+      img_a, img_b = self._get_pair_images(idx)
+      if img_a is None or img_b is None:
+        return jsonify({"error": "Could not load images"}), 500
+      jpeg, info = render_grid(img_a, img_b)
+      self._bale_cache[idx] = info
+      return jsonify({
+        "idx": idx, "total": len(self._pairs),
+        "time_a": self._folder_time.get(fa, ""),
+        "time_b": self._folder_time.get(fb, ""),
+        "b64": base64.b64encode(jpeg).decode(),
+        "info": info,
+      })
 
   def run(self, host="0.0.0.0"):
     print(f"Verdis Bales Validator at http://{host}:{self.port}")
+    interval = ""
+    if self._time_from or self._time_to:
+      interval = f", Time: {self._time_from or '...'} - {self._time_to or '...'}"
+    print(f"Date: {self._date}{interval}, Pairs: {len(self._pairs)}")
     self.app.run(host=host, port=self.port, debug=False, threaded=True)
 
 
@@ -303,235 +370,138 @@ HTML = """<!DOCTYPE html><html><head><meta charset="utf-8"><title>Verdis Bales V
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:system-ui;background:#1a1a1a;color:#fff;height:100vh;display:flex;flex-direction:column}
-#images{flex:1;display:flex;justify-content:center;align-items:center;position:relative;overflow:hidden;background:#000}
-#canvas-container{position:relative;display:inline-block}
-#canvas{cursor:crosshair;max-width:95vw;max-height:85vh;width:auto;height:auto}
-#info-overlay{position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.85);padding:10px 14px;border-radius:6px;font-size:13px}
-#bar{padding:12px;background:#222;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap}
-.btn{padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:500}
-.btn:disabled{opacity:0.4;cursor:not-allowed}
-.save{background:#2d7d46;color:#fff}.save:hover{background:#3d8a56}
-.skip{background:#666}.back{background:#555}
-.clear{background:#8a4a4a;color:#fff}.clear:hover{background:#9a5a5a}
-.delete{background:#5a3a3a;color:#fff}.delete:hover{background:#6a4a4a}
-#progress{color:#888;margin-left:auto}
-#done{display:none;font-size:24px;text-align:center;padding:48px}
-kbd{background:#333;padding:2px 6px;border-radius:3px;font-size:11px;margin-right:4px}
-.review-banner{background:#553;color:#ff8;padding:4px 12px;text-align:center;font-size:12px}
-.instruction{color:#888;font-size:11px;margin-left:12px}
+#hdr{padding:10px 20px;background:#222;display:flex;align-items:center;gap:20px;flex-shrink:0}
+.hd{font-size:18px;font-weight:600}.ht{font-size:15px;color:#aaa}
+.hb{font-size:22px;font-weight:700;color:#4fc3f7}.hm{font-size:13px;color:#666;margin-left:auto}
+#view{flex:1;display:flex;justify-content:center;align-items:center;background:#000;overflow:hidden;position:relative;min-height:0}
+#view img{max-width:100%;max-height:100%;object-fit:contain}
+#ld{position:absolute;font-size:16px;color:#666}
+#bar{padding:8px 20px;background:#252525;display:flex;gap:10px;align-items:center;flex-shrink:0}
+.bt{padding:6px 12px;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:500;color:#fff;background:#444}
+.bt:hover{background:#555}
+kbd{background:#333;padding:2px 5px;border-radius:3px;font-size:11px;margin-right:3px}
+#nfo{color:#888;font-size:12px;margin-left:auto}
+#tl{padding:6px 20px 10px;background:#1e1e1e;overflow-x:auto;white-space:nowrap;display:flex;gap:1px;align-items:end;height:55px;flex-shrink:0}
+.tb{min-width:3px;cursor:pointer;border-radius:1px 1px 0 0;opacity:0.8;transition:opacity .1s}
+.tb:hover{opacity:1}.tb.on{outline:2px solid #fff;outline-offset:-1px}
 </style></head><body>
-<div id="review-banner" class="review-banner" style="display:none">REVIEW MODE - Checking existing ground truths</div>
-<div id="images">
-  <div id="canvas-container">
-    <canvas id="canvas"></canvas>
-  </div>
-  <div id="info-overlay"></div>
+<div id="hdr">
+  <span class="hd" id="dt">Loading...</span>
+  <span class="ht" id="tm"></span>
+  <span class="hb" id="bl"></span>
+  <span class="hm" id="mt"></span>
+</div>
+<div id="view">
+  <img id="img" style="display:none"/>
+  <span id="ld">Loading...</span>
 </div>
 <div id="bar">
-  <button class="btn back" onclick="back()"><kbd>B</kbd>Back</button>
-  <button class="btn save" onclick="save()"><kbd>A</kbd>Save</button>
-  <button class="btn clear" onclick="clearAll()"><kbd>C</kbd>Clear All</button>
-  <button class="btn delete" onclick="deleteSelected()"><kbd>D</kbd>Delete Selected</button>
-  <button class="btn skip" onclick="skip()"><kbd>S</kbd>Skip</button>
-  <span class="instruction">Click to add point | Click point to select</span>
-  <span id="progress">-/-</span>
+  <button class="bt" onclick="go(-1)"><kbd>&larr;</kbd>Prev</button>
+  <button class="bt" onclick="go(1)"><kbd>&rarr;</kbd>Next</button>
+  <button class="bt" id="sb" onclick="toggleSort()">Sort by bales</button>
+  <span id="nfo"></span>
 </div>
-<div id="done">All done!</div>
+<div id="tl"></div>
 <script>
-let currentFolder=null, currentImage=null, points=[], selectedIdx=-1;
-let canvas, ctx, imgElement, cropRect=null;
-// const CROP = {left: 0.2, right: 0.4, bottom: 0.4};
-const CROP = {left: 0, right: 0, bottom: 0};
+let P=[],ci=0,srt=false,si=null;
 
-function initCanvas() {
-  canvas = document.getElementById('canvas');
-  ctx = canvas.getContext('2d');
-  canvas.addEventListener('click', onClick);
+async function init(){
+  const d=await(await fetch('/summary')).json();
+  P=d.pairs;
+  let lbl='Date: '+d.date;
+  if(d.time_from||d.time_to) lbl+=' ('+(d.time_from||'...')+' - '+(d.time_to||'...')+')';
+  document.getElementById('dt').textContent=lbl;
+  buildTL();
+  if(P.length>0) loadP(0);
+  else document.getElementById('ld').textContent='No pairs found for '+d.date;
 }
 
-function toCanvasCoords(e) {
-  const rect = canvas.getBoundingClientRect();
-  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-  return {x, y};
-}
-
-function onClick(e) {
-  const {x, y} = toCanvasCoords(e);
-  let clickedIdx = -1;
-  const hitRadius = 10;
-  for (let i = points.length - 1; i >= 0; i--) {
-    const [px, py] = points[i];
-    if (!cropRect) continue;
-    const cx = px - cropRect.x;
-    const cy = py - cropRect.y;
-    if (cx < 0 || cy < 0 || cx > cropRect.w || cy > cropRect.h) continue;
-    const dx = x - cx;
-    const dy = y - cy;
-    if (Math.hypot(dx, dy) <= hitRadius) {
-      clickedIdx = i;
-      break;
-    }
-  }
-  if (clickedIdx >= 0) {
-    selectedIdx = clickedIdx;
-  } else if (cropRect) {
-    const origX = cropRect.x + x;
-    const origY = cropRect.y + y;
-    points.push([origX, origY]);
-    selectedIdx = points.length - 1;
-  }
-  render();
-}
-
-function render() {
-  if (!imgElement || !cropRect) return;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(
-    imgElement,
-    cropRect.x, cropRect.y, cropRect.w, cropRect.h,
-    0, 0, canvas.width, canvas.height,
-  );
-  points.forEach((pt, i) => {
-    const [px, py] = pt;
-    const cx = px - cropRect.x;
-    const cy = py - cropRect.y;
-    if (cx < 0 || cy < 0 || cx > cropRect.w || cy > cropRect.h) return;
-    ctx.beginPath();
-    ctx.arc(cx, cy, i === selectedIdx ? 6 : 4, 0, Math.PI * 2);
-    ctx.fillStyle = i === selectedIdx ? '#f00' : '#0f0';
-    ctx.fill();
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  });
-  const overlay = document.getElementById('info-overlay');
-  overlay.innerHTML = `<div style="color:#4f8">Points: ${points.length}</div>${selectedIdx >= 0 ? '<div style="color:#f88;margin-top:4px">Selected: Bale ' + (selectedIdx + 1) + '</div>' : ''}`;
-}
-
-async function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
+function buildTL(){
+  const tl=document.getElementById('tl');tl.innerHTML='';
+  const mx=Math.max(0.05,...P.map(p=>p.bales||0));
+  const order=srt?si:P.map((_,i)=>i);
+  const bw=Math.max(3,Math.min(12,Math.floor((window.innerWidth-40)/Math.max(P.length,1))));
+  order.forEach(idx=>{
+    const p=P[idx],b=p.bales||0;
+    const h=Math.max(4,(b/mx)*44);
+    const d=document.createElement('div');
+    d.className='tb'+(idx===ci?' on':'');
+    d.style.height=h+'px';d.style.width=bw+'px';
+    d.style.background=b>0.02?'hsl('+Math.round(120-b/mx*120)+',70%,40%)':'#333';
+    d.title=p.time_a+' \\u2192 '+p.time_b+': '+(b||0).toFixed(3)+' bales';
+    d.onclick=()=>loadP(idx);
+    tl.appendChild(d);
   });
 }
 
-async function load() {
-  const data = await (await fetch('/next')).json();
-  renderData(data);
+async function loadP(idx){
+  if(idx<0||idx>=P.length)return;
+  ci=idx;buildTL();
+  document.getElementById('ld').style.display='block';
+  document.getElementById('img').style.display='none';
+  const d=await(await fetch('/pair/'+idx)).json();
+  if(d.error){document.getElementById('ld').textContent=d.error;return;}
+  document.getElementById('img').src='data:image/jpeg;base64,'+d.b64;
+  document.getElementById('img').style.display='block';
+  document.getElementById('ld').style.display='none';
+  document.getElementById('tm').textContent=d.time_a+' \\u2192 '+d.time_b;
+  document.getElementById('bl').textContent=d.info.bales.toFixed(3)+' bales';
+  document.getElementById('mt').textContent='Pair '+(idx+1)+'/'+d.total;
+  document.getElementById('nfo').textContent=
+    d.info.kept+'/'+d.info.total_segs+' segments'+(d.info.avg_conf?', conf '+d.info.avg_conf:'');
+  P[idx].bales=d.info.bales;
+  buildTL();
 }
 
-async function renderData(data) {
-  if (data.done) {
-    document.getElementById('done').style.display = 'block';
-    document.getElementById('bar').style.display = 'none';
-    document.getElementById('images').style.display = 'none';
-    return;
-  }
-  currentFolder = data.folder;
-  currentImage = data.images[0] || null;
-  points = data.points || [];
-  selectedIdx = -1;
-  document.getElementById('review-banner').style.display = data.review_mode ? 'block' : 'none';
-  await showImage();
-  document.getElementById('progress').textContent = `${data.idx + 1}/${data.total}`;
+function go(dir){
+  if(srt&&si){
+    const pos=si.indexOf(ci);const n=pos+dir;
+    if(n>=0&&n<si.length) loadP(si[n]);
+  } else loadP(ci+dir);
 }
 
-async function showImage() {
-  if (!currentImage) return;
-  imgElement = await loadImage('data:image/jpeg;base64,' + currentImage.b64);
-  const cropX = Math.round(imgElement.width * CROP.left);
-  const cropY = Math.round(imgElement.height * (1 - CROP.bottom));
-  const cropW = Math.round(imgElement.width * (1 - CROP.left - CROP.right));
-  const cropH = Math.round(imgElement.height * CROP.bottom);
-  if (cropW <= 0 || cropH <= 0) {
-    cropRect = {x: 0, y: 0, w: imgElement.width, h: imgElement.height};
-    canvas.width = imgElement.width;
-    canvas.height = imgElement.height;
-  } else {
-    cropRect = {x: cropX, y: cropY, w: cropW, h: cropH};
-    canvas.width = cropW;
-    canvas.height = cropH;
-  }
-  render();
+function toggleSort(){
+  srt=!srt;
+  if(srt) si=[...Array(P.length).keys()].sort((a,b)=>(P[b].bales||0)-(P[a].bales||0));
+  buildTL();
+  document.getElementById('sb').textContent=srt?'Sort by time':'Sort by bales';
 }
 
-async function save() {
-  if (!currentFolder) return;
-  await fetch('/save', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({folder: currentFolder, points: points})
-  });
-  await load();
-}
-
-async function skip() {
-  await fetch('/skip', {method: 'POST'});
-  await load();
-}
-
-async function back() {
-  await fetch('/back', {method: 'POST'});
-  await load();
-}
-
-function clearAll() {
-  points = [];
-  selectedIdx = -1;
-  render();
-}
-
-function deleteSelected() {
-  if (selectedIdx >= 0) {
-    points.splice(selectedIdx, 1);
-    selectedIdx = -1;
-    render();
-  }
-}
-
-document.addEventListener('keydown', e => {
-  if (e.key.toLowerCase() === 'a') save();
-  else if (e.key.toLowerCase() === 's') skip();
-  else if (e.key.toLowerCase() === 'b') back();
-  else if (e.key.toLowerCase() === 'c') clearAll();
-  else if (e.key.toLowerCase() === 'd') deleteSelected();
-  else if (e.key === 'Escape') { selectedIdx = -1; render(); }
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft') go(-1);
+  else if(e.key==='ArrowRight') go(1);
 });
-
-initCanvas();
-load();
+init();
 </script></body></html>"""
 
 
 if __name__ == "__main__":
-  import sys
-
-  review_mode = "--review" in sys.argv or "-r" in sys.argv
-  force_reload = "--force-reload" in sys.argv
-  all_images = "--all" in sys.argv
+  date = None
+  time_from = None
+  time_to = None
+  for i, arg in enumerate(sys.argv):
+    if arg == "--date" and i + 1 < len(sys.argv):
+      date = sys.argv[i + 1]
+    elif arg == "--from" and i + 1 < len(sys.argv):
+      time_from = sys.argv[i + 1]
+    elif arg == "--to" and i + 1 < len(sys.argv):
+      time_to = sys.argv[i + 1]
 
   if "--help" in sys.argv or "-h" in sys.argv:
-    print("Usage: python verdis_bales.py [OPTIONS]")
+    print("Usage: python verdis_bales.py [--date YYYYMMDD] [--from HHMMSS] [--to HHMMSS]")
+    print("\nVisualizes bale motion estimation for a given date.")
+    print("Shows template matching arrows, segment boxes, and bale counts")
+    print("in a 4-panel view: Image A, Image B, Motion, Movement.")
     print("\nOptions:")
-    print("  --review, -r              Review existing ground truths")
-    print("  --force-reload            Force reload cache from registry")
-    print("  --all                     Show all images (no 15-min filtering)")
-    print("  --help, -h                Show this help message")
+    print("  --date YYYYMMDD    Date to analyze (default: today)")
+    print("  --from HHMMSS      Start of time interval (inclusive, e.g. 080000)")
+    print("  --to   HHMMSS      End of time interval (inclusive, e.g. 120000)")
     print("\nControls:")
-    print("  Click         Add point")
-    print("  Click point   Select point")
-    print("  D             Delete selected point")
-    print("  C             Clear all points")
-    print("  A             Save and next")
-    print("  S             Skip")
-    print("  B             Back")
-    print("  Esc           Deselect")
+    print("  \u2190/\u2192              Navigate pairs")
+    print("  Click timeline   Jump to pair")
+    print("  Sort button      Toggle time/bale-count ordering")
     sys.exit(0)
 
   registry = RegistryBase(RegistryConnector(REGISTRY_LOCAL_IP))
-  registry.add_id(VerdisBalesGroundTruth, "a5f6a27e-fc7c-41e3-b335-07e90f8f1320")
-  validator = VerdisBalesValidator(registry, review_mode=review_mode, force_reload=force_reload, all_images=all_images)
+  validator = VerdisBalesValidator(registry, date=date, time_from=time_from, time_to=time_to)
   validator.run()

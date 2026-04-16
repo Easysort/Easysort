@@ -28,6 +28,9 @@ dependencies = [
     "ultralytics>=8.3.227",
     "uvicorn[standard]>=0.32.0",
     "raylib>=5.5.0.4",
+    "rfdetr",
+    "dill>=0.4.1",
+    "transformers>=4.57.6",
 ]
 [tool.uv]
 package = true
@@ -35,7 +38,14 @@ package = true
 [tool.setuptools]
 packages = ["easysort", "easyprod"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests", "easyprod/tests"]
+
 [dependency-groups]
 dev = [
     "ruff>=0.14.10",
+    "types-tqdm>=4.67.3.20260303",
 ]
+
+[tool.mypy]
+explicit_package_bases = true

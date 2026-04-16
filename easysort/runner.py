@@ -174,7 +174,7 @@ def extract_person_crops_from_video(
             out += [PersonCrop(idxs[c.frame_idx], c.direction, c.image, c.box) for c in extract_person_crops(frames, None, model_path=model_path, batch=batch, min_w=min_w, min_h=min_h, min_in_crop=0.0, pad=pad)]
             frames.clear(); idxs.clear()
         if frames:
-            out += [PersonCrop(idxs[c.frame_idx], c.direction, c.image) for c in extract_person_crops(frames, None, model_path=model_path, batch=len(frames), min_w=min_w, min_h=min_h, min_in_crop=0.0, pad=pad)]
+            out += [PersonCrop(idxs[c.frame_idx], c.direction, c.image, c.box) for c in extract_person_crops(frames, None, model_path=model_path, batch=len(frames), min_w=min_w, min_h=min_h, min_in_crop=0.0, pad=pad)]
     finally:
         cap.release()
     return out
