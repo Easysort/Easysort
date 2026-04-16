@@ -60,10 +60,20 @@ def _trained_model_frame_bboxes(
     for offset, result in enumerate(results):
       frame_idx = start + offset
       boxes = getattr(result, "boxes", None)
-      if boxes is None:
+      if boxes is not None:
+        confs = boxes.conf.tolist() if getattr(boxes, "conf", None) is not None else [1.0] * len(boxes.xyxy)
+        coords_iter = boxes.xyxy.tolist()
+      elif hasattr(result, "xyxy"):
+        coords_iter = result.xyxy.tolist() if hasattr(result.xyxy, "tolist") else list(result.xyxy)
+        confs = (
+          result.confidence.tolist()
+          if getattr(result, "confidence", None) is not None and hasattr(result.confidence, "tolist")
+          else list(getattr(result, "confidence", [1.0] * len(coords_iter)))
+        )
+      else:
         continue
-      confs = boxes.conf.tolist() if getattr(boxes, "conf", None) is not None else [1.0] * len(boxes.xyxy)
-      for coords, score in zip(boxes.xyxy.tolist(), confs):
+
+      for coords, score in zip(coords_iter, confs):
         if float(score) < conf_threshold:
           continue
         valid = normalise_box(tuple(coords), frames[frame_idx].shape[1], frames[frame_idx].shape[0])

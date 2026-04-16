@@ -219,7 +219,7 @@ def train_pseudo_model(
   trainer.train(epochs=epochs, patience=patience, batch=batch)
   trainer.eval()
 
-  best_weights = Path(f"{schema.name}_model") / "train" / "weights" / "best.pt"
+  best_weights = Path(f"{schema.name}_model") / "train" / "checkpoint_best_total.pth"
   if not best_weights.exists():
     raise FileNotFoundError(f"Expected trained weights at {best_weights}")
   schema.weights_path.parent.mkdir(parents=True, exist_ok=True)

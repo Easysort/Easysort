@@ -44,10 +44,45 @@ class ModelSchema:
   preprocess: Callable[[np.ndarray], np.ndarray] | None = None
 
 
-def _load_model(task: str, path: str):
+def _is_rfdetr_identifier(path: str, model_hint: str | None = None) -> bool:
+  lowered = str(path).lower()
+  hint = "" if model_hint is None else str(model_hint).lower()
+  return lowered.startswith("rfdetr-") or lowered.endswith(".pth") or hint.startswith("rfdetr-")
+
+
+def _load_model(task: str, path: str, model_hint: str | None = None):
   if task == "detect":
-    from ultralytics import RFDETR
-    return RFDETR(path)
+    lowered = str(path).lower()
+    hint = "" if model_hint is None else str(model_hint).lower()
+    if _is_rfdetr_identifier(path, model_hint=model_hint):
+      from rfdetr import RFDETRBase, RFDETRLarge, RFDETRMedium, RFDETRNano, RFDETRSmall
+
+      if Path(path).exists():
+        weights_path = str(Path(path))
+        if "nano" in lowered or "rfdetr-n" in lowered or "nano" in hint or "rfdetr-n" in hint:
+          return RFDETRNano(pretrain_weights=weights_path)
+        if "small" in lowered or "rfdetr-s" in lowered or "small" in hint or "rfdetr-s" in hint:
+          return RFDETRSmall(pretrain_weights=weights_path)
+        if "medium" in lowered or "rfdetr-m" in lowered or "medium" in hint or "rfdetr-m" in hint:
+          return RFDETRMedium(pretrain_weights=weights_path)
+        if "large" in lowered or "rfdetr-l" in lowered or "large" in hint or "rfdetr-l" in hint:
+          return RFDETRLarge(pretrain_weights=weights_path)
+        return RFDETRBase(pretrain_weights=weights_path)
+
+      if "rfdetr-n" in lowered:
+        return RFDETRNano()
+      if "rfdetr-s" in lowered:
+        return RFDETRSmall()
+      if "rfdetr-m" in lowered:
+        return RFDETRMedium()
+      if "rfdetr-l" in lowered:
+        return RFDETRLarge()
+      if "rfdetr-base" in lowered:
+        return RFDETRBase()
+      raise ValueError(f"Unsupported RF-DETR model identifier: {path}")
+
+    from ultralytics import RTDETR
+    return RTDETR(path)
   from ultralytics import YOLO
   return YOLO(path)
 
@@ -68,12 +103,29 @@ class Trainer:
       else:
         path = s.base_model
         print(f"[Trainer/{s.name}] WARNING: Weights not found at {s.weights_path}, falling back to base model: {s.base_model}")
-      self._model = _load_model(s.task, path)
+      self._model = _load_model(s.task, path, model_hint=s.base_model)
     return self._model
 
   def train(self, epochs=30, patience=5, batch=32, **kw):
     s = self.schema
-    _load_model(s.task, s.base_model).train(
+    model = _load_model(s.task, s.base_model, model_hint=s.base_model)
+    if _is_rfdetr_identifier(s.base_model):
+      output_dir = Path(f"{s.name}_model") / "train"
+      output_dir.mkdir(parents=True, exist_ok=True)
+      model.train(
+        dataset_file="yolo",
+        dataset_dir=str(Path(self.dataset).parent),
+        epochs=epochs,
+        batch_size=batch,
+        output_dir=str(output_dir),
+        early_stopping=patience > 0,
+        early_stopping_patience=patience,
+        progress_bar=True,
+        run_test=True,
+        **kw,
+      )
+      return
+    model.train(
       data=str(self.dataset), epochs=epochs, patience=patience,
       imgsz=s.imgsz, batch=batch, project=f"{s.name}_model",
       name="train", exist_ok=True, verbose=True, plots=True, **kw,
@@ -81,6 +133,9 @@ class Trainer:
 
   def eval(self, **kw):
     s = self.schema
+    if _is_rfdetr_identifier(s.base_model):
+      print(f"[Trainer/{s.name}] RF-DETR validation is run as part of training (`run_test=True`); skipping separate eval().")
+      return
     self.model.val(
       data=str(self.dataset), imgsz=s.imgsz,
       project=f"{s.name}_model", name="val", verbose=True, plots=True, **kw,
@@ -90,6 +145,8 @@ class Trainer:
     prep = self.schema.preprocess
     batch = [prep(img) if prep else img for img in images]
     results = self.model.predict(batch, verbose=False)
+    if _is_rfdetr_identifier(self.schema.base_model):
+      return results if isinstance(results, list) else [results]
     if self.schema.task == "classify":
       return [self.model.names[int(r.probs.top1)] for r in results]
     return results
