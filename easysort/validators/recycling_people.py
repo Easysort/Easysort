@@ -166,6 +166,7 @@ class RecyclingPeopleValidator:
       "frame_w": frame.shape[1],
       "frame_h": frame.shape[0],
       "suggested_bboxes": item["suggested_by_frame"].get(frame_idx, []),
+      "yolo_suggested_bboxes": item["yolo_suggested_by_frame"].get(frame_idx, []),
       "b64": _frame_b64(frame),
     }
     item["frame_cache"][frame_idx] = payload
@@ -223,6 +224,8 @@ class RecyclingPeopleValidator:
       "frame_count": len(all_frames),
       "suggested_by_frame": suggested_by_frame,
       "suggested_frame_indices": sorted(suggested_by_frame),
+      "yolo_suggested_by_frame": yolo_suggested_by_frame,
+      "yolo_frame_indices": sorted(yolo_suggested_by_frame),
       "video_obj": video,
       "frame_cache": {},
     }
@@ -256,6 +259,9 @@ class RecyclingPeopleValidator:
       "frame_count": item["frame_count"],
       "suggested_frame_count": len(item["suggested_frame_indices"]),
       "suggested_frame_indices": item["suggested_frame_indices"],
+      "yolo_frame_count": len(item["yolo_frame_indices"]),
+      "yolo_frame_indices": item["yolo_frame_indices"],
+      "accept_yolo_by_default": self._config.accept_yolo_by_default,
       "stats": self._stats(),
       "hour_counts": self._validated_hour_counts,
       "priority_hours": self._config.priority_hours,
@@ -334,7 +340,7 @@ class RecyclingPeopleValidator:
           return jsonify({"ok": False, "error": "No active video"}), 400
         frame_bboxes = {
           frame_idx: boxes
-          for frame_idx, boxes in self._current_item["suggested_by_frame"].items()
+          for frame_idx, boxes in self._current_item["yolo_suggested_by_frame"].items()
           if boxes
         }
         if not frame_bboxes:
@@ -407,7 +413,7 @@ kbd{background:#333;padding:2px 5px;border-radius:3px;font-size:11px;margin-righ
   <div id="canvas-panel"><canvas id="canvas"></canvas></div>
   <div id="side">
     <h2>People Review</h2>
-    <div class="note">Browse every frame in the video. Blue boxes are YOLO suggestions. If YOLO misses a human in a frame, just draw the box manually there.</div>
+    <div class="note">Browse every frame in the video. Green boxes are selected for saving. YOLO boxes start selected by default, and dashed blue boxes are extra proposals you can add or remove.</div>
     <h3>Video</h3>
     <div id="meta" class="meta"></div>
     <h3>Speed Controls</h3>
@@ -486,6 +492,12 @@ function setAcceptedFor(frame, boxes) {
   acceptedByFrame[frame.frame_idx] = boxes.map(box => [...box]);
 }
 
+function ensureDefaultAcceptedForFrame(frame) {
+  if (!frame || !cur || !cur.accept_yolo_by_default) return;
+  if (acceptedByFrame[frame.frame_idx] !== undefined) return;
+  setAcceptedFor(frame, frame.yolo_suggested_bboxes || []);
+}
+
 function totalAcceptedBoxes() {
   return Object.values(acceptedByFrame).reduce((sum, boxes) => sum + boxes.length, 0);
 }
@@ -513,21 +525,24 @@ function renderCanvas() {
 function updateMeta() {
   if (!cur) return;
   const frame = currentFrame();
-  const hasSuggestion = frame ? frame.suggested_bboxes.length > 0 : false;
+  const hasYoloSuggestion = frame ? frame.yolo_suggested_bboxes.length > 0 : false;
+  const hasExtraSuggestion = frame ? frame.suggested_bboxes.length > frame.yolo_suggested_bboxes.length : false;
   document.getElementById('meta').innerHTML = `
     <div><strong>Camera:</strong> ${cur.camera}</div>
     <div><strong>Video:</strong> ${cur.video_name}</div>
     <div><strong>Timestamp:</strong> ${cur.timestamp || 'unknown'}</div>
     <div><strong>Frame:</strong> ${frameIdx + 1}/${cur.frame_count}${frame ? ` (${frame.frame_idx})` : ''}</div>
-    <div><strong>Frames with YOLO:</strong> ${cur.suggested_frame_count}/${cur.frame_count}</div>
+    <div><strong>Frames with YOLO:</strong> ${cur.yolo_frame_count}/${cur.frame_count}</div>
+    <div><strong>Frames with any proposal:</strong> ${cur.suggested_frame_count}/${cur.frame_count}</div>
+    <div><strong>YOLO boxes in frame:</strong> ${frame ? frame.yolo_suggested_bboxes.length : 0}</div>
     <div><strong>Suggested boxes in frame:</strong> ${frame ? frame.suggested_bboxes.length : 0}</div>
-    <div><strong>Frame status:</strong> ${hasSuggestion ? 'YOLO sees person(s)' : 'No YOLO person in this frame'}</div>
+    <div><strong>Frame status:</strong> ${hasYoloSuggestion ? 'YOLO sees person(s)' : 'No YOLO person in this frame'}${hasExtraSuggestion ? ' | extra proposal available' : ''}</div>
     <div><strong>Accepted boxes in frame:</strong> ${frame ? acceptedFor(frame).length : 0}</div>
     <div><strong>Accepted boxes in video:</strong> ${totalAcceptedBoxes()}</div>
     <div><strong>Session saved:</strong> ${cur.session_saved}</div>
     <div><strong>Session skipped:</strong> ${cur.session_skipped}</div>
   `;
-  document.getElementById('progress').textContent = `frame ${frameIdx + 1}/${cur.frame_count} | ${cur.suggested_frame_count} YOLO frames | ${totalAcceptedBoxes()} accepted boxes`;
+  document.getElementById('progress').textContent = `frame ${frameIdx + 1}/${cur.frame_count} | ${cur.yolo_frame_count} YOLO frames | ${totalAcceptedBoxes()} accepted boxes`;
   document.getElementById('stats').innerHTML = cur.stats.map(stat => `
     <div class="stat">
       <div class="camera">${stat.camera}</div>
@@ -560,6 +575,7 @@ async function loadFrame(targetFrameIdx = frameIdx) {
   const data = await res.json();
   if (token !== frameRequestToken || !data.ok) return;
   currentFrameData = data.frame;
+  ensureDefaultAcceptedForFrame(currentFrameData);
   frameImg.onload = () => {
     if (token !== frameRequestToken) return;
     canvas.width = frameImg.width;
@@ -598,8 +614,8 @@ function nextFrame() {
 }
 
 function moveSuggestedFrame(step) {
-  if (!cur || !cur.suggested_frame_indices.length) return;
-  const indices = cur.suggested_frame_indices;
+  if (!cur || !cur.yolo_frame_indices.length) return;
+  const indices = cur.yolo_frame_indices;
   if (step > 0) {
     const next = indices.find(idx => idx > frameIdx);
     loadFrame(next === undefined ? indices[0] : next);
@@ -621,7 +637,7 @@ function nextSuggestedFrame() {
 function useYoloFrame() {
   const frame = currentFrame();
   if (!frame) return;
-  setAcceptedFor(frame, frame.suggested_bboxes);
+  setAcceptedFor(frame, frame.yolo_suggested_bboxes || []);
   renderCanvas();
   updateMeta();
 }
