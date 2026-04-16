@@ -151,7 +151,7 @@ def build_dataset(
   config = load_people_validation_config(config_name)
   cameras = list(config.cameras)
   images_dir, labels_dir = destination / "images", destination / "labels"
-  for split in ["train", "val"]:
+  for split in ["train", "valid"]:
     (images_dir / split).mkdir(parents=True, exist_ok=True)
     (labels_dir / split).mkdir(parents=True, exist_ok=True)
 
@@ -172,7 +172,7 @@ def build_dataset(
       frame = frames[frame_idx]
       h, w = frame.shape[:2]
 
-      split = "train" if random.random() < 0.8 else "val"
+      split = "train" if random.random() < 0.8 else "valid"
       name = f"{camera_from_path(video_path)}_{video_path.stem}_{frame_idx}"
       _save_dataset_image(frame, images_dir / split / f"{name}.jpg")
 
@@ -185,7 +185,7 @@ def build_dataset(
 
   data_yaml = destination / "data.yaml"
   data_yaml.write_text("\n".join([
-    f"path: {destination}", "train: images/train", "val: images/val",
+    f"path: {destination}", "train: images/train", "val: images/valid",
     "names:", "  0: person", "nc: 1",
   ]))
   return data_yaml
