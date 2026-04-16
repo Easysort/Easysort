@@ -13,7 +13,9 @@ from easysort.helpers import REGISTRY_LOCAL_IP, current_timestamp, unpack_video
 from easysort.runner import Runner, extract_person_crops_from_video, PersonCrop
 from easyprod.products.recycling.people_validation import (
   RECYCLING_PEOPLE_GT_ID,
+  RECYCLING_PEOPLE_PSEUDO_GT_ID,
   RecyclingPeopleGT,
+  RecyclingPeoplePseudoGT,
   camera_from_path,
   list_recycling_videos_by_camera,
   load_people_validation_config,
@@ -137,7 +139,12 @@ def label_videos(registry: RegistryBase, n_per_camera: int = 50, config_name: st
   return labeled
 
 
-def build_dataset(registry: RegistryBase, destination: Path, config_name: str | None = None) -> Path:
+def build_dataset(
+  registry: RegistryBase,
+  destination: Path,
+  config_name: str | None = None,
+  label_type=RecyclingPeopleGT,
+) -> Path:
   config = load_people_validation_config(config_name)
   cameras = list(config.cameras)
   images_dir, labels_dir = destination / "images", destination / "labels"
@@ -145,12 +152,12 @@ def build_dataset(registry: RegistryBase, destination: Path, config_name: str | 
     (images_dir / split).mkdir(parents=True, exist_ok=True)
     (labels_dir / split).mkdir(parents=True, exist_ok=True)
 
-  all_videos = registry.LIST(config.registry_prefix, suffix=[".mp4"], check_exists_with_type=RecyclingPeopleGT)
+  all_videos = registry.LIST(config.registry_prefix, suffix=[".mp4"], check_exists_with_type=label_type)
   gt_videos = [Path(v) for v in all_videos if camera_from_path(v) in cameras]
   print(f"Found {len(gt_videos)} labeled videos")
 
   for video_path in tqdm(gt_videos, desc="Building dataset"):
-    gt = registry.GET(video_path, RecyclingPeopleGT, throw_error=False)
+    gt = registry.GET(video_path, label_type, throw_error=False)
     if gt is None or not gt.frame_bboxes:
       continue
 
@@ -181,9 +188,20 @@ def build_dataset(registry: RegistryBase, destination: Path, config_name: str | 
   return data_yaml
 
 
+def build_pseudo_dataset(registry: RegistryBase, destination: Path, config_name: str | None = None) -> Path:
+  registry.add_id(RecyclingPeoplePseudoGT, RECYCLING_PEOPLE_PSEUDO_GT_ID)
+  return build_dataset(
+    registry,
+    destination,
+    config_name=config_name,
+    label_type=RecyclingPeoplePseudoGT,
+  )
+
+
 if __name__ == "__main__":
   registry = RegistryBase(base=REGISTRY_LOCAL_IP)
   registry.add_id(RecyclingPeopleGT, RECYCLING_PEOPLE_GT_ID)
+  registry.add_id(RecyclingPeoplePseudoGT, RECYCLING_PEOPLE_PSEUDO_GT_ID)
 
   label_videos(registry, n_per_camera=50)
 #   data_yaml = build_dataset(registry, Path("recycling_people_dataset"))
