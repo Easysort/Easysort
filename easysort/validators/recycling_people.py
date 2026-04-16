@@ -1,8 +1,10 @@
 """Manual validator for reviewing people across all frames in a recycling video."""
 
 import base64
+import functools
 import random
 import sys
+from dataclasses import replace
 from pathlib import Path
 from threading import Lock
 from typing import Optional
@@ -34,6 +36,42 @@ from easyprod.products.recycling.people_validation import (
 )
 
 
+@functools.cache
+def _proposal_trainer(weights_path: str):
+  from easysort.trainer import Trainer
+  from easysort.trainers.recycling_people import SCHEMA
+
+  schema = replace(SCHEMA, weights_path=Path(weights_path))
+  return Trainer(schema)
+
+
+def _trained_model_frame_bboxes(
+  frames: list[np.ndarray],
+  weights_path: Path,
+  *,
+  batch_size: int = 16,
+  conf_threshold: float = 0.25,
+) -> dict[int, list[list[int]]]:
+  trainer = _proposal_trainer(str(weights_path))
+  frame_bboxes: dict[int, list[list[int]]] = {}
+  for start in tqdm(range(0, len(frames), batch_size), desc=f"Model proposals ({weights_path.name})"):
+    batch = frames[start:start + batch_size]
+    results = trainer.predict(batch)
+    for offset, result in enumerate(results):
+      frame_idx = start + offset
+      boxes = getattr(result, "boxes", None)
+      if boxes is None:
+        continue
+      confs = boxes.conf.tolist() if getattr(boxes, "conf", None) is not None else [1.0] * len(boxes.xyxy)
+      for coords, score in zip(boxes.xyxy.tolist(), confs):
+        if float(score) < conf_threshold:
+          continue
+        valid = normalise_box(tuple(coords), frames[frame_idx].shape[1], frames[frame_idx].shape[0])
+        if valid is not None:
+          frame_bboxes.setdefault(frame_idx, []).append(valid)
+  return frame_bboxes
+
+
 def _frame_b64(frame: np.ndarray) -> str:
   _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
   return base64.b64encode(buf.tobytes()).decode()
@@ -49,6 +87,7 @@ class RecyclingPeopleValidator:
     seed: int = 0,
     cache_path: Path | None = None,
     refresh_cache: bool = False,
+    model_path: Path | None = None,
   ):
     self.registry = registry
     self.app = Flask(__name__)
@@ -56,6 +95,7 @@ class RecyclingPeopleValidator:
     self._rng = random.Random(seed)
     self._config_name = config_name
     self._config = load_people_validation_config(config_name)
+    self._model_path = Path(model_path) if model_path is not None else None
     self._cache_path = cache_path or DEFAULT_VALIDATION_CACHE_PATH
     self._refresh_cache = refresh_cache
     self._label_cache = load_people_validation_cache(self._cache_path)
@@ -194,6 +234,10 @@ class RecyclingPeopleValidator:
       yolo_suggested_by_frame.setdefault(det.frame_idx, []).append(suggested_bbox)
 
     grounding_dino_suggested_by_frame = grounding_dino_frame_bboxes(all_frames, self._config)
+    model_suggested_by_frame = (
+      _trained_model_frame_bboxes(all_frames, self._model_path)
+      if self._model_path is not None else {}
+    )
     if self._config.proposal_source == "grounding_dino_only":
       suggested_by_frame = merge_frame_box_lists(
         grounding_dino_suggested_by_frame,
@@ -205,15 +249,23 @@ class RecyclingPeopleValidator:
         grounding_dino_suggested_by_frame,
         iou_threshold=self._config.proposal_merge_iou,
       )
+    if model_suggested_by_frame:
+      suggested_by_frame = merge_frame_box_lists(
+        suggested_by_frame,
+        model_suggested_by_frame,
+        iou_threshold=self._config.proposal_merge_iou,
+      )
 
     yolo_count = sum(len(boxes) for boxes in yolo_suggested_by_frame.values())
     grounding_dino_count = sum(len(boxes) for boxes in grounding_dino_suggested_by_frame.values())
+    model_count = sum(len(boxes) for boxes in model_suggested_by_frame.values())
     merged_count = sum(len(boxes) for boxes in suggested_by_frame.values())
 
     print(
       f"Prepared full video review for {video_path.name}: "
       f"{len(all_frames)} frames, {yolo_count} YOLO boxes, "
-      f"{grounding_dino_count} Grounding DINO boxes, {merged_count} merged boxes"
+      f"{grounding_dino_count} Grounding DINO boxes, {model_count} model boxes, "
+      f"{merged_count} merged boxes"
     )
     timestamp = Concat._ts(video.video_path)
     return {
@@ -268,6 +320,7 @@ class RecyclingPeopleValidator:
       "session_saved": self._session_saved,
       "session_skipped": self._session_skipped,
       "config_name": self._config_name or "",
+      "model_path": str(self._model_path) if self._model_path else "",
     }
 
   def _setup_routes(self):
@@ -783,6 +836,7 @@ if __name__ == "__main__":
   seed = 0
   cache_path = None
   refresh_cache = False
+  model_path = None
   for i, arg in enumerate(sys.argv):
     if arg == "--config" and i + 1 < len(sys.argv):
       config_name = sys.argv[i + 1]
@@ -790,11 +844,16 @@ if __name__ == "__main__":
       seed = int(sys.argv[i + 1])
     elif arg == "--cache" and i + 1 < len(sys.argv):
       cache_path = Path(sys.argv[i + 1])
+    elif arg == "--model" and i + 1 < len(sys.argv):
+      model_path = Path(sys.argv[i + 1])
     elif arg == "--refresh-cache":
       refresh_cache = True
 
   if "--help" in sys.argv or "-h" in sys.argv:
-    print("Usage: python -m easysort.validators.recycling_people [--config NAME] [--seed N] [--cache PATH] [--refresh-cache]")
+    print(
+      "Usage: python -m easysort.validators.recycling_people "
+      "[--config NAME] [--seed N] [--cache PATH] [--model PATH] [--refresh-cache]"
+    )
     sys.exit(0)
 
   registry = RegistryBase(base=REGISTRY_LOCAL_IP)
@@ -804,5 +863,6 @@ if __name__ == "__main__":
     seed=seed,
     cache_path=cache_path,
     refresh_cache=refresh_cache,
+    model_path=model_path,
   )
   validator.run()

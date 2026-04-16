@@ -1,7 +1,9 @@
 from pathlib import Path
 from typing import Dict, List
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import random
+import shutil
+import sys
 import cv2
 import numpy as np
 from PIL import Image
@@ -25,10 +27,11 @@ SCHEMA = ModelSchema(
   name="recycling_people",
   task="detect",
   classes=["person"],
-  base_model="yolo11n.pt",
+  base_model="rfdetr-s.pt",
   weights_path=MODELS_DIR / "recycling_people.pt",
   imgsz=640,
 )
+PSEUDO_SCHEMA = replace(SCHEMA, name="recycling_people_pseudo", weights_path=MODELS_DIR / "recycling_people_pseudo.pt")
 
 @dataclass
 class PersonCheck:
@@ -198,14 +201,78 @@ def build_pseudo_dataset(registry: RegistryBase, destination: Path, config_name:
   )
 
 
+def train_pseudo_model(
+  registry: RegistryBase,
+  destination: Path,
+  *,
+  config_name: str | None = None,
+  epochs: int = 20,
+  patience: int = 10,
+  batch: int = 16,
+  weights_output: Path | None = None,
+) -> Path:
+  destination = Path(destination)
+  data_yaml = build_pseudo_dataset(registry, destination, config_name=config_name)
+  schema = replace(PSEUDO_SCHEMA, weights_path=weights_output or PSEUDO_SCHEMA.weights_path)
+  trainer = Trainer(schema, dataset=data_yaml)
+  print(f"Training pseudo-labeled people model from dataset: {data_yaml}")
+  trainer.train(epochs=epochs, patience=patience, batch=batch)
+  trainer.eval()
+
+  best_weights = Path(f"{schema.name}_model") / "train" / "weights" / "best.pt"
+  if not best_weights.exists():
+    raise FileNotFoundError(f"Expected trained weights at {best_weights}")
+  schema.weights_path.parent.mkdir(parents=True, exist_ok=True)
+  shutil.copy2(best_weights, schema.weights_path)
+  print(f"Copied trained weights to {schema.weights_path}")
+  return schema.weights_path
+
+
 if __name__ == "__main__":
+  config_name = None
+  dataset_path = Path("recycling_people_pseudo_dataset")
+  epochs = 20
+  patience = 10
+  batch = 16
+  train_pseudo = False
+  weights_output = None
+
+  for i, arg in enumerate(sys.argv):
+    if arg == "--config" and i + 1 < len(sys.argv):
+      config_name = sys.argv[i + 1]
+    elif arg == "--dataset" and i + 1 < len(sys.argv):
+      dataset_path = Path(sys.argv[i + 1])
+    elif arg == "--epochs" and i + 1 < len(sys.argv):
+      epochs = int(sys.argv[i + 1])
+    elif arg == "--patience" and i + 1 < len(sys.argv):
+      patience = int(sys.argv[i + 1])
+    elif arg == "--batch" and i + 1 < len(sys.argv):
+      batch = int(sys.argv[i + 1])
+    elif arg == "--weights-output" and i + 1 < len(sys.argv):
+      weights_output = Path(sys.argv[i + 1])
+    elif arg == "--train-pseudo":
+      train_pseudo = True
+
+  if "--help" in sys.argv or "-h" in sys.argv:
+    print(
+      "Usage: python -m easysort.trainers.recycling_people "
+      "[--train-pseudo] [--dataset PATH] [--config NAME] [--epochs N] [--patience N] "
+      "[--batch N] [--weights-output PATH]"
+    )
+    sys.exit(0)
+
   registry = RegistryBase(base=REGISTRY_LOCAL_IP)
   registry.add_id(RecyclingPeopleGT, RECYCLING_PEOPLE_GT_ID)
   registry.add_id(RecyclingPeoplePseudoGT, RECYCLING_PEOPLE_PSEUDO_GT_ID)
-
-  label_videos(registry, n_per_camera=50)
-#   data_yaml = build_dataset(registry, Path("recycling_people_dataset"))
-
-#   trainer = Trainer(SCHEMA, dataset=data_yaml)
-#   trainer.train(epochs=20, patience=10, batch=16)
-#   trainer.eval()
+  if train_pseudo:
+    train_pseudo_model(
+      registry,
+      dataset_path,
+      config_name=config_name,
+      epochs=epochs,
+      patience=patience,
+      batch=batch,
+      weights_output=weights_output,
+    )
+  else:
+    label_videos(registry, n_per_camera=50)
