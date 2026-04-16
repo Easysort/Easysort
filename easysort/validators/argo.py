@@ -22,9 +22,9 @@ from easysort.sampler import Crop
 from easyprod.scripts.argo.registry_types import (
   RECYCLING_OVERVIEW_RESULT, RECYCLING_OVERVIEW_DETECTION, RECYCLING_OVERVIEW_RESULT_ID,
 )
+from easysort.helpers import GEMINI_API_KEY
 from easyprod.scripts.argo.argo import PROMPT as ARGO_PROMPT
 
-GEMINI_API_KEY = "AIzaSyBMJxdoq5-UR4OdLjlKWCXVwJXnYjkLky4"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key={GEMINI_API_KEY}"
 
 CROPS = {
