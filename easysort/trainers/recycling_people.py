@@ -150,10 +150,9 @@ def build_dataset(
 ) -> Path:
   config = load_people_validation_config(config_name)
   cameras = list(config.cameras)
-  images_dir, labels_dir = destination / "images", destination / "labels"
   for split in ["train", "valid"]:
-    (images_dir / split).mkdir(parents=True, exist_ok=True)
-    (labels_dir / split).mkdir(parents=True, exist_ok=True)
+    (destination / split / "images").mkdir(parents=True, exist_ok=True)
+    (destination / split / "labels").mkdir(parents=True, exist_ok=True)
 
   all_videos = registry.LIST(config.registry_prefix, suffix=[".mp4"], check_exists_with_type=label_type)
   gt_videos = [Path(v) for v in all_videos if camera_from_path(v) in cameras]
@@ -174,18 +173,18 @@ def build_dataset(
 
       split = "train" if random.random() < 0.8 else "valid"
       name = f"{camera_from_path(video_path)}_{video_path.stem}_{frame_idx}"
-      _save_dataset_image(frame, images_dir / split / f"{name}.jpg")
+      _save_dataset_image(frame, destination / split / "images" / f"{name}.jpg")
 
       lines = []
       for x1, y1, x2, y2 in bboxes:
         cx, cy = ((x1 + x2) / 2) / w, ((y1 + y2) / 2) / h
         bw, bh = (x2 - x1) / w, (y2 - y1) / h
         lines.append(f"0 {cx:.6f} {cy:.6f} {bw:.6f} {bh:.6f}")
-      (labels_dir / split / f"{name}.txt").write_text("\n".join(lines))
+      (destination / split / "labels" / f"{name}.txt").write_text("\n".join(lines))
 
   data_yaml = destination / "data.yaml"
   data_yaml.write_text("\n".join([
-    f"path: {destination}", "train: images/train", "val: images/valid",
+    f"path: {destination}", "train: train/images", "val: valid/images",
     "names:", "  0: person", "nc: 1",
   ]))
   return data_yaml
