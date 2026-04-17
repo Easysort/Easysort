@@ -110,8 +110,15 @@ class Trainer:
     s = self.schema
     model = _load_model(s.task, s.base_model, model_hint=s.base_model)
     if _is_rfdetr_identifier(s.base_model):
+      try:
+        import torch.multiprocessing as mp
+        mp.set_sharing_strategy("file_system")
+      except Exception:
+        pass
       output_dir = Path(f"{s.name}_model") / "train"
       output_dir.mkdir(parents=True, exist_ok=True)
+      rf_kwargs = dict(kw)
+      rf_kwargs.setdefault("num_workers", 0)
       model.train(
         dataset_file="yolo",
         dataset_dir=str(Path(self.dataset).parent),
@@ -122,7 +129,7 @@ class Trainer:
         early_stopping_patience=patience,
         progress_bar=True,
         run_test=True,
-        **kw,
+        **rf_kwargs,
       )
       return
     model.train(
