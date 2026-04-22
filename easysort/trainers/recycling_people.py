@@ -27,7 +27,7 @@ SCHEMA = ModelSchema(
   name="recycling_people",
   task="detect",
   classes=["person"],
-  base_model="rfdetr-s.pt",
+  base_model="rfdetr-n.pt",
   weights_path=MODELS_DIR / "recycling_people.pt",
   imgsz=640,
 )
