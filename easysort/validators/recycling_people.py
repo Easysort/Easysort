@@ -17,12 +17,14 @@ from tqdm import tqdm
 from easysort.helpers import REGISTRY_LOCAL_IP
 from easysort.registry import RegistryBase
 from easyprod.products.recycling.concat import Concat
-from easyprod.products.recycling.helpers import RECYCLING_YOLO_RESULT, RECYCLING_YOLO_RESULT_ID, RecyclingVideo
+from easyprod.products.recycling.helpers import RECYCLING_YOLO_DETECTION, RECYCLING_YOLO_RESULT, RECYCLING_YOLO_RESULT_ID, RecyclingVideo
 from easyprod.products.recycling.people_validation import (
   DEFAULT_VALIDATION_CACHE_PATH,
   RECYCLING_PEOPLE_GT_ID,
   RecyclingPeopleGT,
+  box_inside_ratio,
   choose_next_video,
+  deduplicate_detections,
   grounding_dino_frame_bboxes,
   hour_from_video_path,
   list_recycling_videos_by_camera,
@@ -31,18 +33,35 @@ from easyprod.products.recycling.people_validation import (
   merge_frame_box_lists,
   normalise_box,
   save_people_validation_cache,
-  sort_people_detections,
   update_people_validation_cache,
 )
 
 
+REJECTION_REASONS = ("size", "overlap", "duplicate")
+REJECTION_REASON_LABELS = {
+  "size": "too small (min_w/min_h)",
+  "overlap": "overlaps a larger box (>80% inside)",
+  "duplicate": "ReID duplicate in a nearby frame",
+}
+
+
 @functools.cache
-def _proposal_trainer(weights_path: str):
+def _proposal_trainer(weights_path: str, batch_size: int = 16):
   from easysort.trainer import Trainer
   from easysort.trainers.recycling_people import SCHEMA
 
   schema = replace(SCHEMA, weights_path=Path(weights_path))
-  return Trainer(schema)
+  trainer = Trainer(schema)
+  model = trainer.model
+  optimize = getattr(model, "optimize_for_inference", None)
+  if callable(optimize):
+    try:
+      print(f"[Validator] Optimizing model '{Path(weights_path).name}' for inference (batch_size={batch_size})...")
+      optimize(batch_size=batch_size)
+      print("[Validator] Model optimized for inference")
+    except Exception as err:
+      print(f"[Validator] optimize_for_inference failed, continuing unoptimized: {err}")
+  return trainer
 
 
 def _trained_model_frame_bboxes(
@@ -52,11 +71,15 @@ def _trained_model_frame_bboxes(
   batch_size: int = 16,
   conf_threshold: float = 0.25,
 ) -> dict[int, list[list[int]]]:
-  trainer = _proposal_trainer(str(weights_path))
+  trainer = _proposal_trainer(str(weights_path), batch_size)
   frame_bboxes: dict[int, list[list[int]]] = {}
   for start in tqdm(range(0, len(frames), batch_size), desc=f"Model proposals ({weights_path.name})"):
     batch = frames[start:start + batch_size]
+    real_count = len(batch)
+    if real_count < batch_size and real_count > 0:
+      batch = list(batch) + [batch[-1]] * (batch_size - real_count)
     results = trainer.predict(batch)
+    results = list(results)[:real_count]
     for offset, result in enumerate(results):
       frame_idx = start + offset
       boxes = getattr(result, "boxes", None)
@@ -85,6 +108,64 @@ def _trained_model_frame_bboxes(
 def _frame_b64(frame: np.ndarray) -> str:
   _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
   return base64.b64encode(buf.tobytes()).decode()
+
+
+def _sort_detections_with_reasons(video, detections: list, config, frames: list[np.ndarray]):
+  rejected_by_reason: dict[str, list] = {reason: [] for reason in REJECTION_REASONS}
+
+  passed_size = []
+  for det in detections:
+    if (det.x2 - det.x1) > config.min_w and (det.y2 - det.y1) > config.min_h:
+      passed_size.append(det)
+    else:
+      rejected_by_reason["size"].append(det)
+
+  by_frame: dict[int, list] = {}
+  for det in passed_size:
+    by_frame.setdefault(det.frame_idx, []).append(det)
+  passed_overlap: list = []
+  for frame_detections in by_frame.values():
+    frame_detections.sort(key=lambda d: (d.x2 - d.x1) * (d.y2 - d.y1), reverse=True)
+    kept: list = []
+    for det in frame_detections:
+      overlaps = any(
+        box_inside_ratio((det.x1, det.y1, det.x2, det.y2), (k.x1, k.y1, k.x2, k.y2)) > 0.8
+        for k in kept
+      )
+      if overlaps:
+        rejected_by_reason["overlap"].append(det)
+      else:
+        kept.append(det)
+    passed_overlap.extend(kept)
+
+  final = deduplicate_detections(passed_overlap, frames) if passed_overlap else []
+  final_ids = {id(det) for det in final}
+  for det in passed_overlap:
+    if id(det) not in final_ids:
+      rejected_by_reason["duplicate"].append(det)
+
+  return final, rejected_by_reason
+
+
+def _rejected_frame_bboxes_with_reasons(
+  rejected_by_reason: dict[str, list],
+  frames: list[np.ndarray],
+) -> dict[int, list[dict]]:
+  rejected: dict[int, list[dict]] = {}
+  for reason, detections in rejected_by_reason.items():
+    for det in detections:
+      if det.frame_idx < 0 or det.frame_idx >= len(frames):
+        continue
+      frame = frames[det.frame_idx]
+      box = normalise_box((det.x1, det.y1, det.x2, det.y2), frame.shape[1], frame.shape[0])
+      if box is None:
+        continue
+      rejected.setdefault(det.frame_idx, []).append({
+        "box": box,
+        "reason": reason,
+        "reason_label": REJECTION_REASON_LABELS[reason],
+      })
+  return rejected
 
 
 class RecyclingPeopleValidator:
@@ -217,6 +298,7 @@ class RecyclingPeopleValidator:
       "frame_h": frame.shape[0],
       "suggested_bboxes": item["suggested_by_frame"].get(frame_idx, []),
       "yolo_suggested_bboxes": item["yolo_suggested_by_frame"].get(frame_idx, []),
+      "rejected_bboxes": item.get("rejected_by_frame", {}).get(frame_idx, []),
       "b64": _frame_b64(frame),
     }
     item["frame_cache"][frame_idx] = payload
@@ -230,53 +312,110 @@ class RecyclingPeopleValidator:
       print(f"Skipping {video_path.name}: video has no readable frames")
       return None
 
-    yolo_result = self.registry.GET(video.video_path, RECYCLING_YOLO_RESULT, throw_error=False)
-    raw_detections = [] if yolo_result is None else list(yolo_result.detections)
-    detections = sort_people_detections(video, raw_detections, self._config) if raw_detections else []
-    yolo_suggested_by_frame: dict[int, list[list[int]]] = {}
-    for det in detections:
-      if det.frame_idx < 0 or det.frame_idx >= len(all_frames):
-        continue
-      frame = all_frames[det.frame_idx]
-      suggested_bbox = normalise_box((det.x1, det.y1, det.x2, det.y2), frame.shape[1], frame.shape[0])
-      if suggested_bbox is None:
-        continue
-      yolo_suggested_by_frame.setdefault(det.frame_idx, []).append(suggested_bbox)
-
-    grounding_dino_suggested_by_frame = grounding_dino_frame_bboxes(all_frames, self._config)
-    model_suggested_by_frame = (
-      _trained_model_frame_bboxes(all_frames, self._model_path)
-      if self._model_path is not None else {}
-    )
-    if self._config.proposal_source == "grounding_dino_only":
+    rejected_by_frame: dict[int, list[dict]] = {}
+    if self._model_path is not None:
+      raw_model_frame_bboxes = _trained_model_frame_bboxes(all_frames, self._model_path)
+      raw_model_count = sum(len(boxes) for boxes in raw_model_frame_bboxes.values())
+      raw_model_detections: list[RECYCLING_YOLO_DETECTION] = []
+      for frame_idx, boxes in raw_model_frame_bboxes.items():
+        if frame_idx < 0 or frame_idx >= len(all_frames):
+          continue
+        for box in boxes:
+          x1, y1, x2, y2 = box
+          raw_model_detections.append(RECYCLING_YOLO_DETECTION(frame_idx=frame_idx, x1=x1, y1=y1, x2=x2, y2=y2))
+      if raw_model_detections:
+        sorted_model_detections, rejected_model_by_reason = _sort_detections_with_reasons(
+          video, raw_model_detections, self._config, all_frames,
+        )
+        print(
+          f"Sorted {len(raw_model_detections)} detections to {len(sorted_model_detections)} "
+          f"(rejected: "
+          f"size={len(rejected_model_by_reason['size'])}, "
+          f"overlap={len(rejected_model_by_reason['overlap'])}, "
+          f"duplicate={len(rejected_model_by_reason['duplicate'])})"
+        )
+      else:
+        sorted_model_detections = []
+        rejected_model_by_reason = {reason: [] for reason in REJECTION_REASONS}
+      rejected_by_frame = _rejected_frame_bboxes_with_reasons(rejected_model_by_reason, all_frames)
+      model_suggested_by_frame: dict[int, list[list[int]]] = {}
+      for det in sorted_model_detections:
+        if det.frame_idx < 0 or det.frame_idx >= len(all_frames):
+          continue
+        frame = all_frames[det.frame_idx]
+        suggested_bbox = normalise_box((det.x1, det.y1, det.x2, det.y2), frame.shape[1], frame.shape[0])
+        if suggested_bbox is None:
+          continue
+        model_suggested_by_frame.setdefault(det.frame_idx, []).append(suggested_bbox)
+      yolo_suggested_by_frame = model_suggested_by_frame
+      grounding_dino_suggested_by_frame: dict[int, list[list[int]]] = {}
       suggested_by_frame = merge_frame_box_lists(
-        grounding_dino_suggested_by_frame,
-        iou_threshold=self._config.proposal_merge_iou,
-      )
-    else:
-      suggested_by_frame = merge_frame_box_lists(
-        yolo_suggested_by_frame,
-        grounding_dino_suggested_by_frame,
-        iou_threshold=self._config.proposal_merge_iou,
-      )
-    if model_suggested_by_frame:
-      suggested_by_frame = merge_frame_box_lists(
-        suggested_by_frame,
         model_suggested_by_frame,
         iou_threshold=self._config.proposal_merge_iou,
       )
+      model_count = sum(len(boxes) for boxes in model_suggested_by_frame.values())
+      rejected_count = sum(len(boxes) for boxes in rejected_by_frame.values())
+      merged_count = sum(len(boxes) for boxes in suggested_by_frame.values())
+      print(
+        f"Prepared full video review for {video_path.name}: "
+        f"{len(all_frames)} frames, {raw_model_count} raw model boxes, "
+        f"{model_count} model boxes after sorting, {rejected_count} rejected model boxes "
+        f"(model-only mode, YOLO and Grounding DINO skipped), "
+        f"{merged_count} merged boxes"
+      )
+    else:
+      yolo_result = self.registry.GET(video.video_path, RECYCLING_YOLO_RESULT, throw_error=False)
+      raw_detections = [] if yolo_result is None else list(yolo_result.detections)
+      if raw_detections:
+        detections, rejected_yolo_by_reason = _sort_detections_with_reasons(
+          video, raw_detections, self._config, all_frames,
+        )
+        print(
+          f"Sorted {len(raw_detections)} detections to {len(detections)} "
+          f"(rejected: "
+          f"size={len(rejected_yolo_by_reason['size'])}, "
+          f"overlap={len(rejected_yolo_by_reason['overlap'])}, "
+          f"duplicate={len(rejected_yolo_by_reason['duplicate'])})"
+        )
+      else:
+        detections = []
+        rejected_yolo_by_reason = {reason: [] for reason in REJECTION_REASONS}
+      rejected_by_frame = _rejected_frame_bboxes_with_reasons(rejected_yolo_by_reason, all_frames)
+      yolo_suggested_by_frame = {}
+      for det in detections:
+        if det.frame_idx < 0 or det.frame_idx >= len(all_frames):
+          continue
+        frame = all_frames[det.frame_idx]
+        suggested_bbox = normalise_box((det.x1, det.y1, det.x2, det.y2), frame.shape[1], frame.shape[0])
+        if suggested_bbox is None:
+          continue
+        yolo_suggested_by_frame.setdefault(det.frame_idx, []).append(suggested_bbox)
 
-    yolo_count = sum(len(boxes) for boxes in yolo_suggested_by_frame.values())
-    grounding_dino_count = sum(len(boxes) for boxes in grounding_dino_suggested_by_frame.values())
-    model_count = sum(len(boxes) for boxes in model_suggested_by_frame.values())
-    merged_count = sum(len(boxes) for boxes in suggested_by_frame.values())
+      grounding_dino_suggested_by_frame = grounding_dino_frame_bboxes(all_frames, self._config)
+      if self._config.proposal_source == "grounding_dino_only":
+        suggested_by_frame = merge_frame_box_lists(
+          grounding_dino_suggested_by_frame,
+          iou_threshold=self._config.proposal_merge_iou,
+        )
+      else:
+        suggested_by_frame = merge_frame_box_lists(
+          yolo_suggested_by_frame,
+          grounding_dino_suggested_by_frame,
+          iou_threshold=self._config.proposal_merge_iou,
+        )
 
-    print(
-      f"Prepared full video review for {video_path.name}: "
-      f"{len(all_frames)} frames, {yolo_count} YOLO boxes, "
-      f"{grounding_dino_count} Grounding DINO boxes, {model_count} model boxes, "
-      f"{merged_count} merged boxes"
-    )
+      yolo_count = sum(len(boxes) for boxes in yolo_suggested_by_frame.values())
+      grounding_dino_count = sum(len(boxes) for boxes in grounding_dino_suggested_by_frame.values())
+      rejected_count = sum(len(boxes) for boxes in rejected_by_frame.values())
+      merged_count = sum(len(boxes) for boxes in suggested_by_frame.values())
+
+      print(
+        f"Prepared full video review for {video_path.name}: "
+        f"{len(all_frames)} frames, {yolo_count} YOLO boxes, "
+        f"{grounding_dino_count} Grounding DINO boxes, "
+        f"{rejected_count} rejected YOLO boxes, "
+        f"{merged_count} merged boxes"
+      )
     timestamp = Concat._ts(video.video_path)
     return {
       "camera": camera,
@@ -288,6 +427,7 @@ class RecyclingPeopleValidator:
       "suggested_frame_indices": sorted(suggested_by_frame),
       "yolo_suggested_by_frame": yolo_suggested_by_frame,
       "yolo_frame_indices": sorted(yolo_suggested_by_frame),
+      "rejected_by_frame": rejected_by_frame,
       "video_obj": video,
       "frame_cache": {},
     }
@@ -476,7 +616,7 @@ kbd{background:#333;padding:2px 5px;border-radius:3px;font-size:11px;margin-righ
   <div id="canvas-panel"><canvas id="canvas"></canvas></div>
   <div id="side">
     <h2>People Review</h2>
-    <div class="note">Browse every frame in the video. Green boxes are selected for saving. YOLO boxes start selected by default, and dashed blue boxes are extra proposals you can add or remove.</div>
+    <div class="note">Browse every frame in the video. Green boxes are selected for saving. YOLO boxes start selected by default, dashed blue boxes are extra proposals you can add or remove. Dashed boxes that were rejected by the pre-sorting step are shown but cannot be selected, color-coded by reason: red = too small (min_w/min_h), orange = overlaps a larger box, purple = ReID duplicate in a nearby frame. Each box is labeled with its width x height in pixels.</div>
     <h3>Video</h3>
     <div id="meta" class="meta"></div>
     <h3>Speed Controls</h3>
@@ -576,13 +716,80 @@ function drawBox(box, color, width, dash=[]) {
   ctx.restore();
 }
 
+function drawTextLabel(x, y, text, color) {
+  ctx.save();
+  ctx.font = '14px system-ui, sans-serif';
+  ctx.textBaseline = 'bottom';
+  const padding = 4;
+  const textHeight = 16;
+  const metrics = ctx.measureText(text);
+  const textWidth = metrics.width;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(x, y - textHeight, textWidth + padding * 2, textHeight);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x + padding, y - 2);
+  ctx.restore();
+  return textHeight;
+}
+
+function drawBoxSizeLabel(box, color) {
+  if (!box) return;
+  const [x1, y1, x2, y2] = box;
+  const w = Math.max(0, Math.round(x2 - x1));
+  const h = Math.max(0, Math.round(y2 - y1));
+  const label = `${w}x${h}`;
+  let labelY = y1 - 2;
+  if (labelY - 16 < 0) labelY = y1 + 16 + 2;
+  drawTextLabel(x1, labelY, label, color);
+}
+
+const REJECTION_COLOR = {
+  size: '#ef5350',
+  overlap: '#ff9800',
+  duplicate: '#ab47bc',
+};
+
+function rejectedReasonSummary(entries) {
+  if (!entries || !entries.length) return '';
+  const counts = {};
+  entries.forEach(entry => {
+    const reason = (entry && entry.reason) || 'unknown';
+    counts[reason] = (counts[reason] || 0) + 1;
+  });
+  const parts = Object.entries(counts).map(([reason, count]) => `${reason}: ${count}`);
+  return ` (${parts.join(', ')})`;
+}
+
+function drawRejectedBox(entry) {
+  const box = entry && entry.box ? entry.box : null;
+  if (!box) return;
+  const reason = entry.reason || 'size';
+  const color = REJECTION_COLOR[reason] || '#ef5350';
+  drawBox(box, color, 2, [4, 4]);
+  drawBoxSizeLabel(box, color);
+  const [x1, y1, x2, y2] = box;
+  let labelY = y1 + 16 + 2;
+  if (labelY > y2) labelY = Math.min(canvas.height, y2 + 16);
+  drawTextLabel(x1, labelY, `rejected: ${reason}`, color);
+}
+
 function renderCanvas() {
   if (!frameImg.width || !currentFrameData) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(frameImg, 0, 0);
-  currentFrameData.suggested_bboxes.forEach(box => drawBox(box, '#4fc3f7', 2, [8, 4]));
-  acceptedFor(currentFrameData).forEach(box => drawBox(box, '#4caf50', 3));
-  drawBox(draftBox, '#ffb74d', 2);
+  (currentFrameData.rejected_bboxes || []).forEach(entry => drawRejectedBox(entry));
+  currentFrameData.suggested_bboxes.forEach(box => {
+    drawBox(box, '#4fc3f7', 2, [8, 4]);
+    drawBoxSizeLabel(box, '#4fc3f7');
+  });
+  acceptedFor(currentFrameData).forEach(box => {
+    drawBox(box, '#4caf50', 3);
+    drawBoxSizeLabel(box, '#81c784');
+  });
+  if (draftBox) {
+    drawBox(draftBox, '#ffb74d', 2);
+    drawBoxSizeLabel(draftBox, '#ffb74d');
+  }
 }
 
 function updateMeta() {
@@ -599,6 +806,7 @@ function updateMeta() {
     <div><strong>Frames with any proposal:</strong> ${cur.suggested_frame_count}/${cur.frame_count}</div>
     <div><strong>YOLO boxes in frame:</strong> ${frame ? frame.yolo_suggested_bboxes.length : 0}</div>
     <div><strong>Suggested boxes in frame:</strong> ${frame ? frame.suggested_bboxes.length : 0}</div>
+    <div><strong>Rejected boxes in frame:</strong> ${frame ? (frame.rejected_bboxes || []).length : 0}${frame ? rejectedReasonSummary(frame.rejected_bboxes || []) : ''}</div>
     <div><strong>Frame status:</strong> ${hasYoloSuggestion ? 'YOLO sees person(s)' : 'No YOLO person in this frame'}${hasExtraSuggestion ? ' | extra proposal available' : ''}</div>
     <div><strong>Accepted boxes in frame:</strong> ${frame ? acceptedFor(frame).length : 0}</div>
     <div><strong>Accepted boxes in video:</strong> ${totalAcceptedBoxes()}</div>
