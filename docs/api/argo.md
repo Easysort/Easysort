@@ -48,7 +48,25 @@ curl https://api.easysort.com/v1/results \
 - `week_<week>_<year>` — an ISO-week period (Monday–Sunday).
 - `month_<month>_<year>` — a calendar-month period (if enabled for you).
 
-### 3. Get one period — `GET /v1/results/{period}`
+### 3. List your locations — `GET /v1/locations`
+
+Returns the drop-off locations seen in your **most recent 6 weekly results**, so you know which
+names to expect in the period results (the location names are the per-location keys inside each
+result). Using a recent window keeps the list current with where you're actively reporting.
+
+```bash
+curl https://api.easysort.com/v1/locations \
+  -H "Authorization: Bearer $EASYSORT_API_KEY"
+```
+
+```json
+{
+  "organisation": "ARGO",
+  "locations": ["Jyllinge", "Roskilde"]
+}
+```
+
+### 4. Get one period — `GET /v1/results/{period}`
 
 Pass one of the identifiers returned above.
 
