@@ -1188,7 +1188,19 @@ plain text more than once.</p>
 <li><code class="language-python highlight"><span class="n">week_</span><span class="o">&lt;</span><span class="n">week</span><span class="o">&gt;</span><span class="n">_</span><span class="o">&lt;</span><span class="n">year</span><span class="o">&gt;</span></code> — an ISO-week period (Monday–Sunday).</li>
 <li><code class="language-python highlight"><span class="n">month_</span><span class="o">&lt;</span><span class="n">month</span><span class="o">&gt;</span><span class="n">_</span><span class="o">&lt;</span><span class="n">year</span><span class="o">&gt;</span></code> — a calendar-month period (if enabled for you).</li>
 </ul>
-<h3 id="3-get-one-period-get-v1resultsperiod">3. Get one period — <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">results</span><span class="o">/</span><span class="p">{</span><span class="n">period</span><span class="p">}</span></code><a class="headerlink" href="#3-get-one-period-get-v1resultsperiod" title="Permanent link">¤</a></h3>
+<h3 id="3-list-your-locations-get-v1locations">3. List your locations — <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">locations</span></code><a class="headerlink" href="#3-list-your-locations-get-v1locations" title="Permanent link">¤</a></h3>
+<p>Returns the drop-off locations seen in your <strong>most recent 6 weekly results</strong>, so you know which
+names to expect in the period results (the location names are the per-location keys inside each
+result). Using a recent window keeps the list current with where you're actively reporting.</p>
+<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.com/v1/locations<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span>
+</code></pre></div>
+<div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;organisation&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ARGO&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;locations&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Jyllinge&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Roskilde&quot;</span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="4-get-one-period-get-v1resultsperiod">4. Get one period — <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">results</span><span class="o">/</span><span class="p">{</span><span class="n">period</span><span class="p">}</span></code><a class="headerlink" href="#4-get-one-period-get-v1resultsperiod" title="Permanent link">¤</a></h3>
 <p>Pass one of the identifiers returned above.</p>
 <div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.com/v1/results/week_23_2026<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span>
