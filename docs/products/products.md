@@ -12,19 +12,26 @@ We can help you configure and run the software on your own infrastructure and ho
 
 View your cloud data from your easysort 1.0 or implementation of Easysort Sorting Software in the web.
 
-## Easysort 1.0
+## Easysort Facility Detection System
 
-The Easysort 1.0 is: Lights + Camera + AI + Onboard Compute + Data management all in one unit.
+The Easysort Facility Detection System runs on our machines, connects to existing cameras and provides a web interface to view the data.
 
 It is currently being used for 3 things: 
 
 1) to detect incoming waste and notify the user of critical detections, generate reports generally on the waste stream and link waste scans to specific trucks.
 
-2) monitoring of waste containers on site to provide visibility into the waste stream for the sorting facility and management of the waste stream.
+2) keep an eye on the waste stream, production and purity of waste bales.
 
-3) quality control for incoming waste streams on conveyor belts.
+3) overview of recycling center recycling efforts and detect individual objects picked up for direct recycling.
 
-![Easysort 1.0](../assets/product.png)
+## Easysort Sorting Guide
+
+The Easysort Sorting Guide is: Screen + Lights + AI + Onboard Compute + Data management all in one unit.
+
+This can be placed, where people will sort waste. Within 8 seconds, they get a overview of the waste item and how to properly sort it.
+Part of this system is also live on our website: [easysort.org](https://easysort.org), free of charge.
+
+It is currently being used in Danish Waste recycling centers to help citizens sort waste correctly.
 
 ## Perspectives on a full sorting system
 
