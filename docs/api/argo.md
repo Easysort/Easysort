@@ -4,7 +4,7 @@ This API lets your organisation pull your recycling results programmatically. Yo
 single **API key**; every request must include it. You can only ever see data that belongs
 to your organisation.
 
-- **Base URL:** `https://<the-host-we-give-you>` (e.g. `https://api.easysort.com`)
+- **Base URL:** `https://<the-host-we-give-you>` (e.g. `https://api.easysort.org`)
 - **Auth:** `Authorization: Bearer <YOUR_API_KEY>` header on every request
 - **Format:** JSON over HTTPS
 - **API version:** `v1` (the version is part of the path, e.g. `/v1/results`)
@@ -22,7 +22,7 @@ to your organisation.
 No authentication required. Use it to confirm the service is reachable.
 
 ```bash
-curl https://api.easysort.com/v1/health
+curl https://api.easysort.org/v1/health
 ```
 
 ```json
@@ -34,7 +34,7 @@ curl https://api.easysort.com/v1/health
 Returns the period identifiers you can fetch. Periods are weekly (and monthly) buckets.
 
 ```bash
-curl https://api.easysort.com/v1/results \
+curl https://api.easysort.org/v1/results \
   -H "Authorization: Bearer $EASYSORT_API_KEY"
 ```
 
@@ -55,7 +55,7 @@ names to expect in the period results (the location names are the per-location k
 result). Using a recent window keeps the list current with where you're actively reporting.
 
 ```bash
-curl https://api.easysort.com/v1/locations \
+curl https://api.easysort.org/v1/locations \
   -H "Authorization: Bearer $EASYSORT_API_KEY"
 ```
 
@@ -71,7 +71,7 @@ curl https://api.easysort.com/v1/locations \
 Pass one of the identifiers returned above.
 
 ```bash
-curl https://api.easysort.com/v1/results/week_23_2026 \
+curl https://api.easysort.org/v1/results/week_23_2026 \
   -H "Authorization: Bearer $EASYSORT_API_KEY"
 ```
 
@@ -122,7 +122,7 @@ curl https://api.easysort.com/v1/results/week_23_2026 \
 ```python
 import requests
 
-BASE = "https://api.easysort.com"
+BASE = "https://api.easysort.org"
 KEY = "YOUR_API_KEY"  # load from an env var / secret manager in real code
 headers = {"Authorization": f"Bearer {KEY}"}
 
@@ -139,7 +139,7 @@ for location, summary in data.items():
 ## Example: JavaScript (Node 18+)
 
 ```js
-const BASE = "https://api.easysort.com";
+const BASE = "https://api.easysort.org";
 const KEY = process.env.EASYSORT_API_KEY;
 const headers = { Authorization: `Bearer ${KEY}` };
 
