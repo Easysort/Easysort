@@ -1156,7 +1156,7 @@
 single <strong>API key</strong>; every request must include it. You can only ever see data that belongs
 to your organisation.</p>
 <ul>
-<li><strong>Base URL:</strong> <code class="language-python highlight"><span class="n">https</span><span class="p">:</span><span class="o">//&lt;</span><span class="n">the</span><span class="o">-</span><span class="n">host</span><span class="o">-</span><span class="n">we</span><span class="o">-</span><span class="n">give</span><span class="o">-</span><span class="n">you</span><span class="o">&gt;</span></code> (e.g. <code class="language-python highlight"><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">api</span><span class="o">.</span><span class="n">easysort</span><span class="o">.</span><span class="n">com</span></code>)</li>
+<li><strong>Base URL:</strong> <code class="language-python highlight"><span class="n">https</span><span class="p">:</span><span class="o">//&lt;</span><span class="n">the</span><span class="o">-</span><span class="n">host</span><span class="o">-</span><span class="n">we</span><span class="o">-</span><span class="n">give</span><span class="o">-</span><span class="n">you</span><span class="o">&gt;</span></code> (e.g. <code class="language-python highlight"><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">api</span><span class="o">.</span><span class="n">easysort</span><span class="o">.</span><span class="n">org</span></code>)</li>
 <li><strong>Auth:</strong> <code class="language-python highlight"><span class="n">Authorization</span><span class="p">:</span> <span class="n">Bearer</span> <span class="o">&lt;</span><span class="n">YOUR_API_KEY</span><span class="o">&gt;</span></code> header on every request</li>
 <li><strong>Format:</strong> JSON over HTTPS</li>
 <li><strong>API version:</strong> <code class="language-python highlight"><span class="n">v1</span></code> (the version is part of the path, e.g. <code class="language-python highlight"><span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">results</span></code>)</li>
@@ -1170,13 +1170,13 @@ plain text more than once.</p>
 <h2 id="endpoints">Endpoints<a class="headerlink" href="#endpoints" title="Permanent link">¤</a></h2>
 <h3 id="1-health-check-get-v1health">1. Health check — <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">health</span></code><a class="headerlink" href="#1-health-check-get-v1health" title="Permanent link">¤</a></h3>
 <p>No authentication required. Use it to confirm the service is reachable.</p>
-<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.com/v1/health
+<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.org/v1/health
 </code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span><span class="w"> </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <h3 id="2-list-available-periods-get-v1results">2. List available periods — <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">results</span></code><a class="headerlink" href="#2-list-available-periods-get-v1results" title="Permanent link">¤</a></h3>
 <p>Returns the period identifiers you can fetch. Periods are weekly (and monthly) buckets.</p>
-<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.com/v1/results<span class="w"> </span><span class="se">\</span>
+<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.org/v1/results<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span>
 </code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
@@ -1192,7 +1192,7 @@ plain text more than once.</p>
 <p>Returns the drop-off locations seen in your <strong>most recent 6 weekly results</strong>, so you know which
 names to expect in the period results (the location names are the per-location keys inside each
 result). Using a recent window keeps the list current with where you're actively reporting.</p>
-<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.com/v1/locations<span class="w"> </span><span class="se">\</span>
+<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.org/v1/locations<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span>
 </code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
@@ -1202,7 +1202,7 @@ result). Using a recent window keeps the list current with where you're actively
 </code></pre></div>
 <h3 id="4-get-one-period-get-v1resultsperiod">4. Get one period — <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">results</span><span class="o">/</span><span class="p">{</span><span class="n">period</span><span class="p">}</span></code><a class="headerlink" href="#4-get-one-period-get-v1resultsperiod" title="Permanent link">¤</a></h3>
 <p>Pass one of the identifiers returned above.</p>
-<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.com/v1/results/week_23_2026<span class="w"> </span><span class="se">\</span>
+<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.org/v1/results/week_23_2026<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span>
 </code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
@@ -1278,7 +1278,7 @@ Parse them with <code class="language-python highlight"><span class="nb">int</sp
 <h2 id="example-python">Example: Python<a class="headerlink" href="#example-python" title="Permanent link">¤</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
 
-<span class="n">BASE</span> <span class="o">=</span> <span class="s2">&quot;https://api.easysort.com&quot;</span>
+<span class="n">BASE</span> <span class="o">=</span> <span class="s2">&quot;https://api.easysort.org&quot;</span>
 <span class="n">KEY</span> <span class="o">=</span> <span class="s2">&quot;YOUR_API_KEY&quot;</span>  <span class="c1"># load from an env var / secret manager in real code</span>
 <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">KEY</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
 
@@ -1292,7 +1292,7 @@ Parse them with <code class="language-python highlight"><span class="nb">int</sp
     <span class="nb">print</span><span class="p">(</span><span class="n">location</span><span class="p">,</span> <span class="s2">&quot;-&gt;&quot;</span><span class="p">,</span> <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">],</span> <span class="s2">&quot;items,&quot;</span><span class="p">,</span> <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;weight_kg&quot;</span><span class="p">],</span> <span class="s2">&quot;kg&quot;</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="example-javascript-node-18">Example: JavaScript (Node 18+)<a class="headerlink" href="#example-javascript-node-18" title="Permanent link">¤</a></h2>
-<div class="language-js highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">BASE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://api.easysort.com&quot;</span><span class="p">;</span>
+<div class="language-js highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">BASE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://api.easysort.org&quot;</span><span class="p">;</span>
 <span class="kd">const</span><span class="w"> </span><span class="nx">KEY</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">EASYSORT_API_KEY</span><span class="p">;</span>
 <span class="kd">const</span><span class="w"> </span><span class="nx">headers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Authorization</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">KEY</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">};</span>
 
