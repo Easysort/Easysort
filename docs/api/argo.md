@@ -34,8 +34,7 @@ curl https://api.easysort.org/v1/health
 Returns the period identifiers you can fetch. Periods are weekly (and monthly) buckets.
 
 ```bash
-curl https://api.easysort.org/v1/results \
-  -H "Authorization: Bearer $EASYSORT_API_KEY"
+curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/results
 ```
 
 ```json
@@ -55,8 +54,7 @@ names to expect in the period results (the location names are the per-location k
 result). Using a recent window keeps the list current with where you're actively reporting.
 
 ```bash
-curl https://api.easysort.org/v1/locations \
-  -H "Authorization: Bearer $EASYSORT_API_KEY"
+curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/locations
 ```
 
 ```json
@@ -71,8 +69,7 @@ curl https://api.easysort.org/v1/locations \
 Pass one of the identifiers returned above.
 
 ```bash
-curl https://api.easysort.org/v1/results/week_23_2026 \
-  -H "Authorization: Bearer $EASYSORT_API_KEY"
+curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/results/week_23_2026
 ```
 
 ```json
@@ -82,6 +79,9 @@ curl https://api.easysort.org/v1/results/week_23_2026 \
   "Hørgården": {
     "objects": "412",
     "weight_kg": "63",
+    "co2_kg": "88",
+    "co2_kg_low": "62",
+    "co2_kg_high": "106",
     "visitors": "180",
     "categories": [
       { "category": "Plastic", "count": "120", "weight_kg": "18" },
@@ -107,6 +107,8 @@ curl https://api.easysort.org/v1/results/week_23_2026 \
 | `<location>` | One object per drop-off location in your deployment. |
 | `objects` | Total registered items in the period. |
 | `weight_kg` | Estimated total weight, in kilograms. |
+| `co2_kg` | Estimated CO₂ saved, in kilograms (best estimate). |
+| `co2_kg_low` / `co2_kg_high` | Lower/upper bound of the CO₂ estimate. |
 | `visitors` | Estimated number of visitors. |
 | `categories[]` | Per-material breakdown: `category`, `count`, `weight_kg`. |
 | `objects_per_day[]` | Items per weekday (`Monday`…`Sunday`). |
@@ -115,9 +117,82 @@ curl https://api.easysort.org/v1/results/week_23_2026 \
 > All numeric values are returned as **strings** containing rounded integers (e.g. `"63"`).
 > Parse them with `int(...)` / `parseInt(...)` on your side.
 
+### 5. Daily results — `GET /v1/days` and `GET /v1/results/day_DD_MM_YYYY`
+
+If you want per-day numbers instead of whole weeks, fetch a single day. The identifier is
+`day_DD_MM_YYYY` (e.g. `day_03_06_2026`). You can build it directly from any date, or list the
+days that are available:
+
+```bash
+# List available day identifiers (oldest first):
+curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/days
+
+# Fetch one day:
+curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/results/day_03_06_2026
+```
+
+```json
+{
+  "organisation": "ARGO",
+  "days": ["day_01_06_2026", "day_02_06_2026", "day_03_06_2026"]
+}
+```
+
+A day response has the **same per-location fields** as a period (`objects`, `weight_kg`,
+`co2_kg`, …, `categories[]`), with two differences:
+
+- `date_start` and `date_end` are both that single day.
+- `objects_per_day` and `objects_per_hour` are **omitted** (a single day has no weekday split).
+
+```json
+{
+  "date_start": "03_06_2026",
+  "date_end": "03_06_2026",
+  "Roskilde": {
+    "objects": "142",
+    "weight_kg": "201",
+    "co2_kg": "30",
+    "co2_kg_low": "21",
+    "co2_kg_high": "36",
+    "visitors": "58",
+    "categories": [
+      { "category": "Møbler og indretning", "count": "142", "weight_kg": "201" }
+    ]
+  }
+}
+```
+
+> Daily numbers are derived from the week and add up to it: summing a location's seven days in a
+> week reproduces that week's total. So you can compute **any** total you like yourself — a day,
+> a custom date range, or all locations combined — by fetching the days you need and adding them.
+> `GET /v1/results` only lists weeks/months; use `GET /v1/days` (or build `day_DD_MM_YYYY`) for days.
+
 ---
 
-## Example: Python
+## Worked example: from raw response to the numbers you want
+
+The typical flow is always the same three steps:
+
+1. `GET /v1/results` → pick the period you want (e.g. the latest week).
+2. `GET /v1/results/{period}` → get one JSON object. Its top-level keys are
+   `date_start`, `date_end`, and **one key per location**.
+3. Loop over the location keys, skipping `date_start` / `date_end`, and read the
+   fields you need. Remember every number is a **string** — wrap it in `int(...)`.
+
+Given a period response like:
+
+```json
+{
+  "date_start": "01_06_2026",
+  "date_end": "07_06_2026",
+  "Jyllinge": { "objects": "412", "weight_kg": "63", "co2_kg": "88", "visitors": "180", "categories": [ ... ] },
+  "Roskilde": { "objects": "988", "weight_kg": "141", "co2_kg": "205", "visitors": "402", "categories": [ ... ] }
+}
+```
+
+...here is how to derive the three things people usually ask for.
+
+### Python
 
 ```python
 import requests
@@ -126,17 +201,35 @@ BASE = "https://api.easysort.org"
 KEY = "YOUR_API_KEY"  # load from an env var / secret manager in real code
 headers = {"Authorization": f"Bearer {KEY}"}
 
+# 1 + 2: pick the latest period and download it.
 periods = requests.get(f"{BASE}/v1/results", headers=headers, timeout=30).json()
 latest = periods["results"][-1]
-
 data = requests.get(f"{BASE}/v1/results/{latest}", headers=headers, timeout=30).json()
-for location, summary in data.items():
-    if location in ("date_start", "date_end"):
-        continue
-    print(location, "->", summary["objects"], "items,", summary["weight_kg"], "kg")
+
+# The location keys are everything except the two date fields.
+META = {"date_start", "date_end"}
+locations = {name: summary for name, summary in data.items() if name not in META}
+
+# a) Objects per location
+objects_per_location = {name: int(summary["objects"]) for name, summary in locations.items()}
+# -> {"Jyllinge": 412, "Roskilde": 988}
+
+# b) Total objects across all locations
+total_objects = sum(objects_per_location.values())
+# -> 1400
+
+# c) CO₂ per location (same pattern; use "co2_kg"). Weight works identically via "weight_kg".
+co2_per_location = {name: int(summary["co2_kg"]) for name, summary in locations.items()}
+# -> {"Jyllinge": 88, "Roskilde": 205}
+total_co2 = sum(co2_per_location.values())
+
+print(f"Period {data['date_start']}–{data['date_end']}")
+for name in sorted(locations):
+    print(f"  {name}: {objects_per_location[name]} objects, {co2_per_location[name]} kg CO₂")
+print(f"  TOTAL: {total_objects} objects, {total_co2} kg CO₂")
 ```
 
-## Example: JavaScript (Node 18+)
+### JavaScript (Node 18+)
 
 ```js
 const BASE = "https://api.easysort.org";
@@ -146,8 +239,25 @@ const headers = { Authorization: `Bearer ${KEY}` };
 const periods = await (await fetch(`${BASE}/v1/results`, { headers })).json();
 const latest = periods.results.at(-1);
 const data = await (await fetch(`${BASE}/v1/results/${latest}`, { headers })).json();
-console.log(data);
+
+const META = new Set(["date_start", "date_end"]);
+const locations = Object.entries(data).filter(([name]) => !META.has(name));
+
+// a) Objects per location
+const objectsPerLocation = Object.fromEntries(
+  locations.map(([name, s]) => [name, parseInt(s.objects, 10)]),
+);
+
+// b) Total objects across all locations
+const totalObjects = Object.values(objectsPerLocation).reduce((a, b) => a + b, 0);
+
+console.log(objectsPerLocation, "total:", totalObjects);
 ```
+
+> **CO₂:** `co2_kg` is our best estimate of the CO₂ (in kg) saved by reusing the items
+> registered at that location. `co2_kg_low` / `co2_kg_high` give a conservative lower/upper
+> bound around it. Sum `co2_kg` across locations for an organisation-wide total, exactly like
+> objects above.
 
 ---
 
@@ -168,6 +278,19 @@ Error bodies look like:
 ```json
 { "detail": "Invalid API key." }
 ```
+
+### `curl: (3) URL rejected: Bad hostname` (or "Malformed input to a URL")
+
+This is **not** an API error — you'll usually see it *after* the correct JSON has already
+printed. It means your shell handed `curl` an extra, garbled argument that it tried to open
+as a second URL. It almost always comes from copy-pasting a multi-line command: a trailing
+`\`, a hidden non-breaking space, or a Windows line-ending gets pulled in with the text.
+
+Fixes:
+
+- Use the **single-line** form of the commands in this guide (they no longer use `\`).
+- Or type the command by hand instead of pasting.
+- Your data is fine — the response you received above the error is complete.
 
 ---
 
