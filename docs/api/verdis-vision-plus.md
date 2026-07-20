@@ -66,7 +66,7 @@ Example response:
 ### Upload rules
 
 - File must be an **MP4** (`.mp4`)
-- Maximum size 1 GiB (1024 MiB)
+- Maximum size 100 MiB
 - Filename: simple characters only (letters, digits, `.`, `_`, `-`)
 - Uploading the same path again overwrites the previous file
 - Put the device token only on the device (or a secure secret store) — not in public repos
@@ -186,7 +186,7 @@ curl -H "Authorization: Bearer $EASYSORT_API_KEY" \
 | `401` | Missing / invalid token or API key | Check the `Authorization` header |
 | `403` | API key has no Vision+ access, or device is blocked | Contact Easysort |
 | `404` | Unknown download path | List videos again |
-| `413` | File larger than 1 GiB | Send a smaller clip |
+| `413` | File larger than 100 MiB | Send a smaller clip |
 | `503` | Temporary storage issue | Retry with backoff |
 
 Error body example:
