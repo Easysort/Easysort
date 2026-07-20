@@ -66,9 +66,9 @@ Example response:
 ### Upload rules
 
 - File must be an **MP4** (`.mp4`)
-- Maximum size **200 MiB**
+- Maximum size 1 GiB (1024 MiB)
 - Filename: simple characters only (letters, digits, `.`, `_`, `-`)
-- Uploading the same path again **overwrites** the previous file
+- Uploading the same path again overwrites the previous file
 - Put the device token only on the device (or a secure secret store) — not in public repos
 
 ### Typical device integration
@@ -117,6 +117,7 @@ Example response:
       "device": "prevas-test-01",
       "path": "prevas-test-01/2026-07-20T12-30-00Z.mp4",
       "size": 1048576,
+      "created_at": "2026-07-20T12:30:05.000Z",
       "updated_at": "2026-07-20T12:30:05.000Z"
     }
   ]
@@ -128,7 +129,8 @@ Example response:
 | `device` | Device that uploaded the file |
 | `path` | Bucket path — use this to download |
 | `size` | Size in bytes (may be null) |
-| `updated_at` | Last update timestamp from storage (may be null) |
+| `created_at` | When the object was first created in storage (may be null) |
+| `updated_at` | When the object was last written (may be null). Same as created on first upload; changes if the same path is overwritten. |
 
 ---
 
@@ -184,7 +186,7 @@ curl -H "Authorization: Bearer $EASYSORT_API_KEY" \
 | `401` | Missing / invalid token or API key | Check the `Authorization` header |
 | `403` | API key has no Vision+ access, or device is blocked | Contact Easysort |
 | `404` | Unknown download path | List videos again |
-| `413` | File larger than 200 MiB | Send a smaller clip |
+| `413` | File larger than 1 GiB | Send a smaller clip |
 | `503` | Temporary storage issue | Retry with backoff |
 
 Error body example:
