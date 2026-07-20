@@ -1205,7 +1205,7 @@ curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </spa
 <h3 id="upload-rules">Upload rules<a class="headerlink" href="#upload-rules" title="Permanent link">¤</a></h3>
 <ul>
 <li>File must be an <strong>MP4</strong> (<code class="language-python highlight"><span class="o">.</span><span class="n">mp4</span></code>)</li>
-<li>Maximum size 1 GiB (1024 MiB)</li>
+<li>Maximum size 100 MiB</li>
 <li>Filename: simple characters only (letters, digits, <code class="language-python highlight"><span class="o">.</span></code>, <code class="language-python highlight"><span class="n">_</span></code>, <code class="language-python highlight"><span class="o">-</span></code>)</li>
 <li>Uploading the same path again overwrites the previous file</li>
 <li>Put the device token only on the device (or a secure secret store) — not in public repos</li>
@@ -1347,7 +1347,7 @@ curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Aut
 </tr>
 <tr>
 <td><code class="language-python highlight"><span class="mi">413</span></code></td>
-<td>File larger than 1 GiB</td>
+<td>File larger than 100 MiB</td>
 <td>Send a smaller clip</td>
 </tr>
 <tr>
