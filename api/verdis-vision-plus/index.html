@@ -1205,9 +1205,9 @@ curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </spa
 <h3 id="upload-rules">Upload rules<a class="headerlink" href="#upload-rules" title="Permanent link">¤</a></h3>
 <ul>
 <li>File must be an <strong>MP4</strong> (<code class="language-python highlight"><span class="o">.</span><span class="n">mp4</span></code>)</li>
-<li>Maximum size <strong>200 MiB</strong></li>
+<li>Maximum size 1 GiB (1024 MiB)</li>
 <li>Filename: simple characters only (letters, digits, <code class="language-python highlight"><span class="o">.</span></code>, <code class="language-python highlight"><span class="n">_</span></code>, <code class="language-python highlight"><span class="o">-</span></code>)</li>
-<li>Uploading the same path again <strong>overwrites</strong> the previous file</li>
+<li>Uploading the same path again overwrites the previous file</li>
 <li>Put the device token only on the device (or a secure secret store) — not in public repos</li>
 </ul>
 <h3 id="typical-device-integration">Typical device integration<a class="headerlink" href="#typical-device-integration" title="Permanent link">¤</a></h3>
@@ -1241,6 +1241,7 @@ curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Aut
 <span class="w">      </span><span class="nt">&quot;device&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;prevas-test-01&quot;</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;prevas-test-01/2026-07-20T12-30-00Z.mp4&quot;</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">&quot;size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1048576</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;created_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-07-20T12:30:05.000Z&quot;</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">&quot;updated_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-07-20T12:30:05.000Z&quot;</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">  </span><span class="p">]</span>
@@ -1267,8 +1268,12 @@ curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Aut
 <td>Size in bytes (may be null)</td>
 </tr>
 <tr>
+<td><code class="language-python highlight"><span class="n">created_at</span></code></td>
+<td>When the object was first created in storage (may be null)</td>
+</tr>
+<tr>
 <td><code class="language-python highlight"><span class="n">updated_at</span></code></td>
-<td>Last update timestamp from storage (may be null)</td>
+<td>When the object was last written (may be null). Same as created on first upload; changes if the same path is overwritten.</td>
 </tr>
 </tbody>
 </table>
@@ -1342,7 +1347,7 @@ curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Aut
 </tr>
 <tr>
 <td><code class="language-python highlight"><span class="mi">413</span></code></td>
-<td>File larger than 200 MiB</td>
+<td>File larger than 1 GiB</td>
 <td>Send a smaller clip</td>
 </tr>
 <tr>
