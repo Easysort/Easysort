@@ -1152,9 +1152,10 @@
 
 
 <h1 id="easysort-customer-api-client-guide">Easysort Customer API — Client Guide<a class="headerlink" href="#easysort-customer-api-client-guide" title="Permanent link">¤</a></h1>
-<p>This API lets your organisation pull your recycling results programmatically. You get a
-single <strong>API key</strong>; every request must include it. You can only ever see data that belongs
-to your organisation.</p>
+<p>This API lets your organisation pull your recycling results programmatically (and, if
+enabled for your key, Vision+ device videos). You get a single <strong>API key</strong>; every request
+must include it. Recycling results are scoped to your organisation; Vision+ list/download
+(when granted) covers the shared Vision+ video bucket.</p>
 <ul>
 <li><strong>Base URL:</strong> <code class="language-python highlight"><span class="n">https</span><span class="p">:</span><span class="o">//&lt;</span><span class="n">the</span><span class="o">-</span><span class="n">host</span><span class="o">-</span><span class="n">we</span><span class="o">-</span><span class="n">give</span><span class="o">-</span><span class="n">you</span><span class="o">&gt;</span></code> (e.g. <code class="language-python highlight"><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">api</span><span class="o">.</span><span class="n">easysort</span><span class="o">.</span><span class="n">org</span></code>)</li>
 <li><strong>Auth:</strong> <code class="language-python highlight"><span class="n">Authorization</span><span class="p">:</span> <span class="n">Bearer</span> <span class="o">&lt;</span><span class="n">YOUR_API_KEY</span><span class="o">&gt;</span></code> header on every request</li>
@@ -1172,15 +1173,15 @@ plain text more than once.</p>
 <p>No authentication required. Use it to confirm the service is reachable.</p>
 <div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.org/v1/health
 </code></pre></div>
-<div class="language-json highlight"><pre><span></span><code><span class="p">{</span><span class="w"> </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span><span class="w"> </span><span class="p">}</span>
+<div class="language-json highlight"><pre><span></span><code><span class="p">{</span><span class="w"> </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ok"</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <h3 id="2-list-available-periods-get-v1results">2. List available periods — <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">results</span></code><a class="headerlink" href="#2-list-available-periods-get-v1results" title="Permanent link">¤</a></h3>
 <p>Returns the period identifiers you can fetch. Periods are weekly (and monthly) buckets.</p>
-<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span>https://api.easysort.org/v1/results
+<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">"</span><span class="w"> </span>https://api.easysort.org/v1/results
 </code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;organisation&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ARGO&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;week_21_2026&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;week_22_2026&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;week_23_2026&quot;</span><span class="p">]</span>
+<span class="w">  </span><span class="nt">"organisation"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ARGO"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"results"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"week_21_2026"</span><span class="p">,</span><span class="w"> </span><span class="s2">"week_22_2026"</span><span class="p">,</span><span class="w"> </span><span class="s2">"week_23_2026"</span><span class="p">]</span>
 <span class="p">}</span>
 </code></pre></div>
 <ul>
@@ -1191,38 +1192,48 @@ plain text more than once.</p>
 <p>Returns the drop-off locations seen in your <strong>most recent 6 weekly results</strong>, so you know which
 names to expect in the period results (the location names are the per-location keys inside each
 result). Using a recent window keeps the list current with where you're actively reporting.</p>
-<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span>https://api.easysort.org/v1/locations
+<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">"</span><span class="w"> </span>https://api.easysort.org/v1/locations
 </code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;organisation&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ARGO&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;locations&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Jyllinge&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Roskilde&quot;</span><span class="p">]</span>
+<span class="w">  </span><span class="nt">"organisation"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ARGO"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"locations"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"Jyllinge"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Roskilde"</span><span class="p">]</span>
 <span class="p">}</span>
 </code></pre></div>
 <h3 id="4-get-one-period-get-v1resultsperiod">4. Get one period — <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">results</span><span class="o">/</span><span class="p">{</span><span class="n">period</span><span class="p">}</span></code><a class="headerlink" href="#4-get-one-period-get-v1resultsperiod" title="Permanent link">¤</a></h3>
 <p>Pass one of the identifiers returned above.</p>
-<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span>https://api.easysort.org/v1/results/week_23_2026
+<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">"</span><span class="w"> </span>https://api.easysort.org/v1/results/week_23_2026
 </code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;date_start&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;01_06_2026&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;date_end&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;07_06_2026&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;Hørgården&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;objects&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;412&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;weight_kg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;63&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;co2_kg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;88&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;co2_kg_low&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;62&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;co2_kg_high&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;106&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;visitors&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;180&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;categories&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;category&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Plastic&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;120&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;weight_kg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;18&quot;</span><span class="w"> </span><span class="p">},</span>
-<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;category&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Glass&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;64&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;weight_kg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;22&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="nt">"date_start"</span><span class="p">:</span><span class="w"> </span><span class="s2">"01_06_2026"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"date_end"</span><span class="p">:</span><span class="w"> </span><span class="s2">"07_06_2026"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"Hørgården"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"objects"</span><span class="p">:</span><span class="w"> </span><span class="s2">"412"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"weight_kg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"63"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"co2_kg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"88"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"co2_kg_low"</span><span class="p">:</span><span class="w"> </span><span class="s2">"62"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"co2_kg_high"</span><span class="p">:</span><span class="w"> </span><span class="s2">"106"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"visitors"</span><span class="p">:</span><span class="w"> </span><span class="s2">"180"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"percentage_personnel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"12"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"percentage_citizens"</span><span class="p">:</span><span class="w"> </span><span class="s2">"88"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"categories"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"category"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Plastic"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"120"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"weight_kg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"18"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"objects_per_hour"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span><span class="w"> </span><span class="nt">"hour"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0-3"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="w"> </span><span class="nt">"hour"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9-12"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"74"</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"category"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Glass"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"64"</span><span class="p">,</span><span class="w"> </span><span class="nt">"weight_kg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"22"</span><span class="p">,</span><span class="w"> </span><span class="nt">"objects_per_hour"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="w"> </span><span class="p">}</span>
 <span class="w">    </span><span class="p">],</span>
-<span class="w">    </span><span class="nt">&quot;objects_per_day&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;day&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Monday&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;58&quot;</span><span class="w"> </span><span class="p">},</span>
-<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;day&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Tuesday&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;61&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="nt">"objects_per_day"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"day"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Monday"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"58"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"day"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Tuesday"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"61"</span><span class="w"> </span><span class="p">}</span>
 <span class="w">    </span><span class="p">],</span>
-<span class="w">    </span><span class="nt">&quot;objects_per_hour&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;hour&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0-3&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2&quot;</span><span class="w"> </span><span class="p">},</span>
-<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;hour&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;9-12&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;140&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="nt">"objects_per_hour"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"hour"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0-3"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"hour"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9-12"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"140"</span><span class="w"> </span><span class="p">}</span>
 <span class="w">    </span><span class="p">]</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
@@ -1265,8 +1276,20 @@ result). Using a recent window keeps the list current with where you're actively
 <td>Estimated number of visitors.</td>
 </tr>
 <tr>
+<td><code class="language-python highlight"><span class="n">percentage_personnel</span></code></td>
+<td>Share of <code class="language-python highlight"><span class="n">objects</span></code> registered as personnel activity, as a percentage.</td>
+</tr>
+<tr>
+<td><code class="language-python highlight"><span class="n">percentage_citizens</span></code></td>
+<td>Share of <code class="language-python highlight"><span class="n">objects</span></code> registered as citizen activity, as a percentage. Together with <code class="language-python highlight"><span class="n">percentage_personnel</span></code> this sums to 100.</td>
+</tr>
+<tr>
 <td><code class="language-python highlight"><span class="n">categories</span><span class="p">[]</span></code></td>
-<td>Per-material breakdown: <code class="language-python highlight"><span class="n">category</span></code>, <code class="language-python highlight"><span class="n">count</span></code>, <code class="language-python highlight"><span class="n">weight_kg</span></code>.</td>
+<td>Per-material breakdown: <code class="language-python highlight"><span class="n">category</span></code>, <code class="language-python highlight"><span class="n">count</span></code>, <code class="language-python highlight"><span class="n">weight_kg</span></code>, <code class="language-python highlight"><span class="n">objects_per_hour</span></code>.</td>
+</tr>
+<tr>
+<td><code class="language-python highlight"><span class="n">categories</span><span class="p">[]</span><span class="o">.</span><span class="n">objects_per_hour</span><span class="p">[]</span></code></td>
+<td>That material's items per 3-hour bucket. Same bucket labels as the location-level series, and sums to the category's <code class="language-python highlight"><span class="n">count</span></code>.</td>
 </tr>
 <tr>
 <td><code class="language-python highlight"><span class="n">objects_per_day</span><span class="p">[]</span></code></td>
@@ -1274,12 +1297,29 @@ result). Using a recent window keeps the list current with where you're actively
 </tr>
 <tr>
 <td><code class="language-python highlight"><span class="n">objects_per_hour</span><span class="p">[]</span></code></td>
-<td>Items per 3-hour bucket (<code class="language-python highlight"><span class="s2">&quot;0-3&quot;</span></code>, <code class="language-python highlight"><span class="s2">&quot;3-6&quot;</span></code>, … <code class="language-python highlight"><span class="s2">&quot;21-24&quot;</span></code>).</td>
+<td>Items per 3-hour bucket (<code class="language-python highlight"><span class="s2">"0-3"</span></code>, <code class="language-python highlight"><span class="s2">"3-6"</span></code>, … <code class="language-python highlight"><span class="s2">"21-24"</span></code>).</td>
+</tr>
+<tr>
+<td>&gt; Summing <code class="language-python highlight"><span class="n">objects_per_hour</span></code> across all entries of <code class="language-python highlight"><span class="n">categories</span><span class="p">[]</span></code> reproduces the location-level</td>
+<td></td>
+</tr>
+<tr>
+<td>&gt; <code class="language-python highlight"><span class="n">objects_per_hour</span></code>, and summing a category's <code class="language-python highlight"><span class="n">objects_per_hour</span></code> reproduces its <code class="language-python highlight"><span class="n">count</span></code>. So you can</td>
+<td></td>
+</tr>
+<tr>
+<td>&gt; slice the hourly flow either by material or by location without reconciling two different totals.</td>
+<td></td>
 </tr>
 </tbody>
 </table>
+<p><strong>Availability of <code class="language-python highlight"><span class="n">categories</span><span class="p">[]</span><span class="o">.</span><span class="n">objects_per_hour</span></code>:</strong> this breakdown is available for <strong>weekly</strong>
+periods from <strong>week 32 of 2026</strong> onward; for earlier weeks the array is empty (<code class="language-python highlight"><span class="p">[]</span></code>). For <strong>monthly</strong>
+periods it is available from <strong>September 2026</strong> onward — August 2026 and earlier return an empty
+array, so use the weekly periods if you need hourly material detail before September. The
+location-level <code class="language-python highlight"><span class="n">objects_per_hour</span></code> covers your full history in every period type.</p>
 <blockquote>
-<p>All numeric values are returned as <strong>strings</strong> containing rounded integers (e.g. <code class="language-python highlight"><span class="s2">&quot;63&quot;</span></code>).
+<p>All numeric values are returned as <strong>strings</strong> containing rounded integers (e.g. <code class="language-python highlight"><span class="s2">"63"</span></code>).
 Parse them with <code class="language-python highlight"><span class="nb">int</span><span class="p">(</span><span class="o">...</span><span class="p">)</span></code> / <code class="language-python highlight"><span class="n">parseInt</span><span class="p">(</span><span class="o">...</span><span class="p">)</span></code> on your side.</p>
 </blockquote>
 <h3 id="5-daily-results-get-v1days-and-get-v1resultsday_dd_mm_yyyy">5. Daily results — <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">days</span></code> and <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">results</span><span class="o">/</span><span class="n">day_DD_MM_YYYY</span></code><a class="headerlink" href="#5-daily-results-get-v1days-and-get-v1resultsday_dd_mm_yyyy" title="Permanent link">¤</a></h3>
@@ -1287,45 +1327,100 @@ Parse them with <code class="language-python highlight"><span class="nb">int</sp
 <code class="language-python highlight"><span class="n">day_DD_MM_YYYY</span></code> (e.g. <code class="language-python highlight"><span class="n">day_03_06_2026</span></code>). You can build it directly from any date, or list the
 days that are available:</p>
 <div class="language-bash highlight"><pre><span></span><code><span class="c1"># List available day identifiers (oldest first):</span>
-curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span>https://api.easysort.org/v1/days
+curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">"</span><span class="w"> </span>https://api.easysort.org/v1/days
 
 <span class="c1"># Fetch one day:</span>
-curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span>https://api.easysort.org/v1/results/day_03_06_2026
+curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">"</span><span class="w"> </span>https://api.easysort.org/v1/results/day_03_06_2026
 </code></pre></div>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;organisation&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ARGO&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;days&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;day_01_06_2026&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;day_02_06_2026&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;day_03_06_2026&quot;</span><span class="p">]</span>
+<span class="w">  </span><span class="nt">"organisation"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ARGO"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"days"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"day_01_06_2026"</span><span class="p">,</span><span class="w"> </span><span class="s2">"day_02_06_2026"</span><span class="p">,</span><span class="w"> </span><span class="s2">"day_03_06_2026"</span><span class="p">]</span>
 <span class="p">}</span>
 </code></pre></div>
 <p>A day response has the <strong>same per-location fields</strong> as a period (<code class="language-python highlight"><span class="n">objects</span></code>, <code class="language-python highlight"><span class="n">weight_kg</span></code>,
 <code class="language-python highlight"><span class="n">co2_kg</span></code>, …, <code class="language-python highlight"><span class="n">categories</span><span class="p">[]</span></code>), with two differences:</p>
 <ul>
 <li><code class="language-python highlight"><span class="n">date_start</span></code> and <code class="language-python highlight"><span class="n">date_end</span></code> are both that single day.</li>
-<li><code class="language-python highlight"><span class="n">objects_per_day</span></code> and <code class="language-python highlight"><span class="n">objects_per_hour</span></code> are <strong>omitted</strong> (a single day has no weekday split).</li>
+<li><code class="language-python highlight"><span class="n">objects_per_day</span></code> collapses to a single entry — the weekday that day falls on.</li>
 </ul>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;date_start&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;03_06_2026&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;date_end&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;03_06_2026&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;Roskilde&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;objects&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;142&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;weight_kg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;201&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;co2_kg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;30&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;co2_kg_low&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;21&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;co2_kg_high&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;36&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;visitors&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;58&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;categories&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;category&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Møbler og indretning&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;142&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;weight_kg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;201&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="nt">"date_start"</span><span class="p">:</span><span class="w"> </span><span class="s2">"03_06_2026"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"date_end"</span><span class="p">:</span><span class="w"> </span><span class="s2">"03_06_2026"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"Roskilde"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"objects"</span><span class="p">:</span><span class="w"> </span><span class="s2">"142"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"weight_kg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"201"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"co2_kg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"30"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"co2_kg_low"</span><span class="p">:</span><span class="w"> </span><span class="s2">"21"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"co2_kg_high"</span><span class="p">:</span><span class="w"> </span><span class="s2">"36"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"visitors"</span><span class="p">:</span><span class="w"> </span><span class="s2">"58"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"percentage_personnel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"percentage_citizens"</span><span class="p">:</span><span class="w"> </span><span class="s2">"91"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"categories"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"category"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Møbler og indretning"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"142"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"weight_kg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"201"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"objects_per_hour"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span><span class="w"> </span><span class="nt">"hour"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9-12"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"61"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span><span class="w"> </span><span class="nt">"hour"</span><span class="p">:</span><span class="w"> </span><span class="s2">"12-15"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"70"</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">"objects_per_day"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="w"> </span><span class="nt">"day"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Wednesday"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"142"</span><span class="w"> </span><span class="p">}],</span>
+<span class="w">    </span><span class="nt">"objects_per_hour"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"hour"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9-12"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"61"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">"hour"</span><span class="p">:</span><span class="w"> </span><span class="s2">"12-15"</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="s2">"70"</span><span class="w"> </span><span class="p">}</span>
 <span class="w">    </span><span class="p">]</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
 <blockquote>
-<p>Daily numbers are derived from the week and add up to it: summing a location's seven days in a
-week reproduces that week's total. So you can compute <strong>any</strong> total you like yourself — a day,
-a custom date range, or all locations combined — by fetching the days you need and adding them.
-<code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">results</span></code> only lists weeks/months; use <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">days</span></code> (or build <code class="language-python highlight"><span class="n">day_DD_MM_YYYY</span></code>) for days.</p>
+<p>Summing a location's seven days in a week reproduces that week's total, so you can compute <strong>any</strong>
+total you like yourself — a day, a custom date range, or all locations combined — by fetching the
+days you need and adding them. <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">results</span></code> only lists weeks/months; use <code class="language-python highlight"><span class="n">GET</span> <span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">days</span></code> (or
+build <code class="language-python highlight"><span class="n">day_DD_MM_YYYY</span></code>) for days.</p>
 </blockquote>
 <hr />
+<h2 id="ready-made-csv-converters">Ready-made CSV converters<a class="headerlink" href="#ready-made-csv-converters" title="Permanent link">¤</a></h2>
+<p>If you would rather work in Excel or Power BI than in JSON, two scripts ship alongside this
+document. Both take a file you downloaded from the API and write CSVs next to it. They need only
+Python 3.9+ and the standard library — no packages to install.</p>
+<div class="language-bash highlight"><pre><span></span><code><span class="c1"># A week or a month:</span>
+python<span class="w"> </span>week_to_csv.py<span class="w"> </span>week_34_2026.json
+python<span class="w"> </span>week_to_csv.py<span class="w"> </span>month_8_2026.json<span class="w"> </span>--out-dir<span class="w"> </span>./reports
+
+<span class="c1"># A single day:</span>
+python<span class="w"> </span>day_to_csv.py<span class="w"> </span>day_20_08_2026.json
+</code></pre></div>
+<p>Each run writes four files:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code class="language-python highlight"><span class="o">&lt;</span><span class="n">name</span><span class="o">&gt;</span><span class="n">_objects</span><span class="o">.</span><span class="n">csv</span></code></td>
+<td>One row per location: objects, weight, CO₂, visitors.</td>
+</tr>
+<tr>
+<td><code class="language-python highlight"><span class="o">&lt;</span><span class="n">name</span><span class="o">&gt;</span><span class="n">_totals</span><span class="o">.</span><span class="n">csv</span></code></td>
+<td>Organisation-wide totals for the period.</td>
+</tr>
+<tr>
+<td><code class="language-python highlight"><span class="o">&lt;</span><span class="n">name</span><span class="o">&gt;</span><span class="n">_per_day</span><span class="o">.</span><span class="n">csv</span></code></td>
+<td>Objects per weekday, one column per location (weeks/months).</td>
+</tr>
+<tr>
+<td><code class="language-python highlight"><span class="o">&lt;</span><span class="n">name</span><span class="o">&gt;</span><span class="n">_per_hour</span><span class="o">.</span><span class="n">csv</span></code></td>
+<td>Objects per 3-hour bucket, per location <strong>and per category</strong> — long format, ready to pivot.</td>
+</tr>
+</tbody>
+</table>
+<p>For a day the third file is <code class="language-python highlight"><span class="o">&lt;</span><span class="n">name</span><span class="o">&gt;</span><span class="n">_categories</span><span class="o">.</span><span class="n">csv</span></code> (the per-material breakdown) instead of
+<code class="language-python highlight"><span class="n">_per_day</span><span class="o">.</span><span class="n">csv</span></code>, since a day has only one weekday.</p>
 <h2 id="worked-example-from-raw-response-to-the-numbers-you-want">Worked example: from raw response to the numbers you want<a class="headerlink" href="#worked-example-from-raw-response-to-the-numbers-you-want" title="Permanent link">¤</a></h2>
 <p>The typical flow is always the same three steps:</p>
 <ol>
@@ -1337,49 +1432,49 @@ a custom date range, or all locations combined — by fetching the days you need
 </ol>
 <p>Given a period response like:</p>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;date_start&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;01_06_2026&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;date_end&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;07_06_2026&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;Jyllinge&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;objects&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;412&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;weight_kg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;63&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;co2_kg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;88&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;visitors&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;180&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;categories&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">]</span><span class="w"> </span><span class="p">},</span>
-<span class="w">  </span><span class="nt">&quot;Roskilde&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;objects&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;988&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;weight_kg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;141&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;co2_kg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;205&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;visitors&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;402&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;categories&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="nt">"date_start"</span><span class="p">:</span><span class="w"> </span><span class="s2">"01_06_2026"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"date_end"</span><span class="p">:</span><span class="w"> </span><span class="s2">"07_06_2026"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"Jyllinge"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"objects"</span><span class="p">:</span><span class="w"> </span><span class="s2">"412"</span><span class="p">,</span><span class="w"> </span><span class="nt">"weight_kg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"63"</span><span class="p">,</span><span class="w"> </span><span class="nt">"co2_kg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"88"</span><span class="p">,</span><span class="w"> </span><span class="nt">"visitors"</span><span class="p">:</span><span class="w"> </span><span class="s2">"180"</span><span class="p">,</span><span class="w"> </span><span class="nt">"categories"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">]</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"Roskilde"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"objects"</span><span class="p">:</span><span class="w"> </span><span class="s2">"988"</span><span class="p">,</span><span class="w"> </span><span class="nt">"weight_kg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"141"</span><span class="p">,</span><span class="w"> </span><span class="nt">"co2_kg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"205"</span><span class="p">,</span><span class="w"> </span><span class="nt">"visitors"</span><span class="p">:</span><span class="w"> </span><span class="s2">"402"</span><span class="p">,</span><span class="w"> </span><span class="nt">"categories"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
 <p>...here is how to derive the three things people usually ask for.</p>
 <h3 id="python">Python<a class="headerlink" href="#python" title="Permanent link">¤</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
 
-<span class="n">BASE</span> <span class="o">=</span> <span class="s2">&quot;https://api.easysort.org&quot;</span>
-<span class="n">KEY</span> <span class="o">=</span> <span class="s2">&quot;YOUR_API_KEY&quot;</span>  <span class="c1"># load from an env var / secret manager in real code</span>
-<span class="n">headers</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">KEY</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
+<span class="n">BASE</span> <span class="o">=</span> <span class="s2">"https://api.easysort.org"</span>
+<span class="n">KEY</span> <span class="o">=</span> <span class="s2">"YOUR_API_KEY"</span>  <span class="c1"># load from an env var / secret manager in real code</span>
+<span class="n">headers</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">KEY</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
 
 <span class="c1"># 1 + 2: pick the latest period and download it.</span>
-<span class="n">periods</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">BASE</span><span class="si">}</span><span class="s2">/v1/results&quot;</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
-<span class="n">latest</span> <span class="o">=</span> <span class="n">periods</span><span class="p">[</span><span class="s2">&quot;results&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-<span class="n">data</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">BASE</span><span class="si">}</span><span class="s2">/v1/results/</span><span class="si">{</span><span class="n">latest</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+<span class="n">periods</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">BASE</span><span class="si">}</span><span class="s2">/v1/results"</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+<span class="n">latest</span> <span class="o">=</span> <span class="n">periods</span><span class="p">[</span><span class="s2">"results"</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">BASE</span><span class="si">}</span><span class="s2">/v1/results/</span><span class="si">{</span><span class="n">latest</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
 
 <span class="c1"># The location keys are everything except the two date fields.</span>
-<span class="n">META</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;date_start&quot;</span><span class="p">,</span> <span class="s2">&quot;date_end&quot;</span><span class="p">}</span>
+<span class="n">META</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"date_start"</span><span class="p">,</span> <span class="s2">"date_end"</span><span class="p">}</span>
 <span class="n">locations</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">summary</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">summary</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">META</span><span class="p">}</span>
 
 <span class="c1"># a) Objects per location</span>
-<span class="n">objects_per_location</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">summary</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">])</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">summary</span> <span class="ow">in</span> <span class="n">locations</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
-<span class="c1"># -&gt; {&quot;Jyllinge&quot;: 412, &quot;Roskilde&quot;: 988}</span>
+<span class="n">objects_per_location</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">summary</span><span class="p">[</span><span class="s2">"objects"</span><span class="p">])</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">summary</span> <span class="ow">in</span> <span class="n">locations</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+<span class="c1"># -&gt; {"Jyllinge": 412, "Roskilde": 988}</span>
 
 <span class="c1"># b) Total objects across all locations</span>
 <span class="n">total_objects</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">objects_per_location</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
 <span class="c1"># -&gt; 1400</span>
 
-<span class="c1"># c) CO₂ per location (same pattern; use &quot;co2_kg&quot;). Weight works identically via &quot;weight_kg&quot;.</span>
-<span class="n">co2_per_location</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">summary</span><span class="p">[</span><span class="s2">&quot;co2_kg&quot;</span><span class="p">])</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">summary</span> <span class="ow">in</span> <span class="n">locations</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
-<span class="c1"># -&gt; {&quot;Jyllinge&quot;: 88, &quot;Roskilde&quot;: 205}</span>
+<span class="c1"># c) CO₂ per location (same pattern; use "co2_kg"). Weight works identically via "weight_kg".</span>
+<span class="n">co2_per_location</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">summary</span><span class="p">[</span><span class="s2">"co2_kg"</span><span class="p">])</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">summary</span> <span class="ow">in</span> <span class="n">locations</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+<span class="c1"># -&gt; {"Jyllinge": 88, "Roskilde": 205}</span>
 <span class="n">total_co2</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">co2_per_location</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Period </span><span class="si">{</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;date_start&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">–</span><span class="si">{</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;date_end&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Period </span><span class="si">{</span><span class="n">data</span><span class="p">[</span><span class="s1">'date_start'</span><span class="p">]</span><span class="si">}</span><span class="s2">–</span><span class="si">{</span><span class="n">data</span><span class="p">[</span><span class="s1">'date_end'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">locations</span><span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">objects_per_location</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="si">}</span><span class="s2"> objects, </span><span class="si">{</span><span class="n">co2_per_location</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="si">}</span><span class="s2"> kg CO₂&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  TOTAL: </span><span class="si">{</span><span class="n">total_objects</span><span class="si">}</span><span class="s2"> objects, </span><span class="si">{</span><span class="n">total_co2</span><span class="si">}</span><span class="s2"> kg CO₂&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">objects_per_location</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="si">}</span><span class="s2"> objects, </span><span class="si">{</span><span class="n">co2_per_location</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="si">}</span><span class="s2"> kg CO₂"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  TOTAL: </span><span class="si">{</span><span class="n">total_objects</span><span class="si">}</span><span class="s2"> objects, </span><span class="si">{</span><span class="n">total_co2</span><span class="si">}</span><span class="s2"> kg CO₂"</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="javascript-node-18">JavaScript (Node 18+)<a class="headerlink" href="#javascript-node-18" title="Permanent link">¤</a></h3>
-<div class="language-js highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">BASE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://api.easysort.org&quot;</span><span class="p">;</span>
+<div class="language-js highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">BASE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://api.easysort.org"</span><span class="p">;</span>
 <span class="kd">const</span><span class="w"> </span><span class="nx">KEY</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">EASYSORT_API_KEY</span><span class="p">;</span>
 <span class="kd">const</span><span class="w"> </span><span class="nx">headers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Authorization</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">KEY</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">};</span>
 
@@ -1387,7 +1482,7 @@ a custom date range, or all locations combined — by fetching the days you need
 <span class="kd">const</span><span class="w"> </span><span class="nx">latest</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">periods</span><span class="p">.</span><span class="nx">results</span><span class="p">.</span><span class="nx">at</span><span class="p">(</span><span class="o">-</span><span class="mf">1</span><span class="p">);</span>
 <span class="kd">const</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="p">(</span><span class="k">await</span><span class="w"> </span><span class="nx">fetch</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="nx">BASE</span><span class="si">}</span><span class="sb">/v1/results/</span><span class="si">${</span><span class="nx">latest</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">headers</span><span class="w"> </span><span class="p">})).</span><span class="nx">json</span><span class="p">();</span>
 
-<span class="kd">const</span><span class="w"> </span><span class="nx">META</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Set</span><span class="p">([</span><span class="s2">&quot;date_start&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;date_end&quot;</span><span class="p">]);</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">META</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Set</span><span class="p">([</span><span class="s2">"date_start"</span><span class="p">,</span><span class="w"> </span><span class="s2">"date_end"</span><span class="p">]);</span>
 <span class="kd">const</span><span class="w"> </span><span class="nx">locations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Object</span><span class="p">.</span><span class="nx">entries</span><span class="p">(</span><span class="nx">data</span><span class="p">).</span><span class="nx">filter</span><span class="p">(([</span><span class="nx">name</span><span class="p">])</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="o">!</span><span class="nx">META</span><span class="p">.</span><span class="nx">has</span><span class="p">(</span><span class="nx">name</span><span class="p">));</span>
 
 <span class="c1">// a) Objects per location</span>
@@ -1398,7 +1493,7 @@ a custom date range, or all locations combined — by fetching the days you need
 <span class="c1">// b) Total objects across all locations</span>
 <span class="kd">const</span><span class="w"> </span><span class="nx">totalObjects</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Object</span><span class="p">.</span><span class="nx">values</span><span class="p">(</span><span class="nx">objectsPerLocation</span><span class="p">).</span><span class="nx">reduce</span><span class="p">((</span><span class="nx">a</span><span class="p">,</span><span class="w"> </span><span class="nx">b</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nx">b</span><span class="p">,</span><span class="w"> </span><span class="mf">0</span><span class="p">);</span>
 
-<span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">objectsPerLocation</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;total:&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">totalObjects</span><span class="p">);</span>
+<span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">objectsPerLocation</span><span class="p">,</span><span class="w"> </span><span class="s2">"total:"</span><span class="p">,</span><span class="w"> </span><span class="nx">totalObjects</span><span class="p">);</span>
 </code></pre></div>
 <blockquote>
 <p><strong>CO₂:</strong> <code class="language-python highlight"><span class="n">co2_kg</span></code> is our best estimate of the CO₂ (in kg) saved by reusing the items
@@ -1446,7 +1541,7 @@ objects above.</p>
 </tbody>
 </table>
 <p>Error bodies look like:</p>
-<div class="language-json highlight"><pre><span></span><code><span class="p">{</span><span class="w"> </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Invalid API key.&quot;</span><span class="w"> </span><span class="p">}</span>
+<div class="language-json highlight"><pre><span></span><code><span class="p">{</span><span class="w"> </span><span class="nt">"detail"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Invalid API key."</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <h3 id="curl-3-url-rejected-bad-hostname-or-malformed-input-to-a-url"><code class="language-python highlight"><span class="n">curl</span><span class="p">:</span> <span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="n">URL</span> <span class="n">rejected</span><span class="p">:</span> <span class="n">Bad</span> <span class="n">hostname</span></code> (or "Malformed input to a URL")<a class="headerlink" href="#curl-3-url-rejected-bad-hostname-or-malformed-input-to-a-url" title="Permanent link">¤</a></h3>
 <p>This is <strong>not</strong> an API error — you'll usually see it <em>after</em> the correct JSON has already

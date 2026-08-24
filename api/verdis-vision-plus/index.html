@@ -1171,39 +1171,39 @@
 <h2 id="1-health-check-optional">1. Health check (optional)<a class="headerlink" href="#1-health-check-optional" title="Permanent link">¤</a></h2>
 <div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>https://api.easysort.org/v1/health
 </code></pre></div>
-<div class="language-json highlight"><pre><span></span><code><span class="p">{</span><span class="w"> </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span><span class="w"> </span><span class="p">}</span>
+<div class="language-json highlight"><pre><span></span><code><span class="p">{</span><span class="w"> </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ok"</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <hr />
 <h2 id="2-upload-a-video-from-a-device">2. Upload a video from a device<a class="headerlink" href="#2-upload-a-video-from-a-device" title="Permanent link">¤</a></h2>
 <p>Uploads go in two steps: ask the API for a signed URL, then PUT the file directly to storage
 (not through the API host). That keeps large transfers fast and reliable.</p>
 <h3 id="step-a-get-a-signed-upload-url">Step A — get a signed upload URL<a class="headerlink" href="#step-a-get-a-signed-upload-url" title="Permanent link">¤</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">DEVICE_TOKEN</span><span class="o">=</span><span class="s1">&#39;&lt;YOUR_DEVICE_TOKEN&gt;&#39;</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">API_BASE</span><span class="o">=</span><span class="s1">&#39;https://api.easysort.org&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">DEVICE_TOKEN</span><span class="o">=</span><span class="s1">'&lt;YOUR_DEVICE_TOKEN&gt;'</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">API_BASE</span><span class="o">=</span><span class="s1">'https://api.easysort.org'</span>
 
 curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$DEVICE_TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;filename&quot;:&quot;2026-07-20T12-30-00Z.mp4&quot;}&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s2">&quot;</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/upload-url&quot;</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$DEVICE_TOKEN</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"filename":"2026-07-20T12-30-00Z.mp4"}'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/upload-url"</span>
 </code></pre></div>
 <p><code class="language-python highlight"><span class="n">filename</span></code> is optional. If omitted, a UTC timestamp name is used (e.g. <code class="language-python highlight"><span class="mi">2026</span><span class="o">-</span><span class="mi">07</span><span class="o">-</span><span class="mi">20</span><span class="n">T12</span><span class="o">-</span><span class="mi">30</span><span class="o">-</span><span class="mi">00</span><span class="n">Z</span><span class="o">.</span><span class="n">mp4</span></code>).</p>
 <p>Example response:</p>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;device&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;prevas-test-01&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;prevas-test-01/2026-07-20T12-30-00Z.mp4&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;upload_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://….supabase.co/storage/v1/object/upload/sign/…?token=…&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;token&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;…&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;method&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PUT&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;expires_in&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;headers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;Content-Type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;video/mp4&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="nt">"device"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prevas-test-01"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prevas-test-01/2026-07-20T12-30-00Z.mp4"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"upload_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://….supabase.co/storage/v1/object/upload/sign/…?token=…"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"token"</span><span class="p">:</span><span class="w"> </span><span class="s2">"…"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"method"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PUT"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"expires_in"</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"headers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"Content-Type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"video/mp4"</span><span class="w"> </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
 <h3 id="step-b-put-the-file-to-upload_url">Step B — PUT the file to <code class="language-python highlight"><span class="n">upload_url</span></code><a class="headerlink" href="#step-b-put-the-file-to-upload_url" title="Permanent link">¤</a></h3>
 <div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: video/mp4&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: video/mp4"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--data-binary<span class="w"> </span>@clip.mp4<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s2">&quot;</span><span class="nv">$UPLOAD_URL</span><span class="s2">&quot;</span>
+<span class="w">  </span><span class="s2">"</span><span class="nv">$UPLOAD_URL</span><span class="s2">"</span>
 </code></pre></div>
 <p>Replace <code class="language-python highlight"><span class="err">$</span><span class="n">UPLOAD_URL</span></code> with the <code class="language-python highlight"><span class="n">upload_url</span></code> from step A (do not send the device token to Supabase).</p>
 <h3 id="upload-rules">Upload rules<a class="headerlink" href="#upload-rules" title="Permanent link">¤</a></h3>
@@ -1215,47 +1215,47 @@ curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </spa
 <li>Need another device name/token? Ask Easysort</li>
 </ul>
 <h3 id="typical-device-integration">Typical device integration<a class="headerlink" href="#typical-device-integration" title="Permanent link">¤</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">DEVICE_TOKEN</span><span class="o">=</span><span class="s1">&#39;…&#39;</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">API_BASE</span><span class="o">=</span><span class="s1">&#39;https://api.easysort.org&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">DEVICE_TOKEN</span><span class="o">=</span><span class="s1">'…'</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">API_BASE</span><span class="o">=</span><span class="s1">'https://api.easysort.org'</span>
 <span class="nv">FILE</span><span class="o">=</span>/path/to/recording.mp4
-<span class="nv">NAME</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="w"> </span>-u<span class="w"> </span>+%Y-%m-%dT%H-%M-%SZ<span class="k">)</span><span class="s2">.mp4&quot;</span>
+<span class="nv">NAME</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>date<span class="w"> </span>-u<span class="w"> </span>+%Y-%m-%dT%H-%M-%SZ<span class="k">)</span><span class="s2">.mp4"</span>
 
-<span class="nv">RESP</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>curl<span class="w"> </span>-sS<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$DEVICE_TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s2">&quot;{\&quot;filename\&quot;:\&quot;</span><span class="nv">$NAME</span><span class="s2">\&quot;}&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s2">&quot;</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/upload-url&quot;</span><span class="k">)</span><span class="s2">&quot;</span>
+<span class="nv">RESP</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>curl<span class="w"> </span>-sS<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$DEVICE_TOKEN</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s2">"{\"filename\":\"</span><span class="nv">$NAME</span><span class="s2">\"}"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/upload-url"</span><span class="k">)</span><span class="s2">"</span>
 
-<span class="nv">UPLOAD_URL</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;%s&#39;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$RESP</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import json,sys; print(json.load(sys.stdin)[&quot;upload_url&quot;])&#39;</span><span class="k">)</span><span class="s2">&quot;</span>
+<span class="nv">UPLOAD_URL</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span><span class="nb">printf</span><span class="w"> </span><span class="s1">'%s'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$RESP</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json,sys; print(json.load(sys.stdin)["upload_url"])'</span><span class="k">)</span><span class="s2">"</span>
 
 curl<span class="w"> </span>-sS<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: video/mp4&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--data-binary<span class="w"> </span>@<span class="s2">&quot;</span><span class="nv">$FILE</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s2">&quot;</span><span class="nv">$UPLOAD_URL</span><span class="s2">&quot;</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: video/mp4"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-binary<span class="w"> </span>@<span class="s2">"</span><span class="nv">$FILE</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"</span><span class="nv">$UPLOAD_URL</span><span class="s2">"</span>
 </code></pre></div>
 <hr />
 <h2 id="3-list-videos">3. List videos<a class="headerlink" href="#3-list-videos" title="Permanent link">¤</a></h2>
 <p>Use your API key (not the device token):</p>
-<div class="language-bash highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">EASYSORT_API_KEY</span><span class="o">=</span><span class="s1">&#39;&lt;YOUR_API_KEY&gt;&#39;</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">API_BASE</span><span class="o">=</span><span class="s1">&#39;https://api.easysort.org&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">EASYSORT_API_KEY</span><span class="o">=</span><span class="s1">'&lt;YOUR_API_KEY&gt;'</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">API_BASE</span><span class="o">=</span><span class="s1">'https://api.easysort.org'</span>
 
-curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s2">&quot;</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos&quot;</span>
+curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos"</span>
 </code></pre></div>
 <p>Optional: only one device:</p>
-<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s2">&quot;</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos?device=prevas-test-01&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos?device=prevas-test-01"</span>
 </code></pre></div>
 <p>Example response:</p>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;organisation&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PREVAS&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;videos&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="nt">"organisation"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PREVAS"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"videos"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;device&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;prevas-test-01&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;prevas-test-01/2026-07-20T12-30-00Z.mp4&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1048576</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;created_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-07-20T12:30:05.000Z&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;updated_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-07-20T12:30:05.000Z&quot;</span>
+<span class="w">      </span><span class="nt">"device"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prevas-test-01"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prevas-test-01/2026-07-20T12-30-00Z.mp4"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"size"</span><span class="p">:</span><span class="w"> </span><span class="mi">1048576</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"created_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-07-20T12:30:05.000Z"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"updated_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-07-20T12:30:05.000Z"</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">  </span><span class="p">]</span>
 <span class="p">}</span>
@@ -1293,47 +1293,47 @@ curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Aut
 <hr />
 <h2 id="4-download-a-video">4. Download a video<a class="headerlink" href="#4-download-a-video" title="Permanent link">¤</a></h2>
 <h3 id="step-a-get-a-signed-download-url">Step A — get a signed download URL<a class="headerlink" href="#step-a-get-a-signed-download-url" title="Permanent link">¤</a></h3>
-<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s2">&quot;</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos/prevas-test-01/2026-07-20T12-30-00Z.mp4&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos/prevas-test-01/2026-07-20T12-30-00Z.mp4"</span>
 </code></pre></div>
 <p>Example response:</p>
 <div class="language-json highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;prevas-test-01/2026-07-20T12-30-00Z.mp4&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;download_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://….supabase.co/storage/v1/object/sign/…?token=…&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;expires_in&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span>
+<span class="w">  </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prevas-test-01/2026-07-20T12-30-00Z.mp4"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"download_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://….supabase.co/storage/v1/object/sign/…?token=…"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"expires_in"</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span>
 <span class="p">}</span>
 </code></pre></div>
 <h3 id="step-b-get-the-file-from-download_url">Step B — GET the file from <code class="language-python highlight"><span class="n">download_url</span></code><a class="headerlink" href="#step-b-get-the-file-from-download_url" title="Permanent link">¤</a></h3>
-<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-o<span class="w"> </span>clip.mp4<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$DOWNLOAD_URL</span><span class="s2">&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-o<span class="w"> </span>clip.mp4<span class="w"> </span><span class="s2">"</span><span class="nv">$DOWNLOAD_URL</span><span class="s2">"</span>
 </code></pre></div>
 <p>Optional: follow a redirect instead of parsing JSON:</p>
 <div class="language-bash highlight"><pre><span></span><code>curl<span class="w"> </span>-L<span class="w"> </span>-o<span class="w"> </span>clip.mp4<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s2">&quot;</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos/prevas-test-01/2026-07-20T12-30-00Z.mp4?redirect=true&quot;</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos/prevas-test-01/2026-07-20T12-30-00Z.mp4?redirect=true"</span>
 </code></pre></div>
 <hr />
 <h2 id="5-suggested-smoke-test">5. Suggested smoke test<a class="headerlink" href="#5-suggested-smoke-test" title="Permanent link">¤</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">API_BASE</span><span class="o">=</span><span class="s1">&#39;https://api.easysort.org&#39;</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">DEVICE_TOKEN</span><span class="o">=</span><span class="s1">&#39;&lt;YOUR_DEVICE_TOKEN&gt;&#39;</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">EASYSORT_API_KEY</span><span class="o">=</span><span class="s1">&#39;&lt;YOUR_API_KEY&gt;&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">API_BASE</span><span class="o">=</span><span class="s1">'https://api.easysort.org'</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">DEVICE_TOKEN</span><span class="o">=</span><span class="s1">'&lt;YOUR_DEVICE_TOKEN&gt;'</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">EASYSORT_API_KEY</span><span class="o">=</span><span class="s1">'&lt;YOUR_API_KEY&gt;'</span>
 
-<span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;test&#39;</span><span class="w"> </span>&gt;<span class="w"> </span>/tmp/vision-smoke.mp4
+<span class="nb">printf</span><span class="w"> </span><span class="s1">'test'</span><span class="w"> </span>&gt;<span class="w"> </span>/tmp/vision-smoke.mp4
 
-<span class="nv">RESP</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>curl<span class="w"> </span>-sS<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$DEVICE_TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;filename&quot;:&quot;smoke-test.mp4&quot;}&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="s2">&quot;</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/upload-url&quot;</span><span class="k">)</span><span class="s2">&quot;</span>
-<span class="nv">UPLOAD_URL</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;%s&#39;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$RESP</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import json,sys; print(json.load(sys.stdin)[&quot;upload_url&quot;])&#39;</span><span class="k">)</span><span class="s2">&quot;</span>
-<span class="nv">PATH_IN_BUCKET</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;%s&#39;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$RESP</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import json,sys; print(json.load(sys.stdin)[&quot;path&quot;])&#39;</span><span class="k">)</span><span class="s2">&quot;</span>
+<span class="nv">RESP</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>curl<span class="w"> </span>-sS<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$DEVICE_TOKEN</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"filename":"smoke-test.mp4"}'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/upload-url"</span><span class="k">)</span><span class="s2">"</span>
+<span class="nv">UPLOAD_URL</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span><span class="nb">printf</span><span class="w"> </span><span class="s1">'%s'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$RESP</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json,sys; print(json.load(sys.stdin)["upload_url"])'</span><span class="k">)</span><span class="s2">"</span>
+<span class="nv">PATH_IN_BUCKET</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span><span class="nb">printf</span><span class="w"> </span><span class="s1">'%s'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$RESP</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json,sys; print(json.load(sys.stdin)["path"])'</span><span class="k">)</span><span class="s2">"</span>
 
-curl<span class="w"> </span>-sS<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: video/mp4&quot;</span><span class="w"> </span>--data-binary<span class="w"> </span>@/tmp/vision-smoke.mp4<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$UPLOAD_URL</span><span class="s2">&quot;</span>
+curl<span class="w"> </span>-sS<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Content-Type: video/mp4"</span><span class="w"> </span>--data-binary<span class="w"> </span>@/tmp/vision-smoke.mp4<span class="w"> </span><span class="s2">"</span><span class="nv">$UPLOAD_URL</span><span class="s2">"</span>
 
-curl<span class="w"> </span>-sS<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos&quot;</span>
+curl<span class="w"> </span>-sS<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos"</span>
 
-<span class="nv">DL</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>curl<span class="w"> </span>-sS<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos/</span><span class="nv">$PATH_IN_BUCKET</span><span class="s2">&quot;</span><span class="k">)</span><span class="s2">&quot;</span>
-<span class="nv">DOWNLOAD_URL</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;%s&#39;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$DL</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import json,sys; print(json.load(sys.stdin)[&quot;download_url&quot;])&#39;</span><span class="k">)</span><span class="s2">&quot;</span>
-curl<span class="w"> </span>-sS<span class="w"> </span>-o<span class="w"> </span>/tmp/vision-downloaded.mp4<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$DOWNLOAD_URL</span><span class="s2">&quot;</span>
+<span class="nv">DL</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>curl<span class="w"> </span>-sS<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$EASYSORT_API_KEY</span><span class="s2">"</span><span class="w"> </span><span class="s2">"</span><span class="nv">$API_BASE</span><span class="s2">/v1/vision/videos/</span><span class="nv">$PATH_IN_BUCKET</span><span class="s2">"</span><span class="k">)</span><span class="s2">"</span>
+<span class="nv">DOWNLOAD_URL</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span><span class="nb">printf</span><span class="w"> </span><span class="s1">'%s'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$DL</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import json,sys; print(json.load(sys.stdin)["download_url"])'</span><span class="k">)</span><span class="s2">"</span>
+curl<span class="w"> </span>-sS<span class="w"> </span>-o<span class="w"> </span>/tmp/vision-downloaded.mp4<span class="w"> </span><span class="s2">"</span><span class="nv">$DOWNLOAD_URL</span><span class="s2">"</span>
 </code></pre></div>
 <hr />
 <h2 id="6-errors">6. Errors<a class="headerlink" href="#6-errors" title="Permanent link">¤</a></h2>
