@@ -1,8 +1,9 @@
 # Easysort Customer API — Client Guide
 
-This API lets your organisation pull your recycling results programmatically. You get a
-single **API key**; every request must include it. You can only ever see data that belongs
-to your organisation.
+This API lets your organisation pull your recycling results programmatically (and, if
+enabled for your key, Vision+ device videos). You get a single **API key**; every request
+must include it. Recycling results are scoped to your organisation; Vision+ list/download
+(when granted) covers the shared Vision+ video bucket.
 
 - **Base URL:** `https://<the-host-we-give-you>` (e.g. `https://api.easysort.org`)
 - **Auth:** `Authorization: Bearer <YOUR_API_KEY>` header on every request
@@ -84,8 +85,16 @@ curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/re
     "co2_kg_high": "106",
     "visitors": "180",
     "categories": [
-      { "category": "Plastic", "count": "120", "weight_kg": "18" },
-      { "category": "Glass", "count": "64", "weight_kg": "22" }
+      {
+        "category": "Plastic",
+        "count": "120",
+        "weight_kg": "18",
+        "objects_per_hour": [
+          { "hour": "0-3", "count": "0" },
+          { "hour": "9-12", "count": "74" }
+        ]
+      },
+      { "category": "Glass", "count": "64", "weight_kg": "22", "objects_per_hour": [] }
     ],
     "objects_per_day": [
       { "day": "Monday", "count": "58" },
@@ -110,9 +119,44 @@ curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/re
 | `co2_kg` | Estimated CO₂ saved, in kilograms (best estimate). |
 | `co2_kg_low` / `co2_kg_high` | Lower/upper bound of the CO₂ estimate. |
 | `visitors` | Estimated number of visitors. |
-| `categories[]` | Per-material breakdown: `category`, `count`, `weight_kg`. |
+| `percentage_personnel` | Share of `objects` registered inside the staff window — see below. Only present where it was measured. |
+| `percentage_citizens` | The remainder, i.e. `100 - percentage_personnel`. Only present where it was measured. |
+| `categories[]` | Per-material breakdown: `category`, `count`, `weight_kg`, `objects_per_hour`. |
+| `categories[].objects_per_hour[]` | That material's items per 3-hour bucket. Same bucket labels as the location-level series, and sums to the category's `count`. |
 | `objects_per_day[]` | Items per weekday (`Monday`…`Sunday`). |
 | `objects_per_hour[]` | Items per 3-hour bucket (`"0-3"`, `"3-6"`, … `"21-24"`). |
+> Summing `objects_per_hour` across all entries of `categories[]` reproduces the location-level
+> `objects_per_hour`, and summing a category's `objects_per_hour` reproduces its `count`. So you can
+> slice the hourly flow either by material or by location without reconciling two different totals.
+
+**Availability of `categories[].objects_per_hour`:** this breakdown starts from **week 32 of 2026**.
+Producing it requires the individual detections behind a period, and those are only retained for a
+few weeks, so for earlier periods the array is empty (`[]`). The location-level `objects_per_hour` is
+unaffected and goes back to the start of your history.
+
+For **monthly** periods the breakdown appears once the whole month is covered, so the first complete
+month is **September 2026**. August 2026 begins before week 32, so its array is empty even though the
+individual weeks 32–35 have it — a part-month breakdown would add up to less than the month's
+location-level `objects_per_hour`, and we would rather give you nothing than two totals that
+disagree. Use the weekly periods if you need hourly material detail inside August.
+
+#### How to read `percentage_personnel`
+
+This is a **time-window split, not staff recognition.** Every object registered between 08:00 and
+10:00 counts towards `percentage_personnel`, and
+everything outside it towards `percentage_citizens`. The window is set to the period when staff
+normally move items around the site before the main public traffic arrives, so it is a useful
+proxy for staff-driven activity — but it does not identify who handled an item. An item dropped
+off by a member of the public at 09:30 counts as personnel, and an item moved by staff at 14:00
+counts as citizens.
+
+Treat it as "share of the day's items registered during the morning staff window". It is well
+suited to spotting trends and comparing sites, and not suited to anything that needs the actual
+number of items handled by employees.
+
+Both fields are **omitted entirely for locations where the split was not measured**, rather
+than filled with a default. If they are absent for a location, we did not count it there for that
+period — do not read a missing field as zero.
 
 > All numeric values are returned as **strings** containing rounded integers (e.g. `"63"`).
 > Parse them with `int(...)` / `parseInt(...)` on your side.
@@ -142,7 +186,7 @@ A day response has the **same per-location fields** as a period (`objects`, `wei
 `co2_kg`, …, `categories[]`), with two differences:
 
 - `date_start` and `date_end` are both that single day.
-- `objects_per_day` and `objects_per_hour` are **omitted** (a single day has no weekday split).
+- `objects_per_day` collapses to a single entry — the weekday that day falls on.
 
 ```json
 {
@@ -156,11 +200,31 @@ A day response has the **same per-location fields** as a period (`objects`, `wei
     "co2_kg_high": "36",
     "visitors": "58",
     "categories": [
-      { "category": "Møbler og indretning", "count": "142", "weight_kg": "201" }
+      {
+        "category": "Møbler og indretning",
+        "count": "142",
+        "weight_kg": "201",
+        "objects_per_hour": [
+          { "hour": "9-12", "count": "61" },
+          { "hour": "12-15", "count": "70" }
+        ]
+      }
+    ],
+    "objects_per_day": [{ "day": "Wednesday", "count": "142" }],
+    "objects_per_hour": [
+      { "hour": "9-12", "count": "61" },
+      { "hour": "12-15", "count": "70" }
     ]
   }
 }
 ```
+
+> **How precise is the hourly detail on a day?** The location-level `objects_per_hour` on a day is
+> that specific day's own measured curve — Monday's morning peak is Monday's, not the week's average
+> shape. The per-category hourly series on a day is derived: it takes the week's hourly curve for
+> that material and scales it to the day's share of objects. Both still add up exactly, so totals
+> reconcile whichever way you slice them; only the per-category *shape* within a single day is an
+> approximation. Weekly and monthly periods are measured directly at every level.
 
 > Daily numbers are derived from the week and add up to it: summing a location's seven days in a
 > week reproduces that week's total. So you can compute **any** total you like yourself — a day,
@@ -168,6 +232,33 @@ A day response has the **same per-location fields** as a period (`objects`, `wei
 > `GET /v1/results` only lists weeks/months; use `GET /v1/days` (or build `day_DD_MM_YYYY`) for days.
 
 ---
+
+## Ready-made CSV converters
+
+If you would rather work in Excel or Power BI than in JSON, two scripts ship alongside this
+document. Both take a file you downloaded from the API and write CSVs next to it. They need only
+Python 3.9+ and the standard library — no packages to install.
+
+```bash
+# A week or a month:
+python week_to_csv.py week_34_2026.json
+python week_to_csv.py month_8_2026.json --out-dir ./reports
+
+# A single day:
+python day_to_csv.py day_20_08_2026.json
+```
+
+Each run writes four files:
+
+| File | Contents |
+|---|---|
+| `<name>_objects.csv` | One row per location: objects, weight, CO₂, visitors. |
+| `<name>_totals.csv` | Organisation-wide totals for the period. |
+| `<name>_per_day.csv` | Objects per weekday, one column per location (weeks/months). |
+| `<name>_per_hour.csv` | Objects per 3-hour bucket, per location **and per category** — long format, ready to pivot. |
+
+For a day the third file is `<name>_categories.csv` (the per-material breakdown) instead of
+`_per_day.csv`, since a day has only one weekday.
 
 ## Worked example: from raw response to the numbers you want
 
@@ -258,6 +349,13 @@ console.log(objectsPerLocation, "total:", totalObjects);
 > registered at that location. `co2_kg_low` / `co2_kg_high` give a conservative lower/upper
 > bound around it. Sum `co2_kg` across locations for an organisation-wide total, exactly like
 > objects above.
+
+---
+
+### 6. Vision+ videos
+
+If your organisation has Vision+ enabled, see [`VISION_PLUS_CUSTOMER.md`](./VISION_PLUS_CUSTOMER.md)
+for device upload (signed URL) and list/download.
 
 ---
 
