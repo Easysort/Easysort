@@ -1300,23 +1300,28 @@ result). Using a recent window keeps the list current with where you're actively
 <td>Items per 3-hour bucket (<code class="language-python highlight"><span class="s2">"0-3"</span></code>, <code class="language-python highlight"><span class="s2">"3-6"</span></code>, … <code class="language-python highlight"><span class="s2">"21-24"</span></code>).</td>
 </tr>
 <tr>
-<td>&gt; Summing <code class="language-python highlight"><span class="n">objects_per_hour</span></code> across all entries of <code class="language-python highlight"><span class="n">categories</span><span class="p">[]</span></code> reproduces the location-level</td>
+<td>&gt; Where the per-material breakdown is present, summing <code class="language-python highlight"><span class="n">objects_per_hour</span></code> across all entries of</td>
 <td></td>
 </tr>
 <tr>
-<td>&gt; <code class="language-python highlight"><span class="n">objects_per_hour</span></code>, and summing a category's <code class="language-python highlight"><span class="n">objects_per_hour</span></code> reproduces its <code class="language-python highlight"><span class="n">count</span></code>. So you can</td>
+<td>&gt; <code class="language-python highlight"><span class="n">categories</span><span class="p">[]</span></code> reproduces the location-level <code class="language-python highlight"><span class="n">objects_per_hour</span></code>, and summing a category's</td>
 <td></td>
 </tr>
 <tr>
-<td>&gt; slice the hourly flow either by material or by location without reconciling two different totals.</td>
+<td>&gt; <code class="language-python highlight"><span class="n">objects_per_hour</span></code> reproduces its <code class="language-python highlight"><span class="n">count</span></code>. So you can slice the hourly flow either by material or</td>
+<td></td>
+</tr>
+<tr>
+<td>&gt; by location without reconciling two different totals.</td>
 <td></td>
 </tr>
 </tbody>
 </table>
-<p><strong>Availability of <code class="language-python highlight"><span class="n">categories</span><span class="p">[]</span><span class="o">.</span><span class="n">objects_per_hour</span></code>:</strong> this breakdown is available for <strong>weekly</strong>
-periods from <strong>week 32 of 2026</strong> onward; for earlier weeks the array is empty (<code class="language-python highlight"><span class="p">[]</span></code>). For <strong>monthly</strong>
-periods it is available from <strong>September 2026</strong> onward — August 2026 and earlier return an empty
-array, so use the weekly periods if you need hourly material detail before September. The
+<p><strong>Availability of <code class="language-python highlight"><span class="n">categories</span><span class="p">[]</span><span class="o">.</span><span class="n">objects_per_hour</span></code>:</strong> this breakdown starts with <strong>week 32 of 2026</strong>
+for weekly periods and with <strong>September 2026</strong> for monthly periods; earlier periods return an empty
+array (<code class="language-python highlight"><span class="p">[]</span></code>), so use the weekly periods if you need hourly material detail before September. A
+location may also return an empty array for a period it was not broken down for, so treat <code class="language-python highlight"><span class="p">[]</span></code> as
+"not available here" rather than as zeroes, and check the array before you read it. The
 location-level <code class="language-python highlight"><span class="n">objects_per_hour</span></code> covers your full history in every period type.</p>
 <blockquote>
 <p>All numeric values are returned as <strong>strings</strong> containing rounded integers (e.g. <code class="language-python highlight"><span class="s2">"63"</span></code>).
@@ -1415,7 +1420,7 @@ python<span class="w"> </span>day_to_csv.py<span class="w"> </span>day_20_08_202
 </tr>
 <tr>
 <td><code class="language-python highlight"><span class="o">&lt;</span><span class="n">name</span><span class="o">&gt;</span><span class="n">_per_hour</span><span class="o">.</span><span class="n">csv</span></code></td>
-<td>Objects per 3-hour bucket, per location <strong>and per category</strong> — long format, ready to pivot.</td>
+<td>Objects per 3-hour bucket, per location <strong>and per category</strong> — long format, ready to pivot. Where a location has no per-material breakdown for the period, its hourly flow appears under the category <code class="language-python highlight"><span class="n">All</span> <span class="n">categories</span></code> instead, so the hourly view is filled in for every period.</td>
 </tr>
 </tbody>
 </table>
