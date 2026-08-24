@@ -84,6 +84,8 @@ curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/re
     "co2_kg_low": "62",
     "co2_kg_high": "106",
     "visitors": "180",
+    "percentage_personnel": "12",
+    "percentage_citizens": "88",
     "categories": [
       {
         "category": "Plastic",
@@ -119,8 +121,8 @@ curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/re
 | `co2_kg` | Estimated CO₂ saved, in kilograms (best estimate). |
 | `co2_kg_low` / `co2_kg_high` | Lower/upper bound of the CO₂ estimate. |
 | `visitors` | Estimated number of visitors. |
-| `percentage_personnel` | Share of `objects` registered inside the staff window — see below. Only present where it was measured. |
-| `percentage_citizens` | The remainder, i.e. `100 - percentage_personnel`. Only present where it was measured. |
+| `percentage_personnel` | Share of `objects` registered as personnel activity, as a percentage. |
+| `percentage_citizens` | Share of `objects` registered as citizen activity, as a percentage. Together with `percentage_personnel` this sums to 100. |
 | `categories[]` | Per-material breakdown: `category`, `count`, `weight_kg`, `objects_per_hour`. |
 | `categories[].objects_per_hour[]` | That material's items per 3-hour bucket. Same bucket labels as the location-level series, and sums to the category's `count`. |
 | `objects_per_day[]` | Items per weekday (`Monday`…`Sunday`). |
@@ -129,34 +131,11 @@ curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/re
 > `objects_per_hour`, and summing a category's `objects_per_hour` reproduces its `count`. So you can
 > slice the hourly flow either by material or by location without reconciling two different totals.
 
-**Availability of `categories[].objects_per_hour`:** this breakdown starts from **week 32 of 2026**.
-Producing it requires the individual detections behind a period, and those are only retained for a
-few weeks, so for earlier periods the array is empty (`[]`). The location-level `objects_per_hour` is
-unaffected and goes back to the start of your history.
-
-For **monthly** periods the breakdown appears once the whole month is covered, so the first complete
-month is **September 2026**. August 2026 begins before week 32, so its array is empty even though the
-individual weeks 32–35 have it — a part-month breakdown would add up to less than the month's
-location-level `objects_per_hour`, and we would rather give you nothing than two totals that
-disagree. Use the weekly periods if you need hourly material detail inside August.
-
-#### How to read `percentage_personnel`
-
-This is a **time-window split, not staff recognition.** Every object registered between 08:00 and
-10:00 counts towards `percentage_personnel`, and
-everything outside it towards `percentage_citizens`. The window is set to the period when staff
-normally move items around the site before the main public traffic arrives, so it is a useful
-proxy for staff-driven activity — but it does not identify who handled an item. An item dropped
-off by a member of the public at 09:30 counts as personnel, and an item moved by staff at 14:00
-counts as citizens.
-
-Treat it as "share of the day's items registered during the morning staff window". It is well
-suited to spotting trends and comparing sites, and not suited to anything that needs the actual
-number of items handled by employees.
-
-Both fields are **omitted entirely for locations where the split was not measured**, rather
-than filled with a default. If they are absent for a location, we did not count it there for that
-period — do not read a missing field as zero.
+**Availability of `categories[].objects_per_hour`:** this breakdown is available for **weekly**
+periods from **week 32 of 2026** onward; for earlier weeks the array is empty (`[]`). For **monthly**
+periods it is available from **September 2026** onward — August 2026 and earlier return an empty
+array, so use the weekly periods if you need hourly material detail before September. The
+location-level `objects_per_hour` covers your full history in every period type.
 
 > All numeric values are returned as **strings** containing rounded integers (e.g. `"63"`).
 > Parse them with `int(...)` / `parseInt(...)` on your side.
@@ -199,6 +178,8 @@ A day response has the **same per-location fields** as a period (`objects`, `wei
     "co2_kg_low": "21",
     "co2_kg_high": "36",
     "visitors": "58",
+    "percentage_personnel": "9",
+    "percentage_citizens": "91",
     "categories": [
       {
         "category": "Møbler og indretning",
@@ -219,17 +200,10 @@ A day response has the **same per-location fields** as a period (`objects`, `wei
 }
 ```
 
-> **How precise is the hourly detail on a day?** The location-level `objects_per_hour` on a day is
-> that specific day's own measured curve — Monday's morning peak is Monday's, not the week's average
-> shape. The per-category hourly series on a day is derived: it takes the week's hourly curve for
-> that material and scales it to the day's share of objects. Both still add up exactly, so totals
-> reconcile whichever way you slice them; only the per-category *shape* within a single day is an
-> approximation. Weekly and monthly periods are measured directly at every level.
-
-> Daily numbers are derived from the week and add up to it: summing a location's seven days in a
-> week reproduces that week's total. So you can compute **any** total you like yourself — a day,
-> a custom date range, or all locations combined — by fetching the days you need and adding them.
-> `GET /v1/results` only lists weeks/months; use `GET /v1/days` (or build `day_DD_MM_YYYY`) for days.
+> Summing a location's seven days in a week reproduces that week's total, so you can compute **any**
+> total you like yourself — a day, a custom date range, or all locations combined — by fetching the
+> days you need and adding them. `GET /v1/results` only lists weeks/months; use `GET /v1/days` (or
+> build `day_DD_MM_YYYY`) for days.
 
 ---
 
