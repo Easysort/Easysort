@@ -328,13 +328,6 @@ console.log(objectsPerLocation, "total:", totalObjects);
 
 ---
 
-### 6. Vision+ videos
-
-If your organisation has Vision+ enabled, see [`VISION_PLUS_CUSTOMER.md`](./VISION_PLUS_CUSTOMER.md)
-for device upload (signed URL) and list/download.
-
----
-
 ## Errors
 
 The API uses standard HTTP status codes:
