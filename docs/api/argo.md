@@ -1,8 +1,9 @@
 # Easysort Customer API — Client Guide
 
-This API lets your organisation pull your recycling results programmatically. You get a
-single **API key**; every request must include it. You can only ever see data that belongs
-to your organisation.
+This API lets your organisation pull your recycling results programmatically (and, if
+enabled for your key, Vision+ device videos). You get a single **API key**; every request
+must include it. Recycling results are scoped to your organisation; Vision+ list/download
+(when granted) covers the shared Vision+ video bucket.
 
 - **Base URL:** `https://<the-host-we-give-you>` (e.g. `https://api.easysort.org`)
 - **Auth:** `Authorization: Bearer <YOUR_API_KEY>` header on every request
@@ -83,9 +84,19 @@ curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/re
     "co2_kg_low": "62",
     "co2_kg_high": "106",
     "visitors": "180",
+    "percentage_personnel": "12",
+    "percentage_citizens": "88",
     "categories": [
-      { "category": "Plastic", "count": "120", "weight_kg": "18" },
-      { "category": "Glass", "count": "64", "weight_kg": "22" }
+      {
+        "category": "Plastic",
+        "count": "120",
+        "weight_kg": "18",
+        "objects_per_hour": [
+          { "hour": "0-3", "count": "0" },
+          { "hour": "9-12", "count": "74" }
+        ]
+      },
+      { "category": "Glass", "count": "64", "weight_kg": "22", "objects_per_hour": [] }
     ],
     "objects_per_day": [
       { "day": "Monday", "count": "58" },
@@ -110,9 +121,21 @@ curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/re
 | `co2_kg` | Estimated CO₂ saved, in kilograms (best estimate). |
 | `co2_kg_low` / `co2_kg_high` | Lower/upper bound of the CO₂ estimate. |
 | `visitors` | Estimated number of visitors. |
-| `categories[]` | Per-material breakdown: `category`, `count`, `weight_kg`. |
+| `percentage_personnel` | Share of `objects` registered as personnel activity, as a percentage. |
+| `percentage_citizens` | Share of `objects` registered as citizen activity, as a percentage. Together with `percentage_personnel` this sums to 100. |
+| `categories[]` | Per-material breakdown: `category`, `count`, `weight_kg`, `objects_per_hour`. |
+| `categories[].objects_per_hour[]` | That material's items per 3-hour bucket. Same bucket labels as the location-level series, and sums to the category's `count`. |
 | `objects_per_day[]` | Items per weekday (`Monday`…`Sunday`). |
 | `objects_per_hour[]` | Items per 3-hour bucket (`"0-3"`, `"3-6"`, … `"21-24"`). |
+> Summing `objects_per_hour` across all entries of `categories[]` reproduces the location-level
+> `objects_per_hour`, and summing a category's `objects_per_hour` reproduces its `count`. So you can
+> slice the hourly flow either by material or by location without reconciling two different totals.
+
+**Availability of `categories[].objects_per_hour`:** this breakdown is available for **weekly**
+periods from **week 32 of 2026** onward; for earlier weeks the array is empty (`[]`). For **monthly**
+periods it is available from **September 2026** onward — August 2026 and earlier return an empty
+array, so use the weekly periods if you need hourly material detail before September. The
+location-level `objects_per_hour` covers your full history in every period type.
 
 > All numeric values are returned as **strings** containing rounded integers (e.g. `"63"`).
 > Parse them with `int(...)` / `parseInt(...)` on your side.
@@ -142,7 +165,7 @@ A day response has the **same per-location fields** as a period (`objects`, `wei
 `co2_kg`, …, `categories[]`), with two differences:
 
 - `date_start` and `date_end` are both that single day.
-- `objects_per_day` and `objects_per_hour` are **omitted** (a single day has no weekday split).
+- `objects_per_day` collapses to a single entry — the weekday that day falls on.
 
 ```json
 {
@@ -155,19 +178,61 @@ A day response has the **same per-location fields** as a period (`objects`, `wei
     "co2_kg_low": "21",
     "co2_kg_high": "36",
     "visitors": "58",
+    "percentage_personnel": "9",
+    "percentage_citizens": "91",
     "categories": [
-      { "category": "Møbler og indretning", "count": "142", "weight_kg": "201" }
+      {
+        "category": "Møbler og indretning",
+        "count": "142",
+        "weight_kg": "201",
+        "objects_per_hour": [
+          { "hour": "9-12", "count": "61" },
+          { "hour": "12-15", "count": "70" }
+        ]
+      }
+    ],
+    "objects_per_day": [{ "day": "Wednesday", "count": "142" }],
+    "objects_per_hour": [
+      { "hour": "9-12", "count": "61" },
+      { "hour": "12-15", "count": "70" }
     ]
   }
 }
 ```
 
-> Daily numbers are derived from the week and add up to it: summing a location's seven days in a
-> week reproduces that week's total. So you can compute **any** total you like yourself — a day,
-> a custom date range, or all locations combined — by fetching the days you need and adding them.
-> `GET /v1/results` only lists weeks/months; use `GET /v1/days` (or build `day_DD_MM_YYYY`) for days.
+> Summing a location's seven days in a week reproduces that week's total, so you can compute **any**
+> total you like yourself — a day, a custom date range, or all locations combined — by fetching the
+> days you need and adding them. `GET /v1/results` only lists weeks/months; use `GET /v1/days` (or
+> build `day_DD_MM_YYYY`) for days.
 
 ---
+
+## Ready-made CSV converters
+
+If you would rather work in Excel or Power BI than in JSON, two scripts ship alongside this
+document. Both take a file you downloaded from the API and write CSVs next to it. They need only
+Python 3.9+ and the standard library — no packages to install.
+
+```bash
+# A week or a month:
+python week_to_csv.py week_34_2026.json
+python week_to_csv.py month_8_2026.json --out-dir ./reports
+
+# A single day:
+python day_to_csv.py day_20_08_2026.json
+```
+
+Each run writes four files:
+
+| File | Contents |
+|---|---|
+| `<name>_objects.csv` | One row per location: objects, weight, CO₂, visitors. |
+| `<name>_totals.csv` | Organisation-wide totals for the period. |
+| `<name>_per_day.csv` | Objects per weekday, one column per location (weeks/months). |
+| `<name>_per_hour.csv` | Objects per 3-hour bucket, per location **and per category** — long format, ready to pivot. |
+
+For a day the third file is `<name>_categories.csv` (the per-material breakdown) instead of
+`_per_day.csv`, since a day has only one weekday.
 
 ## Worked example: from raw response to the numbers you want
 
