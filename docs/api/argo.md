@@ -127,14 +127,16 @@ curl -H "Authorization: Bearer $EASYSORT_API_KEY" https://api.easysort.org/v1/re
 | `categories[].objects_per_hour[]` | That material's items per 3-hour bucket. Same bucket labels as the location-level series, and sums to the category's `count`. |
 | `objects_per_day[]` | Items per weekday (`Monday`…`Sunday`). |
 | `objects_per_hour[]` | Items per 3-hour bucket (`"0-3"`, `"3-6"`, … `"21-24"`). |
-> Summing `objects_per_hour` across all entries of `categories[]` reproduces the location-level
-> `objects_per_hour`, and summing a category's `objects_per_hour` reproduces its `count`. So you can
-> slice the hourly flow either by material or by location without reconciling two different totals.
+> Where the per-material breakdown is present, summing `objects_per_hour` across all entries of
+> `categories[]` reproduces the location-level `objects_per_hour`, and summing a category's
+> `objects_per_hour` reproduces its `count`. So you can slice the hourly flow either by material or
+> by location without reconciling two different totals.
 
-**Availability of `categories[].objects_per_hour`:** this breakdown is available for **weekly**
-periods from **week 32 of 2026** onward; for earlier weeks the array is empty (`[]`). For **monthly**
-periods it is available from **September 2026** onward — August 2026 and earlier return an empty
-array, so use the weekly periods if you need hourly material detail before September. The
+**Availability of `categories[].objects_per_hour`:** this breakdown starts with **week 32 of 2026**
+for weekly periods and with **September 2026** for monthly periods; earlier periods return an empty
+array (`[]`), so use the weekly periods if you need hourly material detail before September. A
+location may also return an empty array for a period it was not broken down for, so treat `[]` as
+"not available here" rather than as zeroes, and check the array before you read it. The
 location-level `objects_per_hour` covers your full history in every period type.
 
 > All numeric values are returned as **strings** containing rounded integers (e.g. `"63"`).
@@ -229,7 +231,7 @@ Each run writes four files:
 | `<name>_objects.csv` | One row per location: objects, weight, CO₂, visitors. |
 | `<name>_totals.csv` | Organisation-wide totals for the period. |
 | `<name>_per_day.csv` | Objects per weekday, one column per location (weeks/months). |
-| `<name>_per_hour.csv` | Objects per 3-hour bucket, per location **and per category** — long format, ready to pivot. |
+| `<name>_per_hour.csv` | Objects per 3-hour bucket, per location **and per category** — long format, ready to pivot. Where a location has no per-material breakdown for the period, its hourly flow appears under the category `All categories` instead, so the hourly view is filled in for every period. |
 
 For a day the third file is `<name>_categories.csv` (the per-material breakdown) instead of
 `_per_day.csv`, since a day has only one weekday.
@@ -323,6 +325,13 @@ console.log(objectsPerLocation, "total:", totalObjects);
 > registered at that location. `co2_kg_low` / `co2_kg_high` give a conservative lower/upper
 > bound around it. Sum `co2_kg` across locations for an organisation-wide total, exactly like
 > objects above.
+
+---
+
+### 6. Vision+ videos
+
+If your organisation has Vision+ enabled, see [`VISION_PLUS_CUSTOMER.md`](./VISION_PLUS_CUSTOMER.md)
+for device upload (signed URL) and list/download.
 
 ---
 
